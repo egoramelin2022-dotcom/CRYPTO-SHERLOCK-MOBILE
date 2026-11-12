@@ -20,6 +20,12 @@ class BlindReplayEngineTest {
         assertEquals(5, 5) // five 15m candles = 75 minutes per forecast
         assertTrue(report.notes.contains("последние 14 дней"))
         assertTrue(report.points.all { it.analogCount >= 3 })
+        assertTrue(report.notes.contains("MAE="))
+        assertTrue(report.notes.contains("LONG n="))
+        assertTrue(report.notes.contains("SHORT n="))
+        assertTrue(report.notes.contains("SIDEWAYS precision="))
+        assertTrue(report.notes.contains("Бенчмарки net:"))
+        assertTrue(report.notes.contains("Издержки:"))
     }
 
     @Test fun ignoresCurrentlyOpenCandle() {
@@ -35,5 +41,6 @@ class BlindReplayEngineTest {
         )
         assertTrue(report.tested > 0)
         assertTrue(report.points.none { it.decisionTime == rows.last().openTime })
+        assertTrue(report.notes.contains("look-ahead исключён"))
     }
 }
