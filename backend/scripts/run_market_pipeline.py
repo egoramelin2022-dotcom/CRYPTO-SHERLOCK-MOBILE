@@ -4,6 +4,13 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict
 import json
+from pathlib import Path
+import sys
+
+# Make "python backend/scripts/run_market_pipeline.py" work from repo root.
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.market_data.pipeline import run_historical_pipeline
 
