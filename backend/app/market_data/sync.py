@@ -165,6 +165,43 @@ class HistoricalSyncEngine:
         exponential = self.backoff_base_seconds * (2 ** attempt)
         return min(exponential * (0.5 + self.jitter()), self.backoff_cap_seconds)
 
+    def _reconcile_gaps(self, symbol: str, interval: str, start_ms: int, end_ms: int) -> bool:
+        """Mark a recorded gap RECOVERED only when every missing slot exists."""
+        step = interval_to_ms(interval)
+        rows = self.connection.execute(
+            """SELECT previous_open_time, next_open_time
+               FROM data_gaps
+               WHERE symbol=? AND interval=?
+                 AND next_open_time > ? AND previous_open_time <= ?
+                 AND status != 'RECOVERED'""",
+            (symbol, interval, start_ms, end_ms),
+        ).fetchall()
+        unresolved = False
+        for previous, following in rows:
+            expected = list(range(int(previous) + step, int(following), step))
+            if not expected:
+                continue
+            placeholders = ",".join("?" for _ in expected)
+            found = self.connection.execute(
+                f"""SELECT COUNT(*) FROM candles
+                    WHERE symbol=? AND interval=? AND open_time IN ({placeholders})""",
+                (symbol, interval, *expected),
+            ).fetchone()[0]
+            if int(found) == len(expected):
+                with self.connection:
+                    self.connection.execute(
+                        """UPDATE data_gaps SET status='RECOVERED',
+                           checked_at=?, details=?
+                           WHERE symbol=? AND interval=?
+                             AND previous_open_time=? AND next_open_time=?""",
+                        (datetime.now(timezone.utc).isoformat(),
+                         "All missing candle slots are now present in local storage",
+                         symbol, interval, previous, following),
+                    )
+            else:
+                unresolved = True
+        return unresolved
+
     def sync(
         self, *, symbol: str, interval: str, start_ms: int, end_ms: int,
         page_limit: int = BINANCE_MAX_LIMIT, resume: bool = True,
@@ -315,8 +352,11 @@ class HistoricalSyncEngine:
                 )
                 has_gaps = True
 
-        final_status = "PARTIAL" if has_gaps else "COMPLETE"
+        unresolved_gaps = self._reconcile_gaps(
+            symbol, interval, start_ms, end_ms
+        )
+        final_status = "PARTIAL" if (has_gaps or unresolved_gaps) else "COMPLETE"
         self._checkpoint(symbol, interval, start_ms, end_ms, cursor,
                          final_status, fetched, inserted, pages,
-                         "One or more candle intervals are missing" if has_gaps else None)
+                         "One or more candle intervals are missing" if final_status == "PARTIAL" else None)
         return SyncResult(final_status, fetched, inserted, cursor, pages)
