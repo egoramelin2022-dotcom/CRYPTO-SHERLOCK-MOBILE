@@ -288,7 +288,7 @@ class MainActivity : Activity() {
         status.text = "Pattern Intelligence: анализ исторической базы…"
         analysisExecutor.execute {
             try {
-                val history = candleStore.readLatest("BTCUSDT", "15m", 50000)
+                val history = candleStore.readLatest("BTCUSDT", "15m", Int.MAX_VALUE)
                 val report = PatternIntelligence().search(history, 40, 16, 10)
                 runOnUiThread {
                     patternButton.isEnabled = true
@@ -310,7 +310,7 @@ class MainActivity : Activity() {
         status.text = "BLIND REPLAY: прогоняем исторические точки строго по времени…"
         analysisExecutor.execute {
             try {
-                val history = candleStore.readLatest("BTCUSDT", "15m", 50000)
+                val history = candleStore.readLatest("BTCUSDT", "15m", Int.MAX_VALUE)
                 val report = BlindReplayEngine().run(history, window = 40, horizon = 16, step = 16, minSimilarity = 35.0, topK = 20)
                 runOnUiThread {
                     replayButton.isEnabled = true
