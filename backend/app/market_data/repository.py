@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterable
 
-from .candles import Candle, find_gaps
+from .candles import Candle
 
 
 CANDLE_SCHEMA = """
@@ -44,8 +44,9 @@ class CandleRepository:
     def insert_many(self, candles: Iterable[Candle]) -> int:
         """Validate all rows, then insert idempotently in one transaction.
 
-        Existing rows are never overwritten: a later source correction must
-        be handled by an explicit, audited reconciliation operation.
+        Existing rows are never overwritten. Sparse but valid exchange
+        responses are retained; continuity is audited separately and gaps
+        are recorded in the gap registry rather than blocking ingestion.
         """
         batch = list(candles)
         if not batch:
@@ -59,7 +60,6 @@ class CandleRepository:
         if len(set(keys)) != len(keys):
             raise ValueError("duplicate candle timestamps inside input batch")
         batch.sort(key=lambda c: c.open_time)
-        find_gaps([c.open_time for c in batch], batch[0].interval)
 
         rows = [
             (
