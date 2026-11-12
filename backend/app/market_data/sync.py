@@ -209,6 +209,8 @@ class HistoricalSyncEngine:
                                      "SOURCE_EMPTY", fetched, inserted, pages,
                                      "Binance returned an empty page before requested end")
                     return SyncResult("SOURCE_EMPTY", fetched, inserted, cursor, pages)
+                if len(payload) > page_limit:
+                    raise ValueError("Binance page exceeds requested limit")
 
                 candles: list[Candle] = [
                     parse_binance_kline(item, symbol=symbol, interval=interval)
