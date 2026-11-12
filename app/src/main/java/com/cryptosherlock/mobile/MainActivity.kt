@@ -122,7 +122,7 @@ class MainActivity : Activity() {
         }
         root.addView(signalCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8 })
         chart = CandleChart(this).apply { setBackgroundColor(panel) }
-        root.addView(chart, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = 8; bottomMargin = 4 })
+        root.addView(chart, LinearLayout.LayoutParams(-1, dp(260)).apply { topMargin = 8; bottomMargin = 4 })
         candleInfo = TextView(this).apply {
             text = "Свечи и объём"
             textSize = 11f
@@ -161,12 +161,31 @@ class MainActivity : Activity() {
             setPadding(2, 5, 2, 0)
         }
         root.addView(status)
-        setContentView(root)
+        val scroll = ScrollView(this).apply {
+            isFillViewport = false
+            setBackgroundColor(bg)
+            addView(root, ScrollView.LayoutParams(-1, -2))
+        }
+        setContentView(scroll)
         candleStore = CandleStore(this)
-        val saved = candleStore.count("BTCUSDT", "15m")
-        status.text = "Локальная база: " + saved + " свечей · автообновление 30с"
+        status.text = "Запуск · подключаем рынок и локальную базу…"
+        // SQLite opening/counting is disk I/O: never do it on Android's UI thread.
+        historyExecutor.execute {
+            try {
+                val saved = candleStore.count("BTCUSDT", "15m")
+                runOnUiThread {
+                    if (!isFinishing) status.text = "Локальная база: $saved свечей · автообновление 30с"
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    if (!isFinishing) status.text = "Локальная база пока недоступна: ${e.message ?: "ошибка"}"
+                }
+            }
+        }
         loadMarket(true)
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun loadMarket(showLoading: Boolean) {
         if (!loading.compareAndSet(false, true)) {
