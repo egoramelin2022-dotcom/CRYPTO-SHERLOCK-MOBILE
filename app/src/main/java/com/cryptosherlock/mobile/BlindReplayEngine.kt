@@ -10,7 +10,8 @@ data class BlindReplayPoint(
     val confidence: Double,
     val predictedReturnPct: Double,
     val actualReturnPct: Double,
-    val analogCount: Int
+    val analogCount: Int,
+    val previousMovePct: Double = 0.0
 )
 
 data class BlindReplayReport(
@@ -42,9 +43,10 @@ class BlindReplayEngine {
         topK: Int = 20,
         lookbackCandles: Int = 1344,
         asOfTime: Long = System.currentTimeMillis(),
+        roundTripCostPct: Double = 0.14,
         progress: (Int, Int) -> Unit = { _, _ -> }
     ): BlindReplayReport {
-        require(window >= 10 && horizon >= 1 && step >= 1 && topK >= 1 && lookbackCandles >= horizon)
+        require(window >= 10 && horizon >= 1 && step >= 1 && topK >= 1 && lookbackCandles >= horizon && roundTripCostPct >= 0.0)
         // Ignore the currently forming 15m candle. openTime is aligned to 15m.
         val closed = history.filter { it.openTime + 15L * 60L * 1000L <= asOfTime }
         if (closed.size < window * 4 + horizon * 3) {
@@ -106,7 +108,8 @@ class BlindReplayEngine {
                 points.add(BlindReplayPoint(
                     closed[cursor - 1].openTime, direction, actual,
                     maxOf(positiveWeight, negativeWeight) * 100.0,
-                    expected, actualReturn, best.size
+                    expected, actualReturn, best.size,
+                    if (cursor - horizon - 1 >= 0 && closed[cursor - horizon - 1].close > 0.0) (closed[cursor - 1].close / closed[cursor - horizon - 1].close - 1.0) * 100.0 else 0.0
                 ))
             }
             completed++
@@ -117,11 +120,11 @@ class BlindReplayEngine {
         val directional = points.filter { it.predicted != "SIDEWAYS" }
         val correct = points.count { it.predicted == it.actual }
         val returns = directional.map { p ->
-            when (p.predicted) {
+            (when (p.predicted) {
                 "LONG" -> p.actualReturnPct
                 "SHORT" -> -p.actualReturnPct
                 else -> 0.0
-            }
+            }) - roundTripCostPct
         }
         var equity = 1.0
         var peak = 1.0
@@ -136,14 +139,34 @@ class BlindReplayEngine {
         val avg = if (returns.isEmpty()) 0.0 else returns.average()
         val cumulative = (equity - 1.0) * 100.0
         val meanAbsError = points.map { kotlin.math.abs(it.predictedReturnPct - it.actualReturnPct) }.average()
+        fun fmt(v: Double) = String.format(java.util.Locale.US, "%.3f", v)
+        fun compound(values: List<Double>): Double {
+            var e = 1.0
+            values.forEach { e *= 1.0 + it / 100.0 }
+            return (e - 1.0) * 100.0
+        }
+        fun sideStats(side: String): String {
+            val group = points.filter { it.predicted == side }
+            if (group.isEmpty()) return "$side: нет сигналов"
+            val signed = group.map { if (side == "SHORT") -it.actualReturnPct else it.actualReturnPct }
+            val hit = signed.count { it > 0.0 }.toDouble() / signed.size * 100.0
+            return "$side n=${group.size}, hit=${fmt(hit)}%, avgNet=${fmt(signed.map { it - roundTripCostPct }.average())}%"
+        }
+        val sideways = points.filter { it.predicted == "SIDEWAYS" }
+        val sidewaysPrecision = if (sideways.isEmpty()) 0.0 else sideways.count { it.actual == "SIDEWAYS" }.toDouble() / sideways.size * 100.0
+        val actualSideways = points.count { it.actual == "SIDEWAYS" }
+        val sidewaysRecall = if (actualSideways == 0) 0.0 else sideways.count { it.actual == "SIDEWAYS" }.toDouble() / actualSideways * 100.0
+        val alwaysLong = compound(points.map { it.actualReturnPct - roundTripCostPct })
+        val momentum = compound(points.map { (if (it.previousMovePct >= 0.0) it.actualReturnPct else -it.actualReturnPct) - roundTripCostPct })
         return BlindReplayReport(
             points.size, directional.size, correct, accuracy, coverage, avg, cumulative, maxDd,
             points,
-            "BTCUSDT Binance Spot · 15m. Проверочный участок: последние 14 дней (до 1 344 закрытых свечей). " +
-                "Прогноз обновляется каждые 5 свечей и оценивает следующие 5 свечей (75 минут). " +
-                "Средняя абсолютная ошибка прогноза: %.3f%%. Аналоги и их исходы полностью завершились до целевого окна; " +
-                "будущие свечи не используются. Комиссии и проскальзывание пока не вычтены; результаты не гарантируют будущую доходность."
-                    .format(java.util.Locale.US, meanAbsError)
+            "BTCUSDT Binance Spot · 15m · последние 14 дней. Прогноз каждые 5 свечей на следующие 5 (75 минут). " +
+                "MAE=${fmt(meanAbsError)}%. ${sideStats("LONG")}; ${sideStats("SHORT")}. " +
+                "SIDEWAYS precision=${fmt(sidewaysPrecision)}%, recall=${fmt(sidewaysRecall)}%. " +
+                "Бенчмарки net: always-LONG=${fmt(alwaysLong)}%, momentum-5=${fmt(momentum)}%. " +
+                "Издержки: ${fmt(roundTripCostPct)}% на полный вход/выход (модельная комиссия+проскальзывание). " +
+                "Аналоги и исходы завершились до целевого окна; look-ahead исключён. Рыночные режимы и горизонты требуют отдельной проверки."
         )
     }
 
