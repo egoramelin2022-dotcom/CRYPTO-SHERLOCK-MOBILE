@@ -189,3 +189,58 @@ def test_completed_job_is_idempotent_and_does_not_call_exchange_again():
         engine.close()
         client.close()
         conn.close()
+
+def test_restart_after_candle_commit_before_checkpoint_is_safe():
+    conn = sqlite3.connect(":memory:")
+    step = 900000
+
+    def handler(request: httpx.Request):
+        return httpx.Response(
+            200, json=[kline(0), kline(step)], request=request
+        )
+
+    engine, client = make_engine(conn, handler)
+    original_checkpoint = engine._checkpoint
+
+    class SimulatedProcessCrash(BaseException):
+        pass
+
+    def crash_after_candle_commit(
+        symbol, interval, start_ms, end_ms, next_start_ms, status,
+        fetched, inserted, pages, error=None,
+    ):
+        # Simulate abrupt process death after candle INSERT committed,
+        # but before the advanced cursor can be persisted.
+        if status == "RUNNING" and next_start_ms == 2 * step:
+            raise SimulatedProcessCrash()
+        return original_checkpoint(
+            symbol, interval, start_ms, end_ms, next_start_ms, status,
+            fetched, inserted, pages, error,
+        )
+
+    engine._checkpoint = crash_after_candle_commit
+    try:
+        with pytest.raises(SimulatedProcessCrash):
+            engine.sync(
+                symbol="BTCUSDT", interval="15m", start_ms=0, end_ms=step,
+                page_limit=2,
+            )
+        assert engine.repository.count("BTCUSDT", "15m") == 2
+        # The durable checkpoint still points to the original page.
+        job = conn.execute(
+            "SELECT status, next_start_ms FROM sync_jobs"
+        ).fetchone()
+        assert job == ("RUNNING", 0)
+
+        engine._checkpoint = original_checkpoint
+        resumed = engine.sync(
+            symbol="BTCUSDT", interval="15m", start_ms=0, end_ms=step,
+            page_limit=2,
+        )
+        assert resumed.status == "COMPLETE"
+        assert resumed.inserted == 0
+        assert engine.repository.count("BTCUSDT", "15m") == 2
+    finally:
+        engine.close()
+        client.close()
+        conn.close()
