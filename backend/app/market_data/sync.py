@@ -223,6 +223,17 @@ class HistoricalSyncEngine:
                     "startTime": cursor, "endTime": end_ms, "limit": page_limit,
                 })
                 if not payload:
+                    if previous_time is not None and previous_time < end_ms:
+                        missing = (end_ms - previous_time) // step
+                        if missing > 0:
+                            record_gap(
+                                self.connection, symbol=symbol, interval=interval,
+                                previous_open_time=previous_time,
+                                next_open_time=end_ms + step,
+                                missing_candles=missing, status="GAP_DETECTED",
+                                source="BINANCE_SPOT_REST",
+                                details="Source returned an empty page before requested range ended",
+                            )
                     self._checkpoint(symbol, interval, start_ms, end_ms, cursor,
                                      "SOURCE_EMPTY", fetched, inserted, pages,
                                      "Binance returned an empty page before requested end")
