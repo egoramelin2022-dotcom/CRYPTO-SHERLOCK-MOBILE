@@ -39,6 +39,7 @@ class MainActivity : Activity() {
     private lateinit var chart: CandleChart
     private lateinit var candleInfo: TextView
     private lateinit var signalCard: TextView
+    private lateinit var forecastCard: TextView
     private lateinit var refreshButton: Button
     private lateinit var historyButton: Button
     private lateinit var patternButton: Button
@@ -122,6 +123,14 @@ class MainActivity : Activity() {
             setBackgroundColor(panel)
         }
         root.addView(signalCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8 })
+        forecastCard = TextView(this).apply {
+            text = "MULTI-TIMEFRAME FORECAST\\nОжидаем данные 15m / 1h / 4h / 1d…"
+            textSize = 12f
+            setTextColor(white)
+            setPadding(12, 10, 12, 10)
+            setBackgroundColor(panel)
+        }
+        root.addView(forecastCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6 })
         chart = CandleChart(this).apply { setBackgroundColor(panel) }
         root.addView(chart, LinearLayout.LayoutParams(-1, dp(260)).apply { topMargin = 8; bottomMargin = 4 })
         candleInfo = TextView(this).apply {
@@ -200,20 +209,19 @@ class MainActivity : Activity() {
                 val ticker = JSONObject(readUrl("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT"))
                 val p = ticker.getString("lastPrice").toDouble()
                 val pct = ticker.getString("priceChangePercent").toDouble()
-                val arr = JSONArray(readUrl("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=$interval&limit=120"))
-                val candles = ArrayList<Candle>(arr.length())
-                for (i in 0 until arr.length()) {
-                    val a = arr.getJSONArray(i)
-                    candles.add(Candle(a.getString(1).toFloat(), a.getString(2).toFloat(),
-                        a.getString(3).toFloat(), a.getString(4).toFloat(), a.getString(5).toFloat()))
-                }
+                val candles = fetchCandles(interval)
                 if (candles.size < 30) throw IllegalStateException("Недостаточно свечей для анализа")
+                val states = listOf("15m", "1h", "4h", "1d").map { tf ->
+                    MarketAnalysisEngine().state(tf, if (tf == interval) candles else fetchCandles(tf))
+                }
+                val forecast = MarketAnalysisEngine().forecast(states, p)
                 val snapshot = MarketSnapshot(p, pct, candles, System.currentTimeMillis())
                 val signal = analyze(candles)
                 runOnUiThread {
                     lastSnapshot = snapshot
                     render(snapshot, signal)
-                    status.text = "Binance Spot · обновлено " + SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(snapshot.fetchedAt)) + " · авто 30с"
+                    renderForecast(forecast)
+                    status.text = "Binance Spot · обновлено " + SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(snapshot.fetchedAt)) + " · 4 таймфрейма · авто 30с"
                 }
             } catch (e: Exception) {
                 runOnUiThread {
@@ -290,6 +298,28 @@ class MainActivity : Activity() {
                 }
             }
         }
+    }
+
+    private fun fetchCandles(tf: String): List<Candle> {
+        val arr = JSONArray(readUrl("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=" + tf + "&limit=120"))
+        return (0 until arr.length()).map { i ->
+            val a = arr.getJSONArray(i)
+            Candle(a.getString(1).toFloat(), a.getString(2).toFloat(), a.getString(3).toFloat(),
+                a.getString(4).toFloat(), a.getString(5).toFloat())
+        }
+    }
+
+    private fun renderForecast(f: ForecastSnapshot) {
+        val lines = f.states.joinToString("\\n") {
+            it.interval + " · " + it.bias + " · RSI " + String.format(Locale.US, "%.1f", it.rsi) +
+                " · ATR " + String.format(Locale.US, "%.2f", it.atrPct) + "% · объём x" +
+                String.format(Locale.US, "%.2f", it.volumeRatio)
+        }
+        forecastCard.text = "FORECAST ENGINE · ЭКСПЕРИМЕНТАЛЬНЫЙ\\n" +
+            "LONG " + f.longPct + "%  |  SHORT " + f.shortPct + "%  |  SIDEWAYS " + f.sidewaysPct + "%\\n" +
+            f.entryState + "\\nЗона наблюдения: " + fmt.format(f.entryLow) + " — " + fmt.format(f.entryHigh) +
+            "\\nИнвалидация сценария: " + fmt.format(f.invalidation) + "\\n" + lines +
+            "\\nОценки основаны на правилах, НЕ откалиброваны как реальные вероятности. " + f.rationale
     }
 
     private fun render(s: MarketSnapshot, a: Signal) {
