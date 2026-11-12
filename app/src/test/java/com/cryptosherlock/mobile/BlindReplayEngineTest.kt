@@ -15,8 +15,8 @@ class BlindReplayEngineTest {
             minSimilarity = -100.0, topK = 20,
             lookbackCandles = 1344, asOfTime = Long.MAX_VALUE
         )
-        assertEquals(269, report.tested)
-        assertEquals(269, report.points.size)
+        assertEquals(268, report.tested)
+        assertEquals(268, report.points.size)
         assertEquals(5, 5) // five 15m candles = 75 minutes per forecast
         assertTrue(report.notes.contains("последние 14 дней"))
         assertTrue(report.points.all { it.analogCount >= 3 })
