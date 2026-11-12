@@ -45,7 +45,9 @@ class MainActivity : Activity() {
     private lateinit var candleStore: CandleStore
     private var interval = "15m"
     private val fmt = DecimalFormat("#,##0.00")
-    private val marketExecutor = Executors.newSingleThreadExecutor()\n    private val analysisExecutor = Executors.newSingleThreadExecutor()\n    private val historyExecutor = Executors.newSingleThreadExecutor()
+    private val marketExecutor = Executors.newSingleThreadExecutor()
+    private val analysisExecutor = Executors.newSingleThreadExecutor()
+    private val historyExecutor = Executors.newSingleThreadExecutor()
     private val loading = AtomicBoolean(false)
     private val handler = Handler(Looper.getMainLooper())
     private var lastSnapshot: MarketSnapshot? = null
@@ -173,7 +175,7 @@ class MainActivity : Activity() {
         }
         if (showLoading) status.text = "Получаем данные Binance…"
         refreshButton.isEnabled = false
-        executor.execute {
+        marketExecutor.execute {
             try {
                 val ticker = JSONObject(readUrl("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT"))
                 val p = ticker.getString("lastPrice").toDouble()
@@ -208,7 +210,7 @@ class MainActivity : Activity() {
     private fun runFiveStageSearch() {
         fiveStageButton.isEnabled = false
         status.text = "Five-Stage: проверяем исторические формации…"
-        executor.execute {
+        analysisExecutor.execute {
             try {
                 val history = candleStore.readLatest("BTCUSDT", "15m", 50000)
                 val report = FiveStageStrategy().search(history, 100, 16, 10)
@@ -230,7 +232,7 @@ class MainActivity : Activity() {
     private fun runPatternSearch() {
         patternButton.isEnabled = false
         status.text = "Pattern Intelligence: анализ исторической базы…"
-        executor.execute {
+        analysisExecutor.execute {
             try {
                 val history = candleStore.readLatest("BTCUSDT", "15m", 50000)
                 val report = PatternIntelligence().search(history, 40, 16, 10)
@@ -252,7 +254,7 @@ class MainActivity : Activity() {
     private fun downloadHistory() {
         historyButton.isEnabled = false
         status.text = "Подготовка загрузки исторических данных…"
-        executor.execute {
+        historyExecutor.execute {
             try {
                 val total = BinanceHistoryDownloader(candleStore).sync15m { message ->
                     runOnUiThread { status.text = message + " · загрузка может занять время" }
@@ -336,7 +338,9 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        marketExecutor.shutdownNow()\n        analysisExecutor.shutdownNow()\n        historyExecutor.shutdownNow()
+        marketExecutor.shutdownNow()
+        analysisExecutor.shutdownNow()
+        historyExecutor.shutdownNow()
         super.onDestroy()
     }
 
