@@ -1,6 +1,7 @@
 package com.cryptosherlock.mobile
 
 import kotlin.math.max
+import kotlin.math.min
 
 data class StrategyStats(
     val name: String, val trades: Int, val winRatePct: Double?, val averageNetPct: Double?,
