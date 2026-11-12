@@ -168,7 +168,7 @@ class MainActivity : Activity() {
 
         // 04 — REPLAY
         val replay = makePage("REPLAY")
-        title(replay, "BLIND REPLAY", "Закрытый исторический тест · прогноз до раскрытия будущих свечей")
+        title(replay, "BLIND REPLAY", "BTCUSDT 15m · последние 14 дней · прогноз каждые 5 свечей на следующие 5")
         replayButton = button("▶  ЗАПУСТИТЬ ИСТОРИЧЕСКИЙ ТЕСТ") { runBlindReplay() }
         replay.addView(replayButton, LinearLayout.LayoutParams(-1, dp(50)))
         label(replay, "ПОСЛЕДНИЙ ОТЧЁТ")
@@ -381,7 +381,14 @@ class MainActivity : Activity() {
         analysisExecutor.execute {
             try {
                 val history = candleStore.readLatest("BTCUSDT", "15m", Int.MAX_VALUE)
-                val report = BlindReplayEngine().run(history, window = 40, horizon = 16, step = 16, minSimilarity = 35.0, topK = 20)
+                val report = BlindReplayEngine().run(
+                    history, window = 40, horizon = 5, step = 5,
+                    minSimilarity = 35.0, topK = 20, lookbackCandles = 1344
+                ) { done, total ->
+                    runOnUiThread {
+                        if (!isFinishing) status.text = "Blind Replay · проверено $done / $total прогнозных точек · шаг 5 свечей"
+                    }
+                }
                 runOnUiThread {
                     replayButton.isEnabled = true
                     val recent = report.points.takeLast(8).joinToString("\n") {
@@ -390,8 +397,8 @@ class MainActivity : Activity() {
                             " · ожидание " + String.format(Locale.US, "%+.2f", it.predictedReturnPct) +
                             "% / факт " + String.format(Locale.US, "%+.2f", it.actualReturnPct) + "%"
                     }
-                    replayResult.text = "BLIND REPLAY · PATTERN CORE\n" +
-                        "Тестовых решений: " + report.tested + " · сделок: " + report.traded +
+                    replayResult.text = "BLIND REPLAY · WALK-FORWARD 14D / 5×5\n" +
+                        "Прогнозов: " + report.tested + " · сделок LONG/SHORT: " + report.traded +
                         "\nНаправление верно: " + String.format(Locale.US, "%.1f", report.accuracyPct) +
                         "% · покрытие: " + String.format(Locale.US, "%.1f", report.coveragePct) + "%" +
                         "\nСредний результат на сигнал: " + String.format(Locale.US, "%+.3f", report.averageActualPct) +
