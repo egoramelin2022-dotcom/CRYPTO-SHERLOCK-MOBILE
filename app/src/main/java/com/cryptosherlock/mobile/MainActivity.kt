@@ -41,6 +41,7 @@ class MainActivity : Activity() {
     private lateinit var refreshButton: Button
     private lateinit var historyButton: Button
     private lateinit var patternButton: Button
+    private lateinit var fiveStageButton: Button
     private lateinit var candleStore: CandleStore
     private var interval = "15m"
     private val fmt = DecimalFormat("#,##0.00")
@@ -145,6 +146,12 @@ class MainActivity : Activity() {
             setOnClickListener { runPatternSearch() }
         }
         root.addView(patternButton, LinearLayout.LayoutParams(-1, 44).apply { topMargin = 2 })
+        fiveStageButton = Button(this).apply {
+            text = "FIVE-STAGE · ПОИСК 5 ЭТАПОВ"
+            isAllCaps = false
+            setOnClickListener { runFiveStageSearch() }
+        }
+        root.addView(fiveStageButton, LinearLayout.LayoutParams(-1, 44).apply { topMargin = 2 })
         status = TextView(this).apply {
             text = "Автообновление каждые 30 секунд · Binance Spot"
             textSize = 10f
@@ -194,6 +201,28 @@ class MainActivity : Activity() {
             } finally {
                 loading.set(false)
                 runOnUiThread { refreshButton.isEnabled = true }
+            }
+        }
+    }
+
+    private fun runFiveStageSearch() {
+        fiveStageButton.isEnabled = false
+        status.text = "Five-Stage: проверяем исторические формации…"
+        executor.execute {
+            try {
+                val history = candleStore.readLatest("BTCUSDT", "15m", 50000)
+                val report = FiveStageStrategy().search(history, 100, 16, 10)
+                runOnUiThread {
+                    fiveStageButton.isEnabled = true
+                    val rows = report.matches.mapIndexed { i, m ->
+                        (i + 1).toString() + ". снижение " + String.format(Locale.US, "%.1f", m.declinePct) + "% · восстановление +" + String.format(Locale.US, "%.1f", m.recoveryPct) + "% · обвал " + String.format(Locale.US, "%.1f", m.collapsePct) + "% · после: " + String.format(Locale.US, "%+.2f", m.forwardReturnPct) + "%"
+                    }
+                    signalCard.text = "FIVE-STAGE STRATEGY · BTCUSDT 15M\nПроверено окон: " + report.testedWindows + "\n" + rows.joinToString("\n") + "\n" + report.message
+                    signalCard.setTextColor(white)
+                    status.text = "Five-Stage завершён · база: " + history.size + " свечей"
+                }
+            } catch (e: Exception) {
+                runOnUiThread { fiveStageButton.isEnabled = true; status.text = "Ошибка Five-Stage: " + (e.message ?: "неизвестно") }
             }
         }
     }
