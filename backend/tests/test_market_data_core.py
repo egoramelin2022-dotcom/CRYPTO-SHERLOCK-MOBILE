@@ -43,6 +43,14 @@ def test_candle_validation_checks_interval_and_ohlcv():
         invalid.validate()
 
 
+@pytest.mark.parametrize("trade_count", [-1, True, "10", 1.5])
+def test_candle_rejects_invalid_trade_count_types(trade_count):
+    candle = Candle("BTCUSDT", "15m", 0, 100, 110, 90, 105, 2, 899_999,
+                    205, trade_count, 1, 102)
+    with pytest.raises(ValueError):
+        candle.validate()
+
+
 def test_gap_registry_upserts_source_observations():
     conn = sqlite3.connect(":memory:")
     record_gap(conn, symbol="BTCUSDT", interval="15m", previous_open_time=0,
