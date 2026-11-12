@@ -40,7 +40,8 @@ class BlindReplayEngine {
         horizon: Int = 16,
         step: Int = 16,
         minSimilarity: Double = 35.0,
-        topK: Int = 20
+        topK: Int = 20,
+        progress: (Int, Int) -> Unit = { _, _ -> }
     ): BlindReplayReport {
         require(window >= 10 && horizon >= 1 && step >= 1 && topK >= 1)
         if (history.size < window * 4 + horizon * 3) {
@@ -48,6 +49,8 @@ class BlindReplayEngine {
         }
         val points = ArrayList<BlindReplayPoint>()
         var cursor = window * 3 + horizon
+        val totalSteps = ((history.size - horizon - cursor) / step + 1).coerceAtLeast(1)
+        var completedSteps = 0
         while (cursor + horizon <= history.size) {
             val targetStart = cursor - window
             val target = history.subList(targetStart, cursor)
@@ -63,7 +66,7 @@ class BlindReplayEngine {
                     val outcome = (history[candidate + window + horizon - 1].close / base - 1.0) * 100.0
                     analogs.add(similarity to outcome)
                 }
-                candidate += maxOf(1, window / 2)
+                candidate += window
             }
             val best = analogs.sortedByDescending { it.first }.take(topK)
             if (best.size >= 3) {
@@ -91,6 +94,8 @@ class BlindReplayEngine {
                     expected, actualReturn, best.size
                 ))
             }
+            completedSteps++
+            if (completedSteps % 10 == 0 || completedSteps == totalSteps) progress(completedSteps, totalSteps)
             cursor += step
         }
         if (points.isEmpty()) return empty("Аналоги не прошли минимальный порог сходства. Снизьте порог или загрузите больше истории.")
