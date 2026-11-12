@@ -22,7 +22,7 @@ class MarketAnalysisEngine {
         val rsi = if (losses <= 1e-12) 100.0 else 100.0 - 100.0 / (1.0 + gains / losses)
         val tr = candles.takeLast(14).mapIndexed { index, c ->
             val prev = candles[(candles.size - 14 + index - 1).coerceAtLeast(0)].close.toDouble()
-            max(c.high - c.low, max(kotlin.math.abs(c.high - prev), kotlin.math.abs(c.low - prev))).toDouble()
+            max(c.high.toDouble() - c.low.toDouble(), max(kotlin.math.abs(c.high.toDouble() - prev), kotlin.math.abs(c.low.toDouble() - prev)))
         }.average()
         val atrPct = tr / closes.last().coerceAtLeast(1e-9) * 100.0
         val recentVol = candles.takeLast(5).map { it.volume.toDouble() }.average()
