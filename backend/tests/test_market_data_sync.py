@@ -165,3 +165,27 @@ def test_sync_rejects_invalid_ranges_before_network(kwargs):
         engine.close()
         client.close()
         conn.close()
+
+def test_completed_job_is_idempotent_and_does_not_call_exchange_again():
+    conn = sqlite3.connect(":memory:")
+    requests = {"count": 0}
+
+    def handler(request: httpx.Request):
+        requests["count"] += 1
+        return httpx.Response(200, json=[kline(0)], request=request)
+
+    engine, client = make_engine(conn, handler)
+    try:
+        first = engine.sync(
+            symbol="BTCUSDT", interval="15m", start_ms=0, end_ms=0,
+        )
+        second = engine.sync(
+            symbol="BTCUSDT", interval="15m", start_ms=0, end_ms=0,
+        )
+        assert first == second
+        assert requests["count"] == 1
+        assert engine.repository.count("BTCUSDT", "15m") == 1
+    finally:
+        engine.close()
+        client.close()
+        conn.close()
