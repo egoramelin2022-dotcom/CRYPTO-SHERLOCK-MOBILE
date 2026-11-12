@@ -44,6 +44,7 @@ class MainActivity : Activity() {
     private lateinit var historyButton: Button
     private lateinit var patternButton: Button
     private lateinit var fiveStageButton: Button
+    private lateinit var replayButton: Button
     private lateinit var candleStore: CandleStore
     private var interval = "15m"
     private val fmt = DecimalFormat("#,##0.00")
@@ -164,6 +165,12 @@ class MainActivity : Activity() {
             setOnClickListener { runFiveStageSearch() }
         }
         root.addView(fiveStageButton, LinearLayout.LayoutParams(-1, 44).apply { topMargin = 2 })
+        replayButton = Button(this).apply {
+            text = "BLIND REPLAY · ПРОВЕРИТЬ ЯДРО НА ЗАКРЫТОЙ ИСТОРИИ"
+            isAllCaps = false
+            setOnClickListener { runBlindReplay() }
+        }
+        root.addView(replayButton, LinearLayout.LayoutParams(-1, 48).apply { topMargin = 6 })
         status = TextView(this).apply {
             text = "Автообновление каждые 30 секунд · Binance Spot"
             textSize = 10f
@@ -275,6 +282,41 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) {
                 runOnUiThread { patternButton.isEnabled = true; status.text = "Ошибка Pattern Intelligence: " + (e.message ?: "неизвестно") }
+            }
+        }
+    }
+
+    private fun runBlindReplay() {
+        replayButton.isEnabled = false
+        status.text = "BLIND REPLAY: прогоняем исторические точки строго по времени…"
+        analysisExecutor.execute {
+            try {
+                val history = candleStore.readLatest("BTCUSDT", "15m", 50000)
+                val report = BlindReplayEngine().run(history, window = 40, horizon = 16, step = 16, minSimilarity = 35.0, topK = 20)
+                runOnUiThread {
+                    replayButton.isEnabled = true
+                    val recent = report.points.takeLast(8).joinToString("\n") {
+                        SimpleDateFormat("MM-dd HH:mm", Locale.US).format(Date(it.decisionTime)) +
+                            " · прогноз " + it.predicted + " / факт " + it.actual +
+                            " · ожидание " + String.format(Locale.US, "%+.2f", it.predictedReturnPct) +
+                            "% / факт " + String.format(Locale.US, "%+.2f", it.actualReturnPct) + "%"
+                    }
+                    signalCard.text = "BLIND REPLAY · PATTERN CORE\n" +
+                        "Тестовых решений: " + report.tested + " · сделок: " + report.traded +
+                        "\nНаправление верно: " + String.format(Locale.US, "%.1f", report.accuracyPct) +
+                        "% · покрытие: " + String.format(Locale.US, "%.1f", report.coveragePct) + "%" +
+                        "\nСредний результат на сигнал: " + String.format(Locale.US, "%+.3f", report.averageActualPct) +
+                        "% · накопленный: " + String.format(Locale.US, "%+.2f", report.cumulativeReturnPct) +
+                        "% · max drawdown: " + String.format(Locale.US, "%.2f", report.maxDrawdownPct) +
+                        "%\nПоследние решения:\n" + recent + "\n" + report.notes
+                    signalCard.setTextColor(white)
+                    status.text = "Blind Replay завершён · исторических свечей: " + history.size
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    replayButton.isEnabled = true
+                    status.text = "Ошибка Blind Replay: " + (e.message ?: "неизвестно")
+                }
             }
         }
     }
