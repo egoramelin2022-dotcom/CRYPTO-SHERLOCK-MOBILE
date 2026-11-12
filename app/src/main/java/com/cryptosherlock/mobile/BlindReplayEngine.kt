@@ -11,7 +11,10 @@ data class BlindReplayPoint(
     val predictedReturnPct: Double,
     val actualReturnPct: Double,
     val analogCount: Int,
-    val previousMovePct: Double = 0.0
+    val previousMovePct: Double = 0.0,
+    val candleBias: String = "NEUTRAL",
+    val candleScore: Double = 0.0,
+    val candlePatterns: String = ""
 )
 
 data class BlindReplayReport(
@@ -59,6 +62,7 @@ class BlindReplayEngine {
         val points = ArrayList<BlindReplayPoint>(totalSteps)
         var cursor = firstDecision
         var completed = 0
+        val candleEngine = CandlestickIntelligence()
         while (cursor + horizon <= closed.size) {
             val targetStart = cursor - window
             val targetVector = returnVector(closed, targetStart, window)
@@ -105,11 +109,13 @@ class BlindReplayEngine {
                     actualReturn < -0.12 -> "SHORT"
                     else -> "SIDEWAYS"
                 }
+                val candleSnapshot = candleEngine.analyze(closed, cursor)
                 points.add(BlindReplayPoint(
                     closed[cursor - 1].openTime, direction, actual,
                     maxOf(positiveWeight, negativeWeight) * 100.0,
                     expected, actualReturn, best.size,
-                    if (cursor - horizon - 1 >= 0 && closed[cursor - horizon - 1].close > 0.0) (closed[cursor - 1].close / closed[cursor - horizon - 1].close - 1.0) * 100.0 else 0.0
+                    if (cursor - horizon - 1 >= 0 && closed[cursor - horizon - 1].close > 0.0) (closed[cursor - 1].close / closed[cursor - horizon - 1].close - 1.0) * 100.0 else 0.0,
+                    candleSnapshot.bias, candleSnapshot.score, candleSnapshot.patterns.joinToString(",") { it.name }
                 ))
             }
             completed++
@@ -158,6 +164,10 @@ class BlindReplayEngine {
         val sidewaysRecall = if (actualSideways == 0) 0.0 else sideways.count { it.actual == "SIDEWAYS" }.toDouble() / actualSideways * 100.0
         val alwaysLong = compound(points.map { it.actualReturnPct - roundTripCostPct })
         val momentum = compound(points.map { (if (it.previousMovePct >= 0.0) it.actualReturnPct else -it.actualReturnPct) - roundTripCostPct })
+        val candleSignals = points.filter { it.candleBias != "NEUTRAL" }
+        val candleHit = if (candleSignals.isEmpty()) 0.0 else candleSignals.count { (it.candleBias == "BULLISH" && it.actual == "LONG") || (it.candleBias == "BEARISH" && it.actual == "SHORT") }.toDouble() / candleSignals.size * 100.0
+        val candleNet = if (candleSignals.isEmpty()) 0.0 else compound(candleSignals.map { (if (it.candleBias == "BULLISH") it.actualReturnPct else -it.actualReturnPct) - roundTripCostPct })
+        val candleNames = candleSignals.flatMap { it.candlePatterns.split(",") }.filter { it.isNotBlank() }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.take(8).joinToString { "${it.key}:${it.value}" }
         return BlindReplayReport(
             points.size, directional.size, correct, accuracy, coverage, avg, cumulative, maxDd,
             points,
@@ -165,6 +175,7 @@ class BlindReplayEngine {
                 "MAE=${fmt(meanAbsError)}%. ${sideStats("LONG")}; ${sideStats("SHORT")}. " +
                 "SIDEWAYS precision=${fmt(sidewaysPrecision)}%, recall=${fmt(sidewaysRecall)}%. " +
                 "Бенчмарки net: always-LONG=${fmt(alwaysLong)}%, momentum-5=${fmt(momentum)}%. " +
+                "Candlestick Intelligence: сигналов=${candleSignals.size}, совпадение направления=${fmt(candleHit)}%, net compound=${fmt(candleNet)}%, частые паттерны=$candleNames. " +
                 "Издержки: ${fmt(roundTripCostPct)}% на полный вход/выход (модельная комиссия+проскальзывание). " +
                 "Аналоги и исходы завершились до целевого окна; look-ahead исключён. Рыночные режимы и горизонты требуют отдельной проверки."
         )
