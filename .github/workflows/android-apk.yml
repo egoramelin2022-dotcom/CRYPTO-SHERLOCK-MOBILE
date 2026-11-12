@@ -33,6 +33,8 @@ jobs:
           echo "CRYPTO_SIGNING_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
           echo "CRYPTO_SIGNING_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
           echo "CRYPTO_SIGNING_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+      - name: Run research engine tests
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
       - name: Verify APK
