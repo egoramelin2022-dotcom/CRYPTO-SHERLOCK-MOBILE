@@ -39,6 +39,8 @@ class MainActivity : Activity() {
     private lateinit var chart: CandleChart
     private lateinit var candleInfo: TextView
     private lateinit var signalCard: TextView
+    private lateinit var researchResult: TextView
+    private lateinit var replayResult: TextView
     private lateinit var forecastCard: TextView
     private lateinit var refreshButton: Button
     private lateinit var historyButton: Button
@@ -66,174 +68,154 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = bg
         window.navigationBarColor = bg
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(16, 14, 16, 10)
-            setBackgroundColor(bg)
+        candleStore = CandleStore(this)
+
+        val shell = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(bg) }
+        val host = FrameLayout(this).apply { setBackgroundColor(bg) }
+        val pages = LinkedHashMap<String, ScrollView>()
+        fun makePage(key: String): LinearLayout {
+            val body = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(16), dp(16), dp(16), dp(20))
+                setBackgroundColor(bg)
+            }
+            val scroll = ScrollView(this).apply { isFillViewport = false; addView(body, ViewGroup.LayoutParams(-1, -2)) }
+            pages[key] = scroll
+            host.addView(scroll, FrameLayout.LayoutParams(-1, -1))
+            scroll.visibility = if (key == "РЫНОК") View.VISIBLE else View.GONE
+            return body
         }
-        root.addView(TextView(this).apply {
-            text = "◈  CRYPTO SHERLOCK"
-            textSize = 22f
-            setTextColor(mint)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        })
-        root.addView(TextView(this).apply {
-            text = "MARKET INTELLIGENCE  /  BINANCE SPOT"
-            textSize = 10f
-            setTextColor(muted)
-            setPadding(0, 4, 0, 10)
-        })
+        fun title(body: LinearLayout, main: String, sub: String) {
+            body.addView(TextView(this).apply {
+                text = main; textSize = 22f; setTextColor(mint)
+                typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+            })
+            body.addView(TextView(this).apply {
+                text = sub; textSize = 11f; setTextColor(muted); setPadding(0, dp(4), 0, dp(14))
+            })
+        }
+        fun card(text: String): TextView = TextView(this).apply {
+            this.text = text; textSize = 12f; setTextColor(white)
+            setPadding(dp(14), dp(13), dp(14), dp(13))
+            setBackgroundColor(panel); setLineSpacing(dp(2).toFloat(), 1f)
+        }
+        fun label(body: LinearLayout, name: String) {
+            body.addView(TextView(this).apply {
+                text = name; textSize = 11f; setTextColor(muted)
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setPadding(dp(2), dp(14), dp(2), dp(7))
+            })
+        }
+        fun button(text: String, action: () -> Unit): Button = Button(this).apply {
+            this.text = text; textSize = 11f; isAllCaps = false; setOnClickListener { action() }
+        }
+
+        // 01 — MARKET
+        val market = makePage("РЫНОК")
+        title(market, "◈ SHERLOCK", "MARKET INTELLIGENCE  /  BINANCE SPOT")
         price = TextView(this).apply {
-            text = "BTC / USDT"
-            textSize = 29f
-            setTextColor(white)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            text = "BTC / USDT"; textSize = 34f; setTextColor(white)
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
         }
-        root.addView(price)
-        change = TextView(this).apply {
-            text = "Загрузка котировки…"
-            textSize = 13f
-            setTextColor(mint)
-            setPadding(0, 2, 0, 8)
+        market.addView(price)
+        change = TextView(this).apply { text = "Подключаем рынок…"; textSize = 14f; setTextColor(mint); setPadding(0, dp(3), 0, dp(12)) }
+        market.addView(change)
+        val tf = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        listOf("15m", "30m", "1h", "2h", "4h").forEach { frame ->
+            tf.addView(button(frame) {
+                if (interval != frame) { interval = frame; loadMarket(true) }
+            }, LinearLayout.LayoutParams(0, dp(42), 1f))
         }
-        root.addView(change)
-
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        listOf("15m", "30m", "1h", "2h", "4h").forEach { tf ->
-            row.addView(Button(this).apply {
-                text = tf
-                textSize = 10f
-                isAllCaps = false
-                minWidth = 0
-                setPadding(0, 0, 0, 0)
-                setOnClickListener {
-                    if (interval != tf) {
-                        interval = tf
-                        loadMarket(true)
-                    }
-                }
-            }, LinearLayout.LayoutParams(0, 42, 1f))
-        }
-        root.addView(row)
-
-        signalCard = TextView(this).apply {
-            text = "АНАЛИЗ СИГНАЛА\nОжидаем первые рыночные данные…"
-            textSize = 12f
-            setTextColor(white)
-            setPadding(12, 9, 12, 9)
-            setBackgroundColor(panel)
-        }
-        root.addView(signalCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8 })
-        forecastCard = TextView(this).apply {
-            text = "MULTI-TIMEFRAME FORECAST\nОжидаем данные 15m / 1h / 4h / 1d…"
-            textSize = 12f
-            setTextColor(white)
-            setPadding(12, 10, 12, 10)
-            setBackgroundColor(panel)
-        }
-        root.addView(forecastCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6 })
+        market.addView(tf)
+        label(market, "РЫНОЧНЫЙ ИМПУЛЬС")
+        signalCard = card("Ожидаем данные и подтверждения…")
+        market.addView(signalCard)
+        label(market, "PRICE ACTION  ·  BTCUSDT")
         chart = CandleChart(this).apply { setBackgroundColor(panel) }
-        root.addView(chart, LinearLayout.LayoutParams(-1, dp(260)).apply { topMargin = 8; bottomMargin = 4 })
-        candleInfo = TextView(this).apply {
-            text = "Свечи и объём"
-            textSize = 11f
-            setTextColor(muted)
-            setPadding(2, 3, 2, 3)
-        }
-        root.addView(candleInfo)
-        refreshButton = Button(this).apply {
-            text = "ОБНОВИТЬ СЕЙЧАС"
-            isAllCaps = false
-            setOnClickListener { loadMarket(true) }
-        }
-        root.addView(refreshButton, LinearLayout.LayoutParams(-1, 46))
-        historyButton = Button(this).apply {
-            text = "ЗАГРУЗИТЬ ИСТОРИЮ BTC 15M С 2017 ГОДА"
-            isAllCaps = false
-            setOnClickListener { downloadHistory() }
-        }
-        root.addView(historyButton, LinearLayout.LayoutParams(-1, 44).apply { topMargin = 4 })
-        patternButton = Button(this).apply {
-            text = "PATTERN INTELLIGENCE · ПОИСК АНАЛОГОВ"
-            isAllCaps = false
-            setOnClickListener { runPatternSearch() }
-        }
-        root.addView(patternButton, LinearLayout.LayoutParams(-1, 44).apply { topMargin = 2 })
-        fiveStageButton = Button(this).apply {
-            text = "FIVE-STAGE · ПОИСК 5 ЭТАПОВ"
-            isAllCaps = false
-            setOnClickListener { runFiveStageSearch() }
-        }
-        root.addView(fiveStageButton, LinearLayout.LayoutParams(-1, 44).apply { topMargin = 2 })
-        replayButton = Button(this).apply {
-            text = "BLIND REPLAY · ПРОВЕРИТЬ ЯДРО НА ЗАКРЫТОЙ ИСТОРИИ"
-            isAllCaps = false
-            setOnClickListener { runBlindReplay() }
-        }
-        root.addView(replayButton, LinearLayout.LayoutParams(-1, 48).apply { topMargin = 6 })
-        val portfolioCard = TextView(this).apply {
-            text = "ПОРТФЕЛЬ · РЕЖИМ НАБЛЮДЕНИЯ\n\nЗдесь появятся выбранные активы, виртуальные позиции, риск на сделку и журнал результатов. Реальные ордера не подключены."
-            textSize = 13f
-            setTextColor(white)
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(panel)
-        }
-        root.addView(portfolioCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8 })
+        market.addView(chart, LinearLayout.LayoutParams(-1, dp(285)))
+        candleInfo = TextView(this).apply { text = "Свечи и объём"; textSize = 10f; setTextColor(muted); setPadding(2, dp(5), 2, dp(5)) }
+        market.addView(candleInfo)
+        refreshButton = button("↻  ОБНОВИТЬ РЫНОК") { loadMarket(true) }
+        market.addView(refreshButton, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
+
+        // 02 — SHERLOCK LAB
+        val lab = makePage("ШЕРЛОК")
+        title(lab, "PATTERN LAB", "Поиск повторяющегося поведения цены · локальная история")
+        historyButton = button("↓  ЗАГРУЗИТЬ BTCUSDT 15M С 2017 ГОДА") { downloadHistory() }
+        lab.addView(historyButton, LinearLayout.LayoutParams(-1, dp(48)))
+        label(lab, "ДВА НЕЗАВИСИМЫХ РЕЖИМА")
+        patternButton = button("PATTERN INTELLIGENCE  ·  СВОБОДНЫЙ ПОИСК") { runPatternSearch() }
+        lab.addView(patternButton, LinearLayout.LayoutParams(-1, dp(48)))
+        fiveStageButton = button("FIVE-STAGE  ·  МОДЕЛЬ ПЯТИ ЭТАПОВ") { runFiveStageSearch() }
+        lab.addView(fiveStageButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
+        label(lab, "РЕЗУЛЬТАТЫ ИССЛЕДОВАНИЯ")
+        researchResult = card("Здесь появятся найденные аналоги, степень сходства и движение цены после каждой формации.")
+        lab.addView(researchResult)
+
+        // 03 — ANALYSIS
+        val analysis = makePage("АНАЛИЗ")
+        title(analysis, "MARKET ANALYSIS", "Сценарии рынка и условия возможного входа")
+        label(analysis, "MULTI-TIMEFRAME FORECAST")
+        forecastCard = card("Ожидаем данные 15m / 1h / 4h / 1d…")
+        analysis.addView(forecastCard)
+        label(analysis, "КАК ЧИТАТЬ ОЦЕНКУ")
+        analysis.addView(card("LONG / SHORT / SIDEWAYS — экспериментальные оценки на основе правил. Они пока не откалиброваны как вероятности. Вход рассматриваем только при подтверждении, понятной инвалидации и приемлемом соотношении риска к потенциальной прибыли."))
+
+        // 04 — REPLAY
+        val replay = makePage("REPLAY")
+        title(replay, "BLIND REPLAY", "Закрытый исторический тест · прогноз до раскрытия будущих свечей")
+        replayButton = button("▶  ЗАПУСТИТЬ ИСТОРИЧЕСКИЙ ТЕСТ") { runBlindReplay() }
+        replay.addView(replayButton, LinearLayout.LayoutParams(-1, dp(50)))
+        label(replay, "ПОСЛЕДНИЙ ОТЧЁТ")
+        replayResult = card("Результаты появятся после теста. Для надёжной оценки сначала загрузите длинную историю BTCUSDT 15m.")
+        replay.addView(replayResult)
+        label(replay, "ОГРАНИЧЕНИЯ ТЕКУЩЕЙ ВЕРСИИ")
+        replay.addView(card("Экспериментальный прототип. Комиссии, проскальзывание и funding пока не учитываются; статистика требует сравнения с базовыми стратегиями и проверки на разных рыночных режимах."))
+
+        // 05 — PORTFOLIO
+        val portfolio = makePage("ПОРТФЕЛЬ")
+        title(portfolio, "PORTFOLIO", "Контроль активов · риск · paper trading")
+        label(portfolio, "РЕЖИМ НАБЛЮДЕНИЯ")
+        portfolio.addView(card("Реальные ордера не подключены. Следующий этап — виртуальные сделки, журнал прогнозов, размер риска, стоп-сценарии и разбор результатов."))
+        label(portfolio, "ПРИНЦИП SHERLOCK")
+        portfolio.addView(card("Сначала доказываем качество сигналов на истории и в paper trading. Только после устойчивой проверки можно обсуждать автоматическое исполнение."))
+
         status = TextView(this).apply {
-            text = "Автообновление каждые 30 секунд · Binance Spot"
-            textSize = 10f
-            setTextColor(muted)
-            setPadding(2, 8, 2, 8)
-        }
-        root.addView(status)
-        val scroll = ScrollView(this).apply {
-            isFillViewport = false
-            setBackgroundColor(bg)
-            addView(root, ViewGroup.LayoutParams(-1, -2))
-        }
-        val shell = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(bg)
-            addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+            text = "●  ИНИЦИАЛИЗАЦИЯ"; textSize = 10f; setTextColor(muted)
+            setPadding(dp(12), dp(7), dp(12), dp(7)); setBackgroundColor(bg)
         }
         val nav = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(panel)
-            setPadding(2, 4, 2, 4)
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+            setBackgroundColor(Color.rgb(12, 21, 34)); setPadding(dp(3), dp(4), dp(3), dp(4))
         }
-        fun addTab(label: String, target: View) {
+        val navItems = LinkedHashMap<String, Button>()
+        fun navigate(to: String) {
+            pages.forEach { (name, view) -> view.visibility = if (name == to) View.VISIBLE else View.GONE }
+            navItems.forEach { (name, b) ->
+                b.setTextColor(if (name == to) mint else muted)
+                b.setBackgroundColor(if (name == to) Color.rgb(25, 48, 62) else Color.rgb(12, 21, 34))
+            }
+        }
+        listOf("РЫНОК", "ШЕРЛОК", "АНАЛИЗ", "REPLAY", "ПОРТФЕЛЬ").forEach { name ->
             nav.addView(Button(this).apply {
-                text = label
-                textSize = 9f
-                isAllCaps = false
-                minWidth = 0
-                setPadding(1, 0, 1, 0)
-                setOnClickListener {
-                    scroll.post { scroll.smoothScrollTo(0, target.top.coerceAtLeast(0)) }
-                }
-            }, LinearLayout.LayoutParams(0, dp(52), 1f))
+                text = name; textSize = 9f; isAllCaps = false; minWidth = 0
+                setPadding(0, 0, 0, 0); setTextColor(muted)
+                setBackgroundColor(Color.rgb(12, 21, 34))
+                setOnClickListener { navigate(name) }; navItems[name] = this
+            }, LinearLayout.LayoutParams(0, dp(54), 1f))
         }
-        addTab("РЫНОК", price)
-        addTab("ШЕРЛОК", patternButton)
-        addTab("АНАЛИЗ", forecastCard)
-        addTab("REPLAY", replayButton)
-        addTab("ПОРТФЕЛЬ", portfolioCard)
-        shell.addView(nav, LinearLayout.LayoutParams(-1, dp(56)))
+        shell.addView(host, LinearLayout.LayoutParams(-1, 0, 1f))
+        shell.addView(status)
+        shell.addView(nav, LinearLayout.LayoutParams(-1, dp(60)))
         setContentView(shell)
-        candleStore = CandleStore(this)
-        status.text = "Запуск · подключаем рынок и локальную базу…"
-        // SQLite opening/counting is disk I/O: never do it on Android's UI thread.
+        navigate("РЫНОК")
+
         historyExecutor.execute {
             try {
                 val saved = candleStore.count("BTCUSDT", "15m")
-                runOnUiThread {
-                    if (!isFinishing) status.text = "Локальная база: $saved свечей · автообновление 30с"
-                }
+                runOnUiThread { if (!isFinishing) status.text = "●  BINANCE SPOT  ·  ЛОКАЛЬНО: $saved СВЕЧЕЙ  ·  АВТООБНОВЛЕНИЕ 30С" }
             } catch (e: Exception) {
-                runOnUiThread {
-                    if (!isFinishing) status.text = "Локальная база пока недоступна: ${e.message ?: "ошибка"}"
-                }
+                runOnUiThread { if (!isFinishing) status.text = "●  БАЗА НЕДОСТУПНА: ${e.message ?: "ошибка"}" }
             }
         }
         loadMarket(true)
@@ -291,8 +273,8 @@ class MainActivity : Activity() {
                     val rows = report.matches.mapIndexed { i, m ->
                         (i + 1).toString() + ". снижение " + String.format(Locale.US, "%.1f", m.declinePct) + "% · восстановление +" + String.format(Locale.US, "%.1f", m.recoveryPct) + "% · обвал " + String.format(Locale.US, "%.1f", m.collapsePct) + "% · после: " + String.format(Locale.US, "%+.2f", m.forwardReturnPct) + "%"
                     }
-                    signalCard.text = "FIVE-STAGE STRATEGY · BTCUSDT 15M\nПроверено окон: " + report.testedWindows + "\n" + rows.joinToString("\n") + "\n" + report.message
-                    signalCard.setTextColor(white)
+                    researchResult.text = "FIVE-STAGE STRATEGY · BTCUSDT 15M\nПроверено окон: " + report.testedWindows + "\n" + rows.joinToString("\n") + "\n" + report.message
+                    researchResult.setTextColor(white)
                     status.text = "Five-Stage завершён · база: " + history.size + " свечей"
                 }
             } catch (e: Exception) {
@@ -313,8 +295,8 @@ class MainActivity : Activity() {
                     val lines = report.matches.mapIndexed { index, match ->
                         (index + 1).toString() + ". сходство " + String.format(Locale.US, "%.1f", match.similarity) + "% · после формации " + String.format(Locale.US, "%+.2f", match.forwardReturnPct) + "%"
                     }
-                    signalCard.text = "PATTERN INTELLIGENCE · BTCUSDT 15M\nНайдено исторических окон: " + report.sampleCount + "\nСредний результат после топ-аналогов: " + String.format(Locale.US, "%+.2f", report.averageForwardPct) + "% · положительных: " + String.format(Locale.US, "%.1f", report.positiveRatePct) + "%\n" + lines.joinToString("\n") + "\n" + report.note
-                    signalCard.setTextColor(white)
+                    researchResult.text = "PATTERN INTELLIGENCE · BTCUSDT 15M\nНайдено исторических окон: " + report.sampleCount + "\nСредний результат после топ-аналогов: " + String.format(Locale.US, "%+.2f", report.averageForwardPct) + "% · положительных: " + String.format(Locale.US, "%.1f", report.positiveRatePct) + "%\n" + lines.joinToString("\n") + "\n" + report.note
+                    researchResult.setTextColor(white)
                     status.text = "Поиск завершён · локальная база: " + history.size + " свечей"
                 }
             } catch (e: Exception) {
@@ -338,7 +320,7 @@ class MainActivity : Activity() {
                             " · ожидание " + String.format(Locale.US, "%+.2f", it.predictedReturnPct) +
                             "% / факт " + String.format(Locale.US, "%+.2f", it.actualReturnPct) + "%"
                     }
-                    signalCard.text = "BLIND REPLAY · PATTERN CORE\n" +
+                    replayResult.text = "BLIND REPLAY · PATTERN CORE\n" +
                         "Тестовых решений: " + report.tested + " · сделок: " + report.traded +
                         "\nНаправление верно: " + String.format(Locale.US, "%.1f", report.accuracyPct) +
                         "% · покрытие: " + String.format(Locale.US, "%.1f", report.coveragePct) + "%" +
@@ -346,7 +328,7 @@ class MainActivity : Activity() {
                         "% · накопленный: " + String.format(Locale.US, "%+.2f", report.cumulativeReturnPct) +
                         "% · max drawdown: " + String.format(Locale.US, "%.2f", report.maxDrawdownPct) +
                         "%\nПоследние решения:\n" + recent + "\n" + report.notes
-                    signalCard.setTextColor(white)
+                    replayResult.setTextColor(white)
                     status.text = "Blind Replay завершён · исторических свечей: " + history.size
                 }
             } catch (e: Exception) {
