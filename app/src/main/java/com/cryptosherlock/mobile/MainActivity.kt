@@ -266,14 +266,14 @@ class MainActivity : Activity() {
         status.text = "Five-Stage: проверяем исторические формации…"
         analysisExecutor.execute {
             try {
-                val history = candleStore.readLatest("BTCUSDT", "15m", 50000)
+                val history = candleStore.readLatest("BTCUSDT", "15m", Int.MAX_VALUE)
                 val report = FiveStageStrategy().search(history, 100, 16, 10)
                 runOnUiThread {
                     fiveStageButton.isEnabled = true
                     val rows = report.matches.mapIndexed { i, m ->
                         (i + 1).toString() + ". снижение " + String.format(Locale.US, "%.1f", m.declinePct) + "% · восстановление +" + String.format(Locale.US, "%.1f", m.recoveryPct) + "% · обвал " + String.format(Locale.US, "%.1f", m.collapsePct) + "% · после: " + String.format(Locale.US, "%+.2f", m.forwardReturnPct) + "%"
                     }
-                    researchResult.text = "FIVE-STAGE STRATEGY · BTCUSDT 15M\nПроверено окон: " + report.testedWindows + "\n" + rows.joinToString("\n") + "\n" + report.message
+                    researchResult.text = "FIVE-STAGE STRATEGY · BTCUSDT 15M\nБаза: " + history.size + " свечей · окон проверено: " + report.testedWindows + "\nНайдено формаций: " + report.totalMatches + "\nСредний исход: " + String.format(Locale.US, "%+.2f", report.averageForwardPct) + "% · положительных: " + String.format(Locale.US, "%.1f", report.positiveRatePct) + "% · медиана: " + String.format(Locale.US, "%+.2f", report.medianForwardPct) + "%\nПоследние найденные формации:\n" + rows.joinToString("\n") + "\n" + report.message
                     researchResult.setTextColor(white)
                     status.text = "Five-Stage завершён · база: " + history.size + " свечей"
                 }
@@ -295,7 +295,7 @@ class MainActivity : Activity() {
                     val lines = report.matches.mapIndexed { index, match ->
                         (index + 1).toString() + ". сходство " + String.format(Locale.US, "%.1f", match.similarity) + "% · после формации " + String.format(Locale.US, "%+.2f", match.forwardReturnPct) + "%"
                     }
-                    researchResult.text = "PATTERN INTELLIGENCE · BTCUSDT 15M\nНайдено исторических окон: " + report.sampleCount + "\nСредний результат после топ-аналогов: " + String.format(Locale.US, "%+.2f", report.averageForwardPct) + "% · положительных: " + String.format(Locale.US, "%.1f", report.positiveRatePct) + "%\n" + lines.joinToString("\n") + "\n" + report.note
+                    researchResult.text = "PATTERN INTELLIGENCE 2.0 · BTCUSDT 15M\nПолная база: " + history.size + " свечей · кандидатов: " + report.sampleCount + "\nТоп-" + report.matches.size + " по сходству · средний исход: " + String.format(Locale.US, "%+.2f", report.averageForwardPct) + "% · положительных: " + String.format(Locale.US, "%.1f", report.positiveRatePct) + "%\nСредний максимум вверх: " + String.format(Locale.US, "%+.2f", report.averageFavorablePct) + "% · вниз: " + String.format(Locale.US, "%+.2f", report.averageAdversePct) + "%\n" + lines.joinToString("\n") + "\n" + report.note
                     researchResult.setTextColor(white)
                     status.text = "Поиск завершён · локальная база: " + history.size + " свечей"
                 }
