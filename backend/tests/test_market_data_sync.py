@@ -84,7 +84,7 @@ def test_empty_source_page_is_not_reported_as_complete_and_can_resume():
         )
         assert second.status == "COMPLETE"
         assert second.fetched == 2
-        assert second.inserted == 1
+        assert second.inserted == 2  # cumulative inserts across the resumed job
         assert engine.repository.count("BTCUSDT", "15m") == 2
     finally:
         engine.close()
