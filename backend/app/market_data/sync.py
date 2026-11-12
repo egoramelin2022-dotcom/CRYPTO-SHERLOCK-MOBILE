@@ -209,8 +209,8 @@ class HistoricalSyncEngine:
         has_gaps = False
         previous_time_row = self.connection.execute(
             """SELECT MAX(open_time) FROM candles
-               WHERE symbol=? AND interval=? AND open_time < ?""",
-            (symbol, interval, cursor),
+               WHERE symbol=? AND interval=? AND open_time >= ? AND open_time < ?""",
+            (symbol, interval, start_ms, cursor),
         ).fetchone()
         previous_time = (
             int(previous_time_row[0]) if previous_time_row and previous_time_row[0] is not None
