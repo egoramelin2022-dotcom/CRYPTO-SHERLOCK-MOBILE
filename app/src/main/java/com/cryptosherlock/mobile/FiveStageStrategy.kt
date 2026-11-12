@@ -17,6 +17,10 @@ data class FiveStageMatch(
 
 data class FiveStageReport(
     val testedWindows: Int,
+    val totalMatches: Int,
+    val averageForwardPct: Double,
+    val positiveRatePct: Double,
+    val medianForwardPct: Double,
     val matches: List<FiveStageMatch>,
     val message: String
 )
@@ -31,7 +35,7 @@ data class FiveStageReport(
 class FiveStageStrategy {
     fun search(history: List<StoredCandle>, window: Int = 100, horizon: Int = 16, top: Int = 10): FiveStageReport {
         if (window < 50 || horizon < 1 || history.size < window + horizon + 20) {
-            return FiveStageReport(0, emptyList(), "Недостаточно данных для пятиэтапного поиска.")
+            return FiveStageReport(0, 0, 0.0, 0.0, 0.0, emptyList(), "Недостаточно данных для пятиэтапного поиска.")
         }
         val matches = ArrayList<FiveStageMatch>()
         var tested = 0
@@ -83,8 +87,13 @@ class FiveStageStrategy {
             }
             start += stride
         }
-        val ranked = matches.sortedByDescending { it.forwardReturnPct }.take(top)
-        val note = if (matches.isEmpty()) "Пока не найдено окон, соответствующих текущим порогам. Пороговые значения будут настраиваться после проверки." else "Найдено формаций: ${matches.size}. Результат после формации показан отдельно; сортировка по доходности не означает прогноз."
-        return FiveStageReport(tested, ranked, note)
+        val sortedReturns = matches.map { it.forwardReturnPct }.sorted()
+        val average = if (sortedReturns.isEmpty()) 0.0 else sortedReturns.average()
+        val positive = if (sortedReturns.isEmpty()) 0.0 else sortedReturns.count { it > 0.0 }.toDouble() / sortedReturns.size * 100.0
+        val median = if (sortedReturns.isEmpty()) 0.0 else if (sortedReturns.size % 2 == 1) sortedReturns[sortedReturns.size / 2] else (sortedReturns[sortedReturns.size / 2 - 1] + sortedReturns[sortedReturns.size / 2]) / 2.0
+        // Show examples in chronological order, not cherry-picked by best future return.
+        val examples = matches.sortedByDescending { it.startTime }.take(top)
+        val note = if (matches.isEmpty()) "Пока не найдено окон, соответствующих текущим порогам." else "Статистика рассчитана по всем найденным формациям. Примеры показаны по времени, не отобраны по будущей доходности. Без комиссий и проскальзывания."
+        return FiveStageReport(tested, matches.size, average, positive, median, examples, note)
     }
 }
