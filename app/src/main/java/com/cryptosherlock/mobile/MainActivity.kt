@@ -151,6 +151,8 @@ class MainActivity : Activity() {
         lab.addView(fiveStageButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
         cycleButton = button("CYCLE HUNTER  ·  ПОИСК БОЛЬШИХ ЦИКЛОВ") { runCycleHunter() }
         lab.addView(cycleButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
+        val cycleCompareButton = button("СРАВНИТЬ СТРАТЕГИИ · WALK-FORWARD 70/30") { runCycleComparison() }
+        lab.addView(cycleCompareButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
         label(lab, "РЕЗУЛЬТАТЫ ИССЛЕДОВАНИЯ")
         researchResult = card("Здесь появятся найденные аналоги, степень сходства и движение цены после каждой формации.")
         lab.addView(researchResult)
@@ -318,6 +320,35 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) {
                 runOnUiThread { cycleButton.isEnabled = true; status.text = "Ошибка Cycle Hunter: " + (e.message ?: "неизвестно") }
+            }
+        }
+    }
+
+    private fun runCycleComparison() {
+        status.text = "CYCLE RESEARCH: сравниваем правила на хронологическом тесте 70/30…"
+        analysisExecutor.execute {
+            try {
+                val history = candleStore.readLatest("BTCUSDT", "15m", Int.MAX_VALUE)
+                val report = CycleResearchEngine().analyze(history, roundTripCostPct = 0.20, horizonDays = 90)
+                runOnUiThread {
+                    val rows = report.strategies.map { s ->
+                        val f = { v: Double? -> if (v == null) "н/д" else String.format(Locale.US, "%+.1f%%", v) }
+                        s.name + "\nСделок: " + s.trades + " · win rate: " + f(s.winRatePct) +
+                            " · средняя net: " + f(s.averageNetPct) + " · медиана: " + f(s.medianNetPct) +
+                            " · совокупно: " + f(s.totalNetPct) + " · max DD: " + f(s.maxDrawdownPct) +
+                            "\nTEST 30%: сделок " + s.testTrades + " · win " + f(s.testWinRatePct) +
+                            " · средняя net " + f(s.testAverageNetPct)
+                    }
+                    researchResult.text = "CYCLE RESEARCH · СРАВНЕНИЕ СТРАТЕГИЙ\nДневных баров: " + report.dailyBars +
+                        " · split: " + (if (report.splitDate > 0) SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(report.splitDate)) else "н/д") +
+                        "\nBUY & HOLD · train 70%: " + (report.buyHoldTrainPct?.let { String.format(Locale.US, "%+.1f%%", it) } ?: "н/д") +
+                        " · test 30%: " + (report.buyHoldTestPct?.let { String.format(Locale.US, "%+.1f%%", it) } ?: "н/д") +
+                        "\n\n" + rows.joinToString("\n\n") + "\n\n" + report.caveats
+                    researchResult.setTextColor(white)
+                    status.text = "Cycle Research завершён · стратегий: " + report.strategies.size
+                }
+            } catch (e: Exception) {
+                runOnUiThread { status.text = "Ошибка Cycle Research: " + (e.message ?: "неизвестно") }
             }
         }
     }
