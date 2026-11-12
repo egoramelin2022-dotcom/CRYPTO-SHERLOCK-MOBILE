@@ -355,7 +355,7 @@ class HistoricalSyncEngine:
         unresolved_gaps = self._reconcile_gaps(
             symbol, interval, start_ms, end_ms
         )
-        final_status = "PARTIAL" if (has_gaps or unresolved_gaps) else "COMPLETE"
+        final_status = "PARTIAL" if unresolved_gaps else "COMPLETE"
         self._checkpoint(symbol, interval, start_ms, end_ms, cursor,
                          final_status, fetched, inserted, pages,
                          "One or more candle intervals are missing" if final_status == "PARTIAL" else None)
