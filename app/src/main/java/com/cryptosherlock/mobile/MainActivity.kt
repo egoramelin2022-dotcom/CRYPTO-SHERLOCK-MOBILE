@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     private lateinit var historyButton: Button
     private lateinit var patternButton: Button
     private lateinit var fiveStageButton: Button
+    private lateinit var cycleButton: Button
     private lateinit var replayButton: Button
     private lateinit var candleStore: CandleStore
     private var interval = "15m"
@@ -148,6 +149,8 @@ class MainActivity : Activity() {
         lab.addView(patternButton, LinearLayout.LayoutParams(-1, dp(48)))
         fiveStageButton = button("FIVE-STAGE  ·  МОДЕЛЬ ПЯТИ ЭТАПОВ") { runFiveStageSearch() }
         lab.addView(fiveStageButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
+        cycleButton = button("CYCLE HUNTER  ·  ПОИСК БОЛЬШИХ ЦИКЛОВ") { runCycleHunter() }
+        lab.addView(cycleButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
         label(lab, "РЕЗУЛЬТАТЫ ИССЛЕДОВАНИЯ")
         researchResult = card("Здесь появятся найденные аналоги, степень сходства и движение цены после каждой формации.")
         lab.addView(researchResult)
@@ -279,6 +282,42 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) {
                 runOnUiThread { fiveStageButton.isEnabled = true; status.text = "Ошибка Five-Stage: " + (e.message ?: "неизвестно") }
+            }
+        }
+    }
+
+    private fun runCycleHunter() {
+        cycleButton.isEnabled = false
+        status.text = "CYCLE HUNTER: строим дневную историю и ищем пересечения SMA50/100…"
+        analysisExecutor.execute {
+            try {
+                val history = candleStore.readLatest("BTCUSDT", "15m", Int.MAX_VALUE)
+                val report = CycleHunter().analyze(history, 8)
+                runOnUiThread {
+                    cycleButton.isEnabled = true
+                    fun pct(v: Double?): String = if (v == null) "н/д" else String.format(Locale.US, "%+.1f%%", v)
+                    val rows = report.signals.mapIndexed { i, s ->
+                        (i + 1).toString() + ". " + SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(s.time)) +
+                            " · BTC " + fmt.format(s.price) + " · +30д " + pct(s.forward30Pct) +
+                            " · +90д " + pct(s.forward90Pct) + " · +180д " + pct(s.forward180Pct) +
+                            " · +365д " + pct(s.forward365Pct) + " · max + " + pct(s.maxRise365Pct) +
+                            " / max " + pct(s.maxDrop365Pct)
+                    }
+                    researchResult.text = "CYCLE HUNTER · BTC/USD DAILY\n" +
+                        "Дневных свечей: " + report.dailyBars + " · пересечений SMA50↑SMA100: " + report.goldenCrosses +
+                        "\nСостояние сейчас: " + report.currentState +
+                        "\nSMA50: " + (report.currentSma50?.let { fmt.format(it) } ?: "н/д") +
+                        " · SMA100: " + (report.currentSma100?.let { fmt.format(it) } ?: "н/д") +
+                        "\nСредний исход сигналов: 30д " + pct(report.average30Pct) + " · 90д " + pct(report.average90Pct) +
+                        " · 180д " + pct(report.average180Pct) + " · 365д " + pct(report.average365Pct) +
+                        "\nПоложительных через 365д: " + pct(report.positive365Pct) + " · медиана: " + pct(report.median365Pct) +
+                        "\nПоследние сигналы:\n" + (if (rows.isEmpty()) "Пересечений пока не найдено." else rows.joinToString("\n")) +
+                        "\n\n" + report.note
+                    researchResult.setTextColor(white)
+                    status.text = "Cycle Hunter завершён · дневных свечей: " + report.dailyBars
+                }
+            } catch (e: Exception) {
+                runOnUiThread { cycleButton.isEnabled = true; status.text = "Ошибка Cycle Hunter: " + (e.message ?: "неизвестно") }
             }
         }
     }
