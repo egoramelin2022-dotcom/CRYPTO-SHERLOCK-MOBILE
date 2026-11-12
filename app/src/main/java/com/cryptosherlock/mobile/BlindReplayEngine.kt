@@ -68,8 +68,10 @@ class BlindReplayEngine {
                 val similarity = similarity(targetVector, closed, candidate, window)
                 if (similarity >= minSimilarity) {
                     val base = closed[candidate + window - 1].close
-                    val outcome = (closed[candidate + window + horizon - 1].close / base - 1.0) * 100.0
-                    if (base > 0.0) analogs.add(similarity to outcome)
+                    if (base > 0.0) {
+                        val outcome = (closed[candidate + window + horizon - 1].close / base - 1.0) * 100.0
+                        analogs.add(similarity to outcome)
+                    }
                 }
                 candidate += window
             }
