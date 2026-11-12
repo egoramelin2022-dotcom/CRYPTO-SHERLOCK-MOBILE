@@ -186,6 +186,10 @@ class HistoricalSyncEngine:
                AND requested_start_ms=? AND requested_end_ms=?""",
             (symbol, interval, start_ms, end_ms),
         ).fetchone()
+        if row and resume and row[1] == "COMPLETE":
+            return SyncResult(
+                "COMPLETE", int(row[2]), int(row[3]), int(row[0]), int(row[4])
+            )
         if row and resume and row[1] in {"RUNNING", "SOURCE_EMPTY", "FAILED"}:
             cursor, fetched, inserted, pages = int(row[0]), int(row[2]), int(row[3]), int(row[4])
         else:
