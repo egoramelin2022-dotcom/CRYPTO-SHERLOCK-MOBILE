@@ -21,6 +21,7 @@ from .binance import parse_binance_kline
 from .candles import Candle
 from .intervals import interval_to_ms
 from .repository import CandleRepository
+from .gap_registry import ensure_gap_registry, record_gap
 
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 BINANCE_MAX_LIMIT = 1000
@@ -87,6 +88,7 @@ class HistoricalSyncEngine:
         self.repository = CandleRepository(connection)
         self.repository.ensure_schema()
         ensure_sync_schema(connection)
+        ensure_gap_registry(connection)
 
     def close(self) -> None:
         if self._owns_client:
@@ -193,6 +195,8 @@ class HistoricalSyncEngine:
         if row and resume and row[1] in {"RUNNING", "SOURCE_EMPTY", "FAILED"}:
             cursor, fetched, inserted, pages = int(row[0]), int(row[2]), int(row[3]), int(row[4])
         else:
+            # PARTIAL jobs are deliberately rescanned from the requested start:
+            # idempotent inserts preserve existing rows while rechecking holes.
             cursor, fetched, inserted, pages = start_ms, 0, 0, 0
 
         if cursor > end_ms:
@@ -202,6 +206,16 @@ class HistoricalSyncEngine:
 
         self._checkpoint(symbol, interval, start_ms, end_ms, cursor,
                          "RUNNING", fetched, inserted, pages)
+        has_gaps = False
+        previous_time_row = self.connection.execute(
+            """SELECT MAX(open_time) FROM candles
+               WHERE symbol=? AND interval=? AND open_time < ?""",
+            (symbol, interval, cursor),
+        ).fetchone()
+        previous_time = (
+            int(previous_time_row[0]) if previous_time_row and previous_time_row[0] is not None
+            else None
+        )
         while cursor <= end_ms:
             try:
                 payload = self._request_page({
@@ -225,6 +239,33 @@ class HistoricalSyncEngine:
                     raise ValueError("Binance page timestamps must be strictly increasing")
                 if times[0] < cursor or times[-1] > end_ms:
                     raise ValueError("Binance page contains timestamps outside requested bounds")
+
+                # Audit every discontinuity, including the leading edge of a
+                # requested range and the boundary between consecutive pages.
+                expected_previous = previous_time if previous_time is not None else cursor - step
+                first_time = times[0]
+                if first_time > expected_previous + step:
+                    missing = (first_time - expected_previous) // step - 1
+                    record_gap(
+                        self.connection, symbol=symbol, interval=interval,
+                        previous_open_time=expected_previous,
+                        next_open_time=first_time, missing_candles=missing,
+                        status="GAP_DETECTED", source="BINANCE_SPOT_REST",
+                        details="Missing interval detected while ingesting a non-empty page",
+                    )
+                    has_gaps = True
+                for left, right in zip(times, times[1:]):
+                    if right - left > step:
+                        missing = (right - left) // step - 1
+                        record_gap(
+                            self.connection, symbol=symbol, interval=interval,
+                            previous_open_time=left, next_open_time=right,
+                            missing_candles=missing, status="GAP_DETECTED",
+                            source="BINANCE_SPOT_REST",
+                            details="Internal discontinuity inside Binance response page",
+                        )
+                        has_gaps = True
+
                 new_cursor = times[-1] + step
                 if new_cursor <= cursor:
                     raise ValueError("Binance page did not advance the synchronization cursor")
@@ -236,6 +277,7 @@ class HistoricalSyncEngine:
                 inserted += inserted_now
                 pages += 1
                 cursor = new_cursor
+                previous_time = times[-1]
                 self._checkpoint(
                     symbol, interval, start_ms, end_ms, cursor, "RUNNING",
                     fetched, inserted, pages,
@@ -247,6 +289,23 @@ class HistoricalSyncEngine:
                 )
                 raise
 
+        # A page can end before the requested range. Record the trailing
+        # uncovered slots explicitly; never label a sparse range complete.
+        if previous_time is not None and previous_time < end_ms:
+            missing = (end_ms - previous_time) // step
+            if missing > 0:
+                record_gap(
+                    self.connection, symbol=symbol, interval=interval,
+                    previous_open_time=previous_time,
+                    next_open_time=end_ms + step,
+                    missing_candles=missing, status="GAP_DETECTED",
+                    source="BINANCE_SPOT_REST",
+                    details="Requested range ended before the final expected candle arrived",
+                )
+                has_gaps = True
+
+        final_status = "PARTIAL" if has_gaps else "COMPLETE"
         self._checkpoint(symbol, interval, start_ms, end_ms, cursor,
-                         "COMPLETE", fetched, inserted, pages)
-        return SyncResult("COMPLETE", fetched, inserted, cursor, pages)
+                         final_status, fetched, inserted, pages,
+                         "One or more candle intervals are missing" if has_gaps else None)
+        return SyncResult(final_status, fetched, inserted, cursor, pages)
