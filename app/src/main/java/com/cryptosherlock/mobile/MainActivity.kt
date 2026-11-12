@@ -39,6 +39,8 @@ class MainActivity : Activity() {
     private lateinit var candleInfo: TextView
     private lateinit var signalCard: TextView
     private lateinit var refreshButton: Button
+    private lateinit var historyButton: Button
+    private lateinit var candleStore: CandleStore
     private var interval = "15m"
     private val fmt = DecimalFormat("#,##0.00")
     private val executor = Executors.newSingleThreadExecutor()
@@ -130,6 +132,12 @@ class MainActivity : Activity() {
             setOnClickListener { loadMarket(true) }
         }
         root.addView(refreshButton, LinearLayout.LayoutParams(-1, 46))
+        historyButton = Button(this).apply {
+            text = "ЗАГРУЗИТЬ ИСТОРИЮ BTC 15M С 2017 ГОДА"
+            isAllCaps = false
+            setOnClickListener { downloadHistory() }
+        }
+        root.addView(historyButton, LinearLayout.LayoutParams(-1, 44).apply { topMargin = 4 })
         status = TextView(this).apply {
             text = "Автообновление каждые 30 секунд · Binance Spot"
             textSize = 10f
@@ -138,6 +146,9 @@ class MainActivity : Activity() {
         }
         root.addView(status)
         setContentView(root)
+        candleStore = CandleStore(this)
+        val saved = candleStore.count("BTCUSDT", "15m")
+        status.text = "Локальная база: " + saved + " свечей · автообновление 30с"
         loadMarket(true)
     }
 
@@ -176,6 +187,27 @@ class MainActivity : Activity() {
             } finally {
                 loading.set(false)
                 runOnUiThread { refreshButton.isEnabled = true }
+            }
+        }
+    }
+
+    private fun downloadHistory() {
+        historyButton.isEnabled = false
+        status.text = "Подготовка загрузки исторических данных…"
+        executor.execute {
+            try {
+                val total = BinanceHistoryDownloader(candleStore).sync15m { message ->
+                    runOnUiThread { status.text = message + " · загрузка может занять время" }
+                }
+                runOnUiThread {
+                    historyButton.isEnabled = true
+                    status.text = "Готово: добавлено " + total + " свечей. Всего в базе: " + candleStore.count("BTCUSDT", "15m")
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    historyButton.isEnabled = true
+                    status.text = "Загрузка прервана: " + (e.message ?: "ошибка сети") + ". Можно продолжить позже — загрузчик продолжит с последней свечи."
+                }
             }
         }
     }
