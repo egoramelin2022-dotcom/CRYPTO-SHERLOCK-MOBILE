@@ -40,6 +40,7 @@ class MainActivity : Activity() {
     private lateinit var signalCard: TextView
     private lateinit var refreshButton: Button
     private lateinit var historyButton: Button
+    private lateinit var patternButton: Button
     private lateinit var candleStore: CandleStore
     private var interval = "15m"
     private val fmt = DecimalFormat("#,##0.00")
@@ -138,6 +139,12 @@ class MainActivity : Activity() {
             setOnClickListener { downloadHistory() }
         }
         root.addView(historyButton, LinearLayout.LayoutParams(-1, 44).apply { topMargin = 4 })
+        patternButton = Button(this).apply {
+            text = "PATTERN INTELLIGENCE · ПОИСК АНАЛОГОВ"
+            isAllCaps = false
+            setOnClickListener { runPatternSearch() }
+        }
+        root.addView(patternButton, LinearLayout.LayoutParams(-1, 44).apply { topMargin = 2 })
         status = TextView(this).apply {
             text = "Автообновление каждые 30 секунд · Binance Spot"
             textSize = 10f
@@ -187,6 +194,28 @@ class MainActivity : Activity() {
             } finally {
                 loading.set(false)
                 runOnUiThread { refreshButton.isEnabled = true }
+            }
+        }
+    }
+
+    private fun runPatternSearch() {
+        patternButton.isEnabled = false
+        status.text = "Pattern Intelligence: анализ исторической базы…"
+        executor.execute {
+            try {
+                val history = candleStore.readLatest("BTCUSDT", "15m", 50000)
+                val report = PatternIntelligence().search(history, 40, 16, 10)
+                runOnUiThread {
+                    patternButton.isEnabled = true
+                    val lines = report.matches.mapIndexed { index, match ->
+                        (index + 1).toString() + ". сходство " + String.format(Locale.US, "%.1f", match.similarity) + "% · после формации " + String.format(Locale.US, "%+.2f", match.forwardReturnPct) + "%"
+                    }
+                    signalCard.text = "PATTERN INTELLIGENCE · BTCUSDT 15M\nНайдено исторических окон: " + report.sampleCount + "\nСредний результат после топ-аналогов: " + String.format(Locale.US, "%+.2f", report.averageForwardPct) + "% · положительных: " + String.format(Locale.US, "%.1f", report.positiveRatePct) + "%\n" + lines.joinToString("\n") + "\n" + report.note
+                    signalCard.setTextColor(white)
+                    status.text = "Поиск завершён · локальная база: " + history.size + " свечей"
+                }
+            } catch (e: Exception) {
+                runOnUiThread { patternButton.isEnabled = true; status.text = "Ошибка Pattern Intelligence: " + (e.message ?: "неизвестно") }
             }
         }
     }
