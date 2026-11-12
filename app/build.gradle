@@ -27,5 +27,5 @@ android {
   versionCode 12
   versionName '4.0.0'
  }
- dependencies { testImplementation 'junit:junit:4.13.2' }
 }
+dependencies { testImplementation 'junit:junit:4.13.2' }
