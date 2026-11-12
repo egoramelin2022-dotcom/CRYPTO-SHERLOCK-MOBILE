@@ -1,6 +1,5 @@
 package com.cryptosherlock.mobile
 
-import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.sqrt
 
@@ -28,83 +27,97 @@ data class BlindReplayReport(
 )
 
 /**
- * Chronological blind replay:
- * at each decision timestamp, the target contains only candles already closed;
- * analog windows and their forward outcomes must be fully completed before that
- * timestamp. The next horizon is revealed only for scoring after the prediction.
+ * Last-14-day BTCUSDT 15m walk-forward replay.
+ * A forecast is issued every five closed candles for the next five candles.
+ * At decision index t, analogs are eligible only when their complete window
+ * AND five-candle outcome ended before the current target window began.
  */
 class BlindReplayEngine {
     fun run(
         history: List<StoredCandle>,
         window: Int = 40,
-        horizon: Int = 16,
-        step: Int = 16,
+        horizon: Int = 5,
+        step: Int = 5,
         minSimilarity: Double = 35.0,
         topK: Int = 20,
+        lookbackCandles: Int = 1344,
+        asOfTime: Long = System.currentTimeMillis(),
         progress: (Int, Int) -> Unit = { _, _ -> }
     ): BlindReplayReport {
-        require(window >= 10 && horizon >= 1 && step >= 1 && topK >= 1)
-        if (history.size < window * 4 + horizon * 3) {
-            return empty("Для слепого теста мало истории: нужно несколько независимых окон и завершённых исходов.")
+        require(window >= 10 && horizon >= 1 && step >= 1 && topK >= 1 && lookbackCandles >= horizon)
+        // Ignore the currently forming 15m candle. openTime is aligned to 15m.
+        val closed = history.filter { it.openTime + 15L * 60L * 1000L <= asOfTime }
+        if (closed.size < window * 4 + horizon * 3) {
+            return empty("Недостаточно закрытой истории BTCUSDT 15m для независимого walk-forward теста.")
         }
-        val points = ArrayList<BlindReplayPoint>()
-        var cursor = window * 3 + horizon
-        val totalSteps = ((history.size - horizon - cursor) / step + 1).coerceAtLeast(1)
-        var completedSteps = 0
-        while (cursor + horizon <= history.size) {
+        val evaluationStart = (closed.size - lookbackCandles).coerceAtLeast(window * 3 + horizon)
+        val firstDecision = evaluationStart.coerceAtLeast(window * 3 + horizon)
+        val totalSteps = ((closed.size - horizon - firstDecision) / step + 1).coerceAtLeast(0)
+        if (totalSteps <= 0) return empty("Нет полного 14-дневного окна для прогнозов.")
+        val points = ArrayList<BlindReplayPoint>(totalSteps)
+        var cursor = firstDecision
+        var completed = 0
+        while (cursor + horizon <= closed.size) {
             val targetStart = cursor - window
-            val target = history.subList(targetStart, cursor)
-            val targetVector = vector(target)
+            val targetVector = returnVector(closed, targetStart, window)
             val analogs = ArrayList<Pair<Double, Double>>()
             var candidate = 0
+            // Candidate's full five-candle outcome must be known before target window starts.
             val candidateLimit = targetStart - window - horizon
             while (candidate <= candidateLimit) {
-                val sample = history.subList(candidate, candidate + window)
-                val similarity = cosine(targetVector, vector(sample))
+                val similarity = similarity(targetVector, closed, candidate, window)
                 if (similarity >= minSimilarity) {
-                    val base = sample.last().close
-                    val outcome = (history[candidate + window + horizon - 1].close / base - 1.0) * 100.0
-                    analogs.add(similarity to outcome)
+                    val base = closed[candidate + window - 1].close
+                    val outcome = (closed[candidate + window + horizon - 1].close / base - 1.0) * 100.0
+                    if (base > 0.0) analogs.add(similarity to outcome)
                 }
                 candidate += window
             }
             val best = analogs.sortedByDescending { it.first }.take(topK)
             if (best.size >= 3) {
-                val weights = best.map { (it.first.coerceAtLeast(0.0) / 100.0).let { w -> w * w + 0.01 } }
-                val totalWeight = weights.sum()
-                val expected = best.indices.sumOf { best[it].second * weights[it] } / totalWeight
-                val positiveWeight = best.indices.filter { best[it].second > 0.0 }.sumOf { weights[it] } / totalWeight
-                val negativeWeight = best.indices.filter { best[it].second < 0.0 }.sumOf { weights[it] } / totalWeight
+                var totalWeight = 0.0
+                var expected = 0.0
+                var positiveWeight = 0.0
+                var negativeWeight = 0.0
+                for ((sim, outcome) in best) {
+                    val w = (sim.coerceAtLeast(0.0) / 100.0).let { it * it + 0.01 }
+                    totalWeight += w
+                    expected += outcome * w
+                    if (outcome > 0.0) positiveWeight += w
+                    if (outcome < 0.0) negativeWeight += w
+                }
+                expected /= totalWeight
+                positiveWeight /= totalWeight
+                negativeWeight /= totalWeight
                 val direction = when {
                     expected > 0.12 && positiveWeight >= 0.55 -> "LONG"
                     expected < -0.12 && negativeWeight >= 0.55 -> "SHORT"
                     else -> "SIDEWAYS"
                 }
-                val future = history.subList(cursor, cursor + horizon)
-                val base = history[cursor - 1].close
-                val actualReturn = (future.last().close / base - 1.0) * 100.0
+                val base = closed[cursor - 1].close
+                val actualReturn = if (base > 0.0) (closed[cursor + horizon - 1].close / base - 1.0) * 100.0 else 0.0
                 val actual = when {
                     actualReturn > 0.12 -> "LONG"
                     actualReturn < -0.12 -> "SHORT"
                     else -> "SIDEWAYS"
                 }
                 points.add(BlindReplayPoint(
-                    history[cursor - 1].openTime, direction, actual,
+                    closed[cursor - 1].openTime, direction, actual,
                     maxOf(positiveWeight, negativeWeight) * 100.0,
                     expected, actualReturn, best.size
                 ))
             }
-            completedSteps++
-            if (completedSteps % 10 == 0 || completedSteps == totalSteps) progress(completedSteps, totalSteps)
+            completed++
+            if (completed % 5 == 0 || completed == totalSteps) progress(completed, totalSteps)
             cursor += step
         }
-        if (points.isEmpty()) return empty("Аналоги не прошли минимальный порог сходства. Снизьте порог или загрузите больше истории.")
+        if (points.isEmpty()) return empty("Не найдено достаточно исторических аналогов. Проверьте полноту истории или порог сходства.")
         val directional = points.filter { it.predicted != "SIDEWAYS" }
-        val correct = directional.count { it.predicted == it.actual }
+        val correct = points.count { it.predicted == it.actual }
         val returns = directional.map { p ->
-            when {
-                p.predicted == "LONG" -> p.actualReturnPct
-                p.predicted == "SHORT" -> -p.actualReturnPct
+            when (p.predicted) {
+                "LONG" -> p.actualReturnPct
+                "SHORT" -> -p.actualReturnPct
                 else -> 0.0
             }
         }
@@ -116,36 +129,59 @@ class BlindReplayEngine {
             peak = maxOf(peak, equity)
             maxDd = maxOf(maxDd, (peak - equity) / peak * 100.0)
         }
-        val accuracy = if (directional.isEmpty()) 0.0 else correct.toDouble() / directional.size * 100.0
+        val accuracy = if (points.isEmpty()) 0.0 else correct.toDouble() / points.size * 100.0
         val coverage = directional.size.toDouble() / points.size * 100.0
         val avg = if (returns.isEmpty()) 0.0 else returns.average()
         val cumulative = (equity - 1.0) * 100.0
-        return BlindReplayReport(points.size, directional.size, correct, accuracy, coverage, avg, cumulative, maxDd,
-            points.takeLast(30),
-            "Исторический walk-forward replay без доступа к будущим свечам на момент решения. Это исследовательский прогон: без комиссий, проскальзывания и funding; пересекающиеся тестовые периоды возможны. Результат не является доказательством будущей доходности.")
+        val meanAbsError = points.map { kotlin.math.abs(it.predictedReturnPct - it.actualReturnPct) }.average()
+        return BlindReplayReport(
+            points.size, directional.size, correct, accuracy, coverage, avg, cumulative, maxDd,
+            points,
+            "BTCUSDT Binance Spot · 15m. Проверочный участок: последние 14 дней (до 1 344 закрытых свечей). " +
+                "Прогноз обновляется каждые 5 свечей и оценивает следующие 5 свечей (75 минут). " +
+                "Средняя абсолютная ошибка прогноза: %.3f%%. Аналоги и их исходы полностью завершились до целевого окна; " +
+                "будущие свечи не используются. Комиссии и проскальзывание пока не вычтены; результаты не гарантируют будущую доходность."
+                    .format(java.util.Locale.US, meanAbsError)
+        )
     }
 
-    private fun empty(message: String) = BlindReplayReport(0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, emptyList(), message)
+    private fun empty(message: String) =
+        BlindReplayReport(0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, emptyList(), message)
 
-    private fun vector(c: List<StoredCandle>): DoubleArray {
-        val raw = DoubleArray(c.size - 1) { i ->
-            if (c[i].close <= 0.0) 0.0 else ln(c[i + 1].close / c[i].close)
+    private fun returnVector(data: List<StoredCandle>, start: Int, window: Int): DoubleArray {
+        val n = window - 1
+        val raw = DoubleArray(n) { i ->
+            val a = data[start + i].close
+            val b = data[start + i + 1].close
+            if (a > 0.0 && b > 0.0) ln(b / a) else 0.0
         }
         val mean = raw.average()
-        val sd = sqrt(raw.map { (it - mean) * (it - mean) }.average()).coerceAtLeast(1e-9)
-        return DoubleArray(raw.size) { (raw[it] - mean) / sd }
+        val sd = sqrt(raw.sumOf { (it - mean) * (it - mean) } / n).coerceAtLeast(1e-9)
+        return DoubleArray(n) { (raw[it] - mean) / sd }
     }
 
-    private fun cosine(a: DoubleArray, b: DoubleArray): Double {
-        var dot = 0.0
-        var aa = 0.0
-        var bb = 0.0
-        for (i in a.indices) {
-            dot += a[i] * b[i]
-            aa += a[i] * a[i]
-            bb += b[i] * b[i]
+    private fun similarity(target: DoubleArray, data: List<StoredCandle>, start: Int, window: Int): Double {
+        val n = window - 1
+        var mean = 0.0
+        for (i in 0 until n) {
+            val a = data[start + i].close
+            val b = data[start + i + 1].close
+            mean += if (a > 0.0 && b > 0.0) ln(b / a) else 0.0
         }
-        if (aa <= 0.0 || bb <= 0.0) return 0.0
-        return (dot / sqrt(aa * bb)).coerceIn(-1.0, 1.0) * 100.0
+        mean /= n
+        var variance = 0.0
+        var dot = 0.0
+        var targetNorm = 0.0
+        for (i in 0 until n) {
+            val a = data[start + i].close
+            val b = data[start + i + 1].close
+            val r = (if (a > 0.0 && b > 0.0) ln(b / a) else 0.0) - mean
+            variance += r * r
+            dot += target[i] * r
+            targetNorm += target[i] * target[i]
+        }
+        val denom = sqrt(variance * targetNorm)
+        if (denom <= 0.0) return 0.0
+        return (dot / denom).coerceIn(-1.0, 1.0) * 100.0
     }
 }
