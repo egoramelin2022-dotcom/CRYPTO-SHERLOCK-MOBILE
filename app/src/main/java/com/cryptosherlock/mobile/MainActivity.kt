@@ -171,11 +171,19 @@ class MainActivity : Activity() {
             setOnClickListener { runBlindReplay() }
         }
         root.addView(replayButton, LinearLayout.LayoutParams(-1, 48).apply { topMargin = 6 })
+        val portfolioCard = TextView(this).apply {
+            text = "ПОРТФЕЛЬ · РЕЖИМ НАБЛЮДЕНИЯ\\n\\nЗдесь появятся выбранные активы, виртуальные позиции, риск на сделку и журнал результатов. Реальные ордера не подключены."
+            textSize = 13f
+            setTextColor(white)
+            setPadding(12, 12, 12, 12)
+            setBackgroundColor(panel)
+        }
+        root.addView(portfolioCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8 })
         status = TextView(this).apply {
             text = "Автообновление каждые 30 секунд · Binance Spot"
             textSize = 10f
             setTextColor(muted)
-            setPadding(2, 5, 2, 0)
+            setPadding(2, 8, 2, 8)
         }
         root.addView(status)
         val scroll = ScrollView(this).apply {
@@ -183,7 +191,36 @@ class MainActivity : Activity() {
             setBackgroundColor(bg)
             addView(root, ViewGroup.LayoutParams(-1, -2))
         }
-        setContentView(scroll)
+        val shell = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(bg)
+            addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(panel)
+            setPadding(2, 4, 2, 4)
+        }
+        fun addTab(label: String, target: View) {
+            nav.addView(Button(this).apply {
+                text = label
+                textSize = 9f
+                isAllCaps = false
+                minWidth = 0
+                setPadding(1, 0, 1, 0)
+                setOnClickListener {
+                    scroll.post { scroll.smoothScrollTo(0, target.top.coerceAtLeast(0)) }
+                }
+            }, LinearLayout.LayoutParams(0, dp(52), 1f))
+        }
+        addTab("РЫНОК", price)
+        addTab("ШЕРЛОК", patternButton)
+        addTab("АНАЛИЗ", forecastCard)
+        addTab("REPLAY", replayButton)
+        addTab("ПОРТФЕЛЬ", portfolioCard)
+        shell.addView(nav, LinearLayout.LayoutParams(-1, dp(56)))
+        setContentView(shell)
         candleStore = CandleStore(this)
         status.text = "Запуск · подключаем рынок и локальную базу…"
         // SQLite opening/counting is disk I/O: never do it on Android's UI thread.
