@@ -45,7 +45,7 @@ class MainActivity : Activity() {
     private lateinit var candleStore: CandleStore
     private var interval = "15m"
     private val fmt = DecimalFormat("#,##0.00")
-    private val executor = Executors.newSingleThreadExecutor()
+    private val marketExecutor = Executors.newSingleThreadExecutor()\n    private val analysisExecutor = Executors.newSingleThreadExecutor()\n    private val historyExecutor = Executors.newSingleThreadExecutor()
     private val loading = AtomicBoolean(false)
     private val handler = Handler(Looper.getMainLooper())
     private var lastSnapshot: MarketSnapshot? = null
@@ -336,7 +336,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        executor.shutdownNow()
+        marketExecutor.shutdownNow()\n        analysisExecutor.shutdownNow()\n        historyExecutor.shutdownNow()
         super.onDestroy()
     }
 
