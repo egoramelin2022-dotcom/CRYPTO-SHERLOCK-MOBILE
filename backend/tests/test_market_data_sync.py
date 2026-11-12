@@ -86,6 +86,8 @@ def test_empty_source_page_is_not_reported_as_complete_and_can_resume():
         assert second.fetched == 2
         assert second.inserted == 2  # cumulative inserts across the resumed job
         assert engine.repository.count("BTCUSDT", "15m") == 2
+        gap_status = conn.execute("SELECT status FROM data_gaps").fetchone()[0]
+        assert gap_status == "RECOVERED"
     finally:
         engine.close()
         client.close()
