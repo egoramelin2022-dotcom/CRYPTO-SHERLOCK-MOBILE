@@ -125,7 +125,7 @@ class MainActivity : Activity() {
         }
         root.addView(signalCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8 })
         forecastCard = TextView(this).apply {
-            text = "MULTI-TIMEFRAME FORECAST\\nОжидаем данные 15m / 1h / 4h / 1d…"
+            text = "MULTI-TIMEFRAME FORECAST\nОжидаем данные 15m / 1h / 4h / 1d…"
             textSize = 12f
             setTextColor(white)
             setPadding(12, 10, 12, 10)
@@ -172,7 +172,7 @@ class MainActivity : Activity() {
         }
         root.addView(replayButton, LinearLayout.LayoutParams(-1, 48).apply { topMargin = 6 })
         val portfolioCard = TextView(this).apply {
-            text = "ПОРТФЕЛЬ · РЕЖИМ НАБЛЮДЕНИЯ\\n\\nЗдесь появятся выбранные активы, виртуальные позиции, риск на сделку и журнал результатов. Реальные ордера не подключены."
+            text = "ПОРТФЕЛЬ · РЕЖИМ НАБЛЮДЕНИЯ\n\nЗдесь появятся выбранные активы, виртуальные позиции, риск на сделку и журнал результатов. Реальные ордера не подключены."
             textSize = 13f
             setTextColor(white)
             setPadding(12, 12, 12, 12)
@@ -389,16 +389,16 @@ class MainActivity : Activity() {
     }
 
     private fun renderForecast(f: ForecastSnapshot) {
-        val lines = f.states.joinToString("\\n") {
+        val lines = f.states.joinToString("\n") {
             it.interval + " · " + it.bias + " · RSI " + String.format(Locale.US, "%.1f", it.rsi) +
                 " · ATR " + String.format(Locale.US, "%.2f", it.atrPct) + "% · объём x" +
                 String.format(Locale.US, "%.2f", it.volumeRatio)
         }
-        forecastCard.text = "FORECAST ENGINE · ЭКСПЕРИМЕНТАЛЬНЫЙ\\n" +
-            "LONG " + f.longPct + "%  |  SHORT " + f.shortPct + "%  |  SIDEWAYS " + f.sidewaysPct + "%\\n" +
-            f.entryState + "\\nЗона наблюдения: " + fmt.format(f.entryLow) + " — " + fmt.format(f.entryHigh) +
-            "\\nИнвалидация сценария: " + fmt.format(f.invalidation) + "\\n" + lines +
-            "\\nОценки основаны на правилах, НЕ откалиброваны как реальные вероятности. " + f.rationale
+        forecastCard.text = "FORECAST ENGINE · ЭКСПЕРИМЕНТАЛЬНЫЙ\n" +
+            "LONG " + f.longPct + "%  |  SHORT " + f.shortPct + "%  |  SIDEWAYS " + f.sidewaysPct + "%\n" +
+            f.entryState + "\nЗона наблюдения: " + fmt.format(f.entryLow) + " — " + fmt.format(f.entryHigh) +
+            "\nИнвалидация сценария: " + fmt.format(f.invalidation) + "\n" + lines +
+            "\nОценки основаны на правилах, НЕ откалиброваны как реальные вероятности. " + f.rationale
     }
 
     private fun render(s: MarketSnapshot, a: Signal) {
