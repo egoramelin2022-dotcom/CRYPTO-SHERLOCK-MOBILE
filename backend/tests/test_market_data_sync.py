@@ -244,3 +244,33 @@ def test_restart_after_candle_commit_before_checkpoint_is_safe():
         engine.close()
         client.close()
         conn.close()
+
+def test_sparse_page_is_ingested_but_marked_partial_with_gap_registry():
+    conn = sqlite3.connect(":memory:")
+    step = 900000
+
+    def handler(request: httpx.Request):
+        return httpx.Response(
+            200, json=[kline(0), kline(2 * step)], request=request
+        )
+
+    engine, client = make_engine(conn, handler)
+    try:
+        result = engine.sync(
+            symbol="BTCUSDT", interval="15m", start_ms=0,
+            end_ms=2 * step,
+        )
+        assert result.status == "PARTIAL"
+        assert engine.repository.count("BTCUSDT", "15m") == 2
+        gaps = conn.execute(
+            """SELECT previous_open_time, next_open_time, missing_candles,
+                      status, source
+               FROM data_gaps"""
+        ).fetchall()
+        assert gaps == [(0, 2 * step, 1, "GAP_DETECTED", "BINANCE_SPOT_REST")]
+        job_status = conn.execute("SELECT status FROM sync_jobs").fetchone()[0]
+        assert job_status == "PARTIAL"
+    finally:
+        engine.close()
+        client.close()
+        conn.close()
