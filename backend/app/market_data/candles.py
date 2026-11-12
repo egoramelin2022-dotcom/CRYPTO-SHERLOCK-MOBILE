@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -26,11 +27,15 @@ class Candle:
 
     def validate(self) -> None:
         """Reject malformed or internally inconsistent exchange candles."""
-        if not self.symbol or not self.symbol.isalnum():
+        if not isinstance(self.symbol, str) or not self.symbol or not self.symbol.isalnum():
             raise ValueError("invalid symbol")
         step = interval_to_ms(self.interval)
+        if isinstance(self.open_time, bool) or not isinstance(self.open_time, int):
+            raise ValueError("open_time must be an integer")
         if self.open_time < 0 or self.open_time % step:
             raise ValueError("open_time is not aligned to interval")
+        if isinstance(self.close_time, bool) or not isinstance(self.close_time, int):
+            raise ValueError("close_time must be an integer")
         if self.close_time != self.open_time + step - 1:
             raise ValueError("close_time does not match interval")
         prices = (self.open, self.high, self.low, self.close)
@@ -48,10 +53,10 @@ class Candle:
             raise ValueError("taker_buy_base must be finite and nonnegative")
         if not _finite_nonnegative(self.taker_buy_quote):
             raise ValueError("taker_buy_quote must be finite and nonnegative")
-        if isinstance(self.trade_count, bool) or self.trade_count < 0:
-            raise ValueError("trade_count must be a nonnegative integer")
-        if not isinstance(self.trade_count, int):
+        if isinstance(self.trade_count, bool) or not isinstance(self.trade_count, int):
             raise ValueError("trade_count must be an integer")
+        if self.trade_count < 0:
+            raise ValueError("trade_count must be nonnegative")
         if self.taker_buy_base > self.volume + 1e-12:
             raise ValueError("taker_buy_base exceeds total base volume")
         if self.taker_buy_quote > self.quote_volume + 1e-12:
@@ -59,13 +64,21 @@ class Candle:
 
 
 def _finite_positive(value: float) -> bool:
-    import math
-    return isinstance(value, (int, float)) and math.isfinite(value) and value > 0
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and value > 0
+    )
 
 
 def _finite_nonnegative(value: float) -> bool:
-    import math
-    return isinstance(value, (int, float)) and math.isfinite(value) and value >= 0
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and value >= 0
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,7 +95,9 @@ def find_gaps(open_times: Iterable[int], interval: str) -> list[Gap]:
     gaps: list[Gap] = []
     previous = None
     for current in ordered:
-        if current % step:
+        if isinstance(current, bool) or not isinstance(current, int):
+            raise ValueError("timestamps must be integers")
+        if current < 0 or current % step:
             raise ValueError(f"unaligned candle timestamp: {current}")
         if previous is not None:
             delta = current - previous
