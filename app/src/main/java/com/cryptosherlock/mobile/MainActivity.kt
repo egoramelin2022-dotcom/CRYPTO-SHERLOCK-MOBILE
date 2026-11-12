@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.Color
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -164,7 +165,7 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this).apply {
             isFillViewport = false
             setBackgroundColor(bg)
-            addView(root, ScrollView.LayoutParams(-1, -2))
+            addView(root, ViewGroup.LayoutParams(-1, -2))
         }
         setContentView(scroll)
         candleStore = CandleStore(this)
