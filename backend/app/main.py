@@ -162,11 +162,16 @@ async def start_pattern_research(
     adaptive_min_window: int = Query(20, ge=5, le=500),
     adaptive_max_window: int = Query(100, ge=5, le=500),
     adaptive_step: int = Query(20, ge=1, le=500),
-    adaptive_candidate_budget: int = Query(5000, ge=100, le=20000),
+    adaptive_candidate_budget: int = Query(5000, ge=100, le=5000),
 ) -> dict[str, Any]:
     """Queue free or five-stage historical analog search on verified local candles."""
     if mode == "five_stage" and query_window < 5:
         raise HTTPException(status_code=422, detail="five_stage requires at least five candles")
+    if adaptive_search:
+        if adaptive_min_window > adaptive_max_window:
+            raise HTTPException(status_code=422, detail="adaptive_min_window must not exceed adaptive_max_window")
+        if len(range(adaptive_min_window, adaptive_max_window + 1, adaptive_step)) > 10:
+            raise HTTPException(status_code=422, detail="adaptive search supports at most 10 window lengths")
     job = research_jobs._new_job("pattern_research")
     background_tasks.add_task(
         _run_desktop_research_job, job.job_id, desktop_services.run_pattern_research,
