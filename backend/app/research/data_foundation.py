@@ -61,7 +61,7 @@ def audit_sqlite_dataset(
         raise ValueError("table must be a simple SQLite identifier")
 
     stat = path.stat()
-    with _readonly_connection(path) as connection:
+    with closing(_readonly_connection(path)) as connection:
         integrity_rows = [row[0] for row in connection.execute("PRAGMA integrity_check")]
         table_row = connection.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
