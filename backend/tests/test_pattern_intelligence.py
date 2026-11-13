@@ -149,3 +149,30 @@ def test_search_requires_at_least_one_forward_horizon():
         assert "at least one forward horizon" in str(exc)
     else:
         raise AssertionError("empty horizons must be rejected")
+
+
+def test_candidate_stride_samples_candidates_without_crossing_query_embargo():
+    rows = [candle(i, 100 + (i % 13)) for i in range(120)]
+    full = search_analogs(
+        rows, query_start=100, query_end=109, top_k=5,
+        horizons=(1, 4), candidate_stride=1,
+    )
+    sampled = search_analogs(
+        rows, query_start=100, query_end=109, top_k=5,
+        horizons=(1, 4), candidate_stride=7,
+    )
+    assert sampled.candidate_stride == 7
+    assert sampled.candidates_examined < full.candidates_examined
+    assert all(item.end_index + 4 < sampled.query_start_index for item in sampled.analogs)
+    assert sampled.to_dict()["candidate_sampling"] == "uniform_index_stride"
+
+
+def test_candidate_stride_rejects_invalid_values():
+    rows = [candle(i, 100 + i) for i in range(20)]
+    for stride in (0, -1, 1.5, True):
+        try:
+            search_analogs(rows, query_start=12, query_end=15, candidate_stride=stride)
+        except ValueError as exc:
+            assert "candidate_stride" in str(exc)
+        else:
+            raise AssertionError("invalid candidate stride must be rejected")
