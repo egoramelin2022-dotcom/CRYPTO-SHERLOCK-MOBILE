@@ -10,7 +10,7 @@ py -3.12 -m venv .venv-desktop
 .\\.venv-desktop\\Scripts\\python.exe -m desktop
 ```
 
-The Windows package includes a local backend executable. Open **Server Settings**, select the existing `sherlock_market.db`, choose a separate analytics database path, then save and start the local server. The desktop launches the backend on `127.0.0.1:8000` and stops the process when the app closes. The source database is never used for writes.
+The Windows package includes a local backend executable. Open **Server Settings**, select the existing `sherlock_market.db`, choose a separate analytics database path, then save and start the local server. Saving changed paths restarts the bundled backend. After a historical archive download completes, you can select the staging database as the source for a separate research run. The desktop launches the backend on `127.0.0.1:8000` and stops the process when the app closes. The source database is never used for writes.
 
 ## Connected workflows
 
