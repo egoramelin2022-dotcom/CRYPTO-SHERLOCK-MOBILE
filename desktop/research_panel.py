@@ -288,6 +288,8 @@ class ResearchPanel(QWidget):
                         f"avg/fold {values['average_return_per_fold']:+.2%} · "
                         f"positive {values['positive_fold_rate']:.0%} · "
                         f"max DD {values['max_drawdown_sum_basis']:.2%}"
+                    if strategy == "model":
+                        summary.append(f"      Trades: {values.get('trades', 0)} · FLAT folds: {values.get('flat_folds', 0)}")
                     )
         if "history_candles" in result and result.get("query_selection") is not None:
             query_label = (
