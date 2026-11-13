@@ -324,10 +324,14 @@ def run_intelligence_core_research(
     result.update({
         "query_window": query_window,
         "query_selection": query_selection,
+        "query_start_time": candles[query_start].open_time,
+        "query_end_time": candles[query_end].open_time,
+        "candidates_examined": result["provenance"]["candidates_examined"],
         "candidate_budget": candidate_budget,
         "data_sources": data_sources,
         "history_candles": len(candles),
         "historical_gaps": len(gaps),
+        "contiguous_segments": len(gaps) + 1,
         "data_freshness": {
             "latest_closed_candle_time": candles[-1].close_time,
             "age_hours": age_hours,
