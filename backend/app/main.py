@@ -151,12 +151,15 @@ async def start_ensemble_research(
     top_k: int = Query(10, ge=1, le=100),
     mode: str = Query("free", pattern=r"^(free|five_stage)$"),
     include_stumpy: bool = Query(False),
+    fee_bps_per_side: float = Query(0.0, ge=0, lt=10_000),
+    slippage_bps_per_side: float = Query(0.0, ge=0, lt=10_000),
 ) -> dict[str, Any]:
     """Queue read-only Pattern Intelligence + optional STUMPY research."""
     job = research_jobs.queue_ensemble()
     background_tasks.add_task(
         research_jobs.run_ensemble_job,
         job["job_id"], symbol, interval, window, top_k, mode, include_stumpy,
+        fee_bps_per_side, slippage_bps_per_side,
     )
     return job
 
