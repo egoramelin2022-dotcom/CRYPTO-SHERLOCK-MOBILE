@@ -163,8 +163,10 @@ class ResearchPanel(QWidget):
         self.robustness_button = None
         if kind == "walk_forward":
             self.robustness_button = QPushButton("RUN ROBUSTNESS AUDIT")
-            self.robustness_button.setToolTip("Run bounded independent parameter sensitivity checks; no winner is selected.")
-            self.robustness_button.clicked.connect(lambda: self.run_research("/v1/research/robustness"))
+            self.robustness_button.setToolTip(
+                "Run up to five independent parameter configurations. "
+                "Capped at 30 folds and 2,000 candidate windows per fold; no winner is selected."
+            )
             actions.addWidget(self.robustness_button)
         actions.addStretch(1)
         root.addLayout(actions)
@@ -240,7 +242,12 @@ class ResearchPanel(QWidget):
                 "mode": self.mode.currentData(),
                 "top_k": self.top_k.value(),
             })
+        if endpoint_override and endpoint_override.endswith("/robustness"):
+            params["max_folds"] = min(params.get("max_folds", 20), 30)
+            params["candidate_budget"] = min(params.get("candidate_budget", 1000), 2000)
         self.run_button.setEnabled(False)
+        if self.robustness_button is not None:
+            self.robustness_button.setEnabled(False)
         self.output.clear()
         self.status.setText("Submitting research job…")
         self.worker = ResearchJobWorker(self.api_url, endpoint_override or self.endpoint, params)
@@ -248,6 +255,8 @@ class ResearchPanel(QWidget):
         self.worker.completed.connect(self.on_completed)
         self.worker.failed.connect(self.on_failed)
         self.worker.finished.connect(lambda: self.run_button.setEnabled(True))
+        if self.robustness_button is not None:
+            self.worker.finished.connect(lambda: self.robustness_button.setEnabled(True))
         self.worker.start()
 
     def on_completed(self, job: dict):
