@@ -38,6 +38,7 @@ def test_walk_forward_uses_strictly_prior_analogs_and_reports_baselines():
     )
     assert result["evaluated_folds"] >= 2
     assert result["anti_leakage"]["training_is_strictly_before_test_start"] is True
+    assert result["anti_leakage"]["future_candles_excluded_from_analog_search"] is True
     assert result["anti_leakage"]["candidate_forward_outcomes_end_before_test_start"] is True
     assert result["anti_leakage"]["test_windows_and_forward_paths_non_overlapping"] is True
     for fold in result["folds"]:
