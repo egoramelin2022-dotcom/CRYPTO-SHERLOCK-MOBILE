@@ -6,7 +6,7 @@ import httpx
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QComboBox, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel,
-    QPushButton, QTextEdit, QVBoxLayout, QWidget,
+    QMessageBox, QPushButton, QTextEdit, QVBoxLayout, QWidget,
 )
 
 
@@ -95,10 +95,20 @@ class PaperPanel(QWidget):
         self._start("snapshot")
 
     def place_order(self):
+        symbol = self.symbol.currentText()
+        side = self.side.currentText()
+        quantity = self.quantity.value()
+        answer = QMessageBox.question(
+            self, "Confirm virtual order",
+            f"Confirm PAPER ONLY {side} of {quantity:.8f} {symbol}?\n\n"
+            "This changes only the local virtual portfolio. No exchange order is sent.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
         self._start("order", {
-            "symbol": self.symbol.currentText(),
-            "side": self.side.currentText(),
-            "quantity": self.quantity.value(),
+            "symbol": symbol, "side": side, "quantity": quantity,
         })
 
     def _on_done(self, result: dict):
