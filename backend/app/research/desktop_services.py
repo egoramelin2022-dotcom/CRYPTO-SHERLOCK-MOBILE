@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+from bisect import bisect_left
 import os
 from dataclasses import asdict
 from pathlib import Path
@@ -81,14 +82,25 @@ def run_pattern_research(
     symbol: str = "BTCUSDT", interval: str = "15m", query_window: int = 40,
     mode: str = "free", top_k: int = 10, history_limit: int = 400000,
     fee_bps_per_side: float = 5.0, slippage_bps_per_side: float = 2.0,
+    query_start_time: int | None = None,
 ) -> dict[str, Any]:
     if history_limit < query_window + 2 or history_limit > 500000:
         raise ValueError("history_limit must be between query_window + 2 and 500000")
     candles, data_sources = _load_candles(symbol, interval, history_limit)
     if len(candles) <= query_window:
         raise ValueError("Not enough local history for query window and earlier analogs")
-    query_start = len(candles) - query_window
-    query_end = len(candles) - 1
+    if query_start_time is None:
+        query_start = len(candles) - query_window
+    else:
+        if isinstance(query_start_time, bool) or not isinstance(query_start_time, int) or query_start_time < 0:
+            raise ValueError("query_start_time must be a nonnegative UTC millisecond timestamp")
+        open_times = [item.open_time for item in candles]
+        query_start = bisect_left(open_times, query_start_time)
+        if query_start >= len(candles) or open_times[query_start] != query_start_time:
+            raise ValueError("query_start_time does not match an available closed candle open time")
+        if query_start + query_window > len(candles):
+            raise ValueError("query window extends beyond available closed history")
+    query_end = query_start + query_window - 1
     result = search_analogs(
         candles, query_start=query_start, query_end=query_end,
         mode=mode, top_k=top_k, horizons=(1, 4, 16, 32, 64),
@@ -123,6 +135,7 @@ def run_pattern_research(
         "data_sources": data_sources,
         "query_start_time": candles[query_start].open_time,
         "query_end_time": candles[query_end].open_time,
+        "query_selection": "latest_window" if query_start_time is None else "historical_open_time",
         "query_window": query_window,
         "query_chart": {"normalized_close": query_chart},
         "candidates_examined": result.candidates_examined,
