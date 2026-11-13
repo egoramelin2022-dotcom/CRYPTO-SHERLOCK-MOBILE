@@ -24,7 +24,24 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements.txt
-      - name: Install dependencies
+      - name: Install core dependencies
         run: pip install -r requirements.txt
       - name: Run backend tests
         run: pytest -q
+
+  research-integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-research.txt
+      - name: Install optional research dependencies
+        run: pip install -r requirements-research.txt
+      - name: Run real STUMPY integration tests
+        run: pytest -q tests/test_stumpy_adapter_integration.py
