@@ -27,17 +27,18 @@ def fixture():
     # 60 daily candles contain 360 four-hour candles each.
     four_hour = [
         make("BTCUSDT", "4h", i, 97, 99, 95, 97)
-        for i in range(60 * 6)
+        for i in range(61 * 6 - 1)
     ]
-    four_hour.append(make("BTCUSDT", "4h", 60 * 6, 97, 98, 90, 96))
+    four_hour.append(make("BTCUSDT", "4h", 61 * 6 - 1, 97, 98, 90, 96))
 
     # 15m bars throughout the matching 4h interval; one long lower wick.
-    h4_index = 60 * 6
+    h4_index = 61 * 6 - 1
     fifteen = [
         make("BTCUSDT", "15m", i, 96, 97, 95, 96)
         for i in range(h4_index * 16, (h4_index + 1) * 16)
     ]
-    fifteen[3] = make("BTCUSDT", "15m", h4_index * 16 + 3, 96, 97, 88, 96)
+    # The last 15m candle closes simultaneously with the 4h and daily bars.
+    fifteen[15] = make("BTCUSDT", "15m", h4_index * 16 + 15, 96, 97, 88, 96)
     return fifteen, four_hour, daily
 
 
@@ -46,7 +47,7 @@ def test_detects_simultaneous_three_timeframe_setup():
     signals = detect_multitimeframe_setups(m15, h4, d1)
     assert len(signals) == 1
     signal = signals[0]
-    assert signal.timestamp == m15[3].open_time
+    assert signal.timestamp == m15[15].open_time
     assert signal.support_4h == 95
     assert signal.sweep_depth_4h == 5
     assert signal.daily_body_return == pytest.approx(-0.09)
