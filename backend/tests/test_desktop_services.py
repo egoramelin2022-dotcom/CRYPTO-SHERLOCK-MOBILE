@@ -277,6 +277,9 @@ def test_intelligence_core_service_runs_on_read_only_verified_history(tmp_path, 
     assert result["core_version"] == "0.1.0"
     assert result["query_selection"] == "historical_open_time"
     assert result["query"]["start_time"] == 90 * 900_000
+    assert result["query_start_time"] == 90 * 900_000
+    assert result["query_end_time"] == 99 * 900_000
+    assert result["candidates_examined"] > 0
     assert result["data_sources"] == ["source"]
     assert result["history_candles"] == 120
     assert result["decision"]["trading_signal"] is None
