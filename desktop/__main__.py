@@ -302,6 +302,13 @@ class MainWindow(QMainWindow):
         for i, button in enumerate(self.nav_buttons):
             button.setChecked(i == index)
         self.breadcrumb.setText(f"{self.NAV_ITEMS[index][0].upper()}  /  CRYPTO SHERLOCK")
+        if hasattr(self, "market_panel"):
+            if index == 1:
+                self.market_panel.auto_refresh.start(30_000)
+                if self.backend_online:
+                    self.market_panel.refresh()
+            else:
+                self.market_panel.auto_refresh.stop()
     
     def open_server_settings(self):
         dialog = ServerSettingsDialog(self.settings, self)
