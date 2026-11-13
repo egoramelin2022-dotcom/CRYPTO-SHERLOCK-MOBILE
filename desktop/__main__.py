@@ -7,13 +7,15 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 import httpx
-from PySide6.QtCore import Qt, QThread, Signal, QProcess, QProcessEnvironment, QTimer, QSettings
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QProcess, QProcessEnvironment, QTimer, QSettings
 from PySide6.QtGui import QFont
 from desktop.market_panel import MarketPanel
 from desktop.research_panel import ResearchPanel
 from desktop.paper_panel import PaperPanel
 from desktop.download_panel import DownloadPanel
 from desktop.system_panel import SystemPanel
+from desktop.settings_dialog import configure_local_databases
+from desktop.server_manager import EmbeddedBackend
 from desktop.server_settings import ServerSettingsDialog, default_analytics_path
 
 from PySide6.QtWidgets import (
@@ -90,13 +92,19 @@ class MainWindow(QMainWindow):
         ("System Monitor", "08"),
     ]
 
-    def __init__(self):
+    def __init__(self, source_db, analytics_db):
         super().__init__()
         self.setWindowTitle("CRYPTO SHERLOCK")
         self.resize(1480, 920)
         self.setMinimumSize(1120, 720)
         self.api_url = API_DEFAULT
         self.health_worker = None
+        self.backend = EmbeddedBackend(source_db, analytics_db)
+        self.backend.failed.connect(self.on_backend_failed)
+        self.backend.start()
+        self.health_timer = QTimer(self)
+        self.health_timer.timeout.connect(self.check_backend)
+        self.health_timer.start(2000)
         self.settings = QSettings('CRYPTO_SHERLOCK', 'Desktop')
         self.server_process = QProcess(self)
         self.server_process.errorOccurred.connect(self.on_server_error)
@@ -342,10 +350,21 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def check_backend(self):
+        if self.health_worker is not None and self.health_worker.isRunning():
+            return
         self.connection.setText("●  CONNECTING")
         self.health_worker = HealthWorker(self.api_url)
         self.health_worker.result_ready.connect(self.on_health)
         self.health_worker.start()
+
+    def on_backend_failed(self, message: str):
+        self.connection.setText("●  BACKEND FAILED")
+        self.backend_detail.setText(message)
+
+    def closeEvent(self, event):
+        self.health_timer.stop()
+        self.backend.stop()
+        event.accept()
 
     def on_health(self, ok: bool, message: str):
         self.connection.setText("●  BACKEND ONLINE" if ok else "●  BACKEND OFFLINE")
@@ -396,7 +415,10 @@ def main():
     app.setOrganizationName("CRYPTO_SHERLOCK")
     app.setStyle("Fusion")
     app.setStyleSheet(STYLE)
-    window = MainWindow()
+    databases = configure_local_databases()
+    if databases is None:
+        return 0
+    window = MainWindow(*databases)
     window.show()
     return app.exec()
 
