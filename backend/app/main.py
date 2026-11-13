@@ -219,12 +219,13 @@ def _run_desktop_research_job(job_id: str, function, kwargs: dict[str, Any]) -> 
 async def start_archive_download(
     background_tasks: BackgroundTasks,
     start: str = Query("2017-08", pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
-    end: str = Query("2026-10", pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    end: str | None = Query(None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
 ) -> dict[str, Any]:
     """Download official monthly Binance Spot archives into a separate staging DB."""
+    latest_complete_month = (datetime.now(timezone.utc).replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    end = end or latest_complete_month
     if tuple(map(int, start.split("-"))) > tuple(map(int, end.split("-"))):
         raise HTTPException(status_code=422, detail="start month must not be after end month")
-    latest_complete_month = (datetime.now(timezone.utc).replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
     if start < "2017-08" or end > latest_complete_month:
         raise HTTPException(
             status_code=422,
