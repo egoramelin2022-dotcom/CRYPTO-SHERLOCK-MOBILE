@@ -163,6 +163,11 @@ def test_robustness_panel_formats_parameter_stability_without_picking_winner():
                 "top_k": 10,
                 "evaluated_folds": 8,
                 "skipped_fold_count": 1,
+            {
+                "configuration": "longer_window", "query_window": 48, "top_k": 10,
+                "status": "skipped", "reason": "not enough history",
+                "evaluated_folds": 0, "skipped_fold_count": 0,
+            },
             }],
         },
     })
@@ -171,5 +176,6 @@ def test_robustness_panel_formats_parameter_stability_without_picking_winner():
     assert "Configurations evaluated: 4 / 5" in rendered
     assert "positive configurations 50%" in rendered
     assert "no winner selected" in rendered
+    assert "reason: not enough history" in rendered
     panel.close()
     app.processEvents()
