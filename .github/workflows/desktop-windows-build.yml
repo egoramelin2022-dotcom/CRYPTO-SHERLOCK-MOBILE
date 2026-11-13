@@ -56,10 +56,21 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist/CRYPTO-SHERLOCK/Server | Out-Null
           Copy-Item -Path dist/server/CRYPTO-SHERLOCK-Server/* -Destination dist/CRYPTO-SHERLOCK/Server -Recurse -Force
-      - name: Upload Windows application
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Build per-user Windows installer
+        shell: pwsh
+        run: |
+          $compiler = "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe"
+          & $compiler "desktop\\installer.iss"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload Windows installer and portable folder
         uses: actions/upload-artifact@v4
         with:
           name: CRYPTO-SHERLOCK-Windows-x64
-          path: dist/CRYPTO-SHERLOCK/
+          path: |
+            dist/installer/*.exe
+            dist/CRYPTO-SHERLOCK/
           if-no-files-found: error
           retention-days: 14
