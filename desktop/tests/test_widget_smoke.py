@@ -98,6 +98,8 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
         "updated_at": "test",
         "result": {
             "method": "expanding_window_historical_analog_median",
+            "regime_detection_note": "Causal trailing-window heuristic.",
+            "regime_outcomes": {"TREND_UP|4": {"folds": 3, "average_model_return": 0.012, "positive_fold_rate": 0.67}},
             "evaluated_folds": 4,
             "history_candles": 400,
             "skipped_folds": [],
@@ -133,6 +135,8 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
     assert "Model: sum +2.50%" in rendered
     assert "Always Long: sum +1.00%" in rendered
     assert "TEMPORAL STABILITY" in rendered
+    assert "REGIME-CONDITIONAL OUTCOMES" in rendered
+    assert "TREND_UP · +4: 3 folds" in rendered
     assert "+4 recent: model sum +1.00%" in rendered
     panel.close()
     app.processEvents()
