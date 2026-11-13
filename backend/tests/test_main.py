@@ -276,3 +276,59 @@ def test_robustness_endpoint_rejects_training_history_shorter_than_embargo():
         params={"query_window": 40, "min_training_candles": 100},
     )
     assert response.status_code == 422
+
+
+
+def test_intelligence_core_endpoint_queues_research_job(monkeypatch):
+    import app.main as main
+
+    queued = {
+        "job_id": "intelligence-core-job",
+        "kind": "intelligence_core",
+        "status": "queued",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+        "result": None,
+        "error": None,
+    }
+    captured = {}
+    monkeypatch.setattr(
+        main.research_jobs, "_new_job",
+        lambda kind: SimpleNamespace(job_id=queued["job_id"]),
+    )
+    monkeypatch.setattr(main.research_jobs, "get_job", lambda job_id: queued)
+    monkeypatch.setattr(
+        main, "_run_desktop_research_job",
+        lambda job_id, function, kwargs: captured.update(
+            job_id=job_id, function=function, kwargs=kwargs
+        ),
+    )
+    response = client.post(
+        "/v1/research/core",
+        params={
+            "query_window": 32,
+            "mode": "five_stage",
+            "top_k": 20,
+            "min_analogs": 5,
+            "candidate_budget": 1500,
+        },
+    )
+    assert response.status_code == 202
+    assert response.json()["kind"] == "intelligence_core"
+    assert captured["function"] is main.desktop_services.run_intelligence_core_research
+    assert captured["kwargs"]["query_window"] == 32
+    assert captured["kwargs"]["mode"] == "five_stage"
+    assert captured["kwargs"]["candidate_budget"] == 1500
+
+
+def test_intelligence_core_endpoint_rejects_impossible_sample_and_costs():
+    impossible_sample = client.post(
+        "/v1/research/core", params={"top_k": 5, "min_analogs": 6}
+    )
+    assert impossible_sample.status_code == 422
+
+    invalid_costs = client.post(
+        "/v1/research/core",
+        params={"fee_bps_per_side": 6000, "slippage_bps_per_side": 5000},
+    )
+    assert invalid_costs.status_code == 422
