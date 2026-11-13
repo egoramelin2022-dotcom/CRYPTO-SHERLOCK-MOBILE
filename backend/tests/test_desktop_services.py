@@ -193,3 +193,25 @@ def test_adaptive_pattern_search_rejects_invalid_controls(tmp_path, monkeypatch)
         assert "window bounds" in str(exc)
     else:
         raise AssertionError("invalid adaptive window bounds must fail")
+
+
+def test_adaptive_search_skips_only_window_that_crosses_gap(tmp_path, monkeypatch):
+    configure_db(tmp_path, monkeypatch)
+    connection = sqlite3.connect(tmp_path / "source.db")
+    connection.execute(
+        "DELETE FROM candles WHERE symbol=? AND interval=? AND open_time=?",
+        ("BTCUSDT", "15m", 85 * 900_000),
+    )
+    connection.commit()
+    connection.close()
+    result = run_pattern_research(
+        query_window=20, top_k=2, history_limit=120,
+        query_start_time=90 * 900_000,
+        adaptive_search=True, adaptive_min_window=20,
+        adaptive_max_window=30, adaptive_step=10,
+        adaptive_candidate_budget=100,
+    )
+    assert result["adaptive_results"][0]["status"] == "completed"
+    assert result["adaptive_results"][0]["window_length"] == 20
+    assert result["adaptive_results"][1]["status"] == "skipped"
+    assert "missing-candle gap" in result["adaptive_results"][1]["reason"]
