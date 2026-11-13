@@ -15,13 +15,17 @@ historical candidate discovery engines.
    horizon before the query begins.
 5. Convert both engines' candidates to the common evidence contract.
 6. Group exact candidate windows and count distinct supporting modules.
-7. Only after candidate discovery is frozen, evaluate forward paths using
+7. Run leave-one-module-out ablations to measure how removing each engine
+   changes the exact-window candidate set.
+8. Only after candidate discovery is frozen, evaluate forward paths using
    next-candle-open entry, configured fees and slippage.
 
 ## Output and limitations
 
 The result contains module candidate counts, evidence count, exact-window
-consensus, and cost-adjusted LONG/SHORT forward outcome metrics. It does not
+consensus, leave-one-module-out discovery impact, and cost-adjusted LONG/SHORT
+forward outcome metrics. Ablations describe candidate-set changes only; they
+do not establish that a module adds predictive value. It does not
 average engine similarity scores, infer SIDEWAYS labels, calibrate
 probabilities, forecast, or emit trading signals. STUMPY is optional and is
 not imported until explicitly enabled by the caller.
