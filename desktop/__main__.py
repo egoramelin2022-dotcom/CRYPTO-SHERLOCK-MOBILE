@@ -168,7 +168,7 @@ class MainWindow(QMainWindow):
             self.make_research_page("Pattern Intelligence", "Historical analog search with a free mode and the preserved equal-weight five-stage formation.", "/v1/research/pattern", "pattern"),
             self.make_research_page("Multi-Timeframe Scanner", "Aligned 15m lower-wick, 4h support sweep/reclaim and closed 1d bearish-context scan.", "/v1/research/multitimeframe", "mtf"),
             self.make_research_page("Ensemble Engine", "Evidence aggregation with explicit engine availability. No uncalibrated probabilities or signal averaging.", "/v1/research/ensemble", "ensemble"),
-            self.make_research_page("Backtesting Lab", "Historical forward-outcome audit for analogs. Full strategy walk-forward backtesting remains a separate validation stage.", "/v1/research/pattern", "pattern"),
+            self.make_research_page("Backtesting Lab", "Expanding-window out-of-sample validation of historical analog decisions, with embargo, costs and simple baselines.", "/v1/research/walk-forward", "walk_forward"),
             self.make_paper_page(),
             self.make_system_page(),
         ]
