@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import httpx
 import pyqtgraph as pg
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QThread, Signal, QRectF
 from PySide6.QtGui import QPicture, QPainter
 from PySide6.QtWidgets import (
     QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget,
