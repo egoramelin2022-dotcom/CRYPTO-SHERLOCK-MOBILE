@@ -1,4 +1,14 @@
 """Bundled local API server entry point for the Windows desktop package."""
+import os
+import sys
+
+# PyInstaller --windowed builds may expose None for stdio streams. Uvicorn's
+# logging handlers still expect writable streams, so safely redirect them.
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
 import uvicorn
 
 
