@@ -99,10 +99,15 @@ def run_pattern_research(
         mode=mode, top_k=top_k, horizons=(1, 4, 16, 32, 64),
     )
     evidence = pattern_search_evidence(result, candles)
+    query_segment = candles[query_start:query_end + 1]
+    query_chart = [item.close / query_segment[0].close * 100.0 for item in query_segment]
     evaluated = []
     for analog in result.analogs:
+        analog_segment = candles[analog.start_index:analog.end_index + 1]
+        analog_chart = [item.close / analog_segment[0].close * 100.0 for item in analog_segment]
         evaluated.append({
             "analog": asdict(analog),
+            "chart": {"normalized_close": analog_chart},
             "forward_path": evaluate_forward_path(
                 candles, candidate_end_index=analog.end_index,
                 horizons=(1, 4, 16, 32, 64),
@@ -117,6 +122,7 @@ def run_pattern_research(
         "query_start_time": candles[query_start].open_time,
         "query_end_time": candles[query_end].open_time,
         "query_window": query_window,
+        "query_chart": {"normalized_close": query_chart},
         "candidates_examined": result.candidates_examined,
         "evidence": [asdict(item) for item in evidence],
         "analogs": evaluated,
