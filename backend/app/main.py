@@ -11,7 +11,7 @@ BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL", "https://api.binance.com")
 TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 app = FastAPI(
     title="CRYPTO SHERLOCK Data Gateway",
-    version="0.1.0",
+    version="0.3.0",
     description="Read-only public market-data gateway. No exchange credentials or order execution.",
 )
 
@@ -30,7 +30,7 @@ async def binance_get(path: str, params: dict[str, Any]) -> Any:
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "sherlock-data-gateway", "version": "0.1.0"}
+    return {"status": "ok", "service": "sherlock-data-gateway", "version": "0.3.0"}
 
 
 @app.get("/v1/market/ticker/24hr")
