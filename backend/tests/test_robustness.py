@@ -48,3 +48,14 @@ def test_robustness_audit_keeps_parameter_runs_separate_and_reports_baselines():
 def test_robustness_audit_rejects_invalid_parameters():
     with pytest.raises(ValueError, match="query_window"):
         run_robustness_audit(make_candles(), query_window=2)
+
+
+def test_robustness_audit_marks_configurations_skipped_when_history_is_insufficient():
+    result = run_robustness_audit(
+        make_candles(300), query_window=100, top_k=3, max_folds=2,
+        min_training_candles=150, candidate_budget=100,
+    )
+    assert result["configurations_attempted"] >= 1
+    assert result["configurations_evaluated"] == 0
+    assert all(run["status"] == "skipped" for run in result["runs"])
+    assert all(run["reason"] for run in result["runs"])
