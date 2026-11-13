@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import datetime, timezone
 
 import httpx
 import pyqtgraph as pg
@@ -84,6 +85,13 @@ class ResearchPanel(QWidget):
         self.window.setRange(5, 500)
         self.window.setValue(40)
         form.addRow("Query window (candles)", self.window)
+        self.query_start = QLineEdit()
+        self.query_start.setPlaceholderText("Optional · YYYY-MM-DD HH:MM UTC")
+        self.query_start.setToolTip(
+            "Leave empty to analyze the latest closed candles. "
+            "Enter an exact candle open time in UTC to compare a historical sample."
+        )
+        form.addRow("Historical sample start (UTC)", self.query_start)
         self.top_k = QSpinBox()
         self.top_k.setRange(1, 100)
         self.top_k.setValue(10)
@@ -91,7 +99,10 @@ class ResearchPanel(QWidget):
         if kind == "mtf":
             self.mode.setEnabled(False)
             self.window.setEnabled(False)
+            self.query_start.setEnabled(False)
             self.top_k.setEnabled(False)
+        elif kind == "ensemble":
+            self.query_start.setEnabled(False)
         root.addLayout(form)
 
         actions = QHBoxLayout()
@@ -138,6 +149,16 @@ class ResearchPanel(QWidget):
                 "mode": self.mode.currentData(),
                 "top_k": self.top_k.value(),
             })
+            selected_time = self.query_start.text().strip()
+            if selected_time:
+                try:
+                    parsed = datetime.fromisoformat(selected_time.replace("Z", "+00:00"))
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=timezone.utc)
+                    params["query_start_time"] = int(parsed.astimezone(timezone.utc).timestamp() * 1000)
+                except ValueError:
+                    self.status.setText("Invalid sample time · use YYYY-MM-DD HH:MM UTC")
+                    return
         elif self.kind == "ensemble":
             params.update({
                 "interval": self.interval.currentText(),
