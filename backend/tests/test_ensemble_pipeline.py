@@ -68,10 +68,10 @@ def test_stumpy_and_pattern_evidence_are_combined(monkeypatch):
     assert candidate.module_count == 2
 
 
-def test_insufficient_stumpy_history_falls_back_to_pattern():
+def test_short_query_skips_stumpy_and_falls_back_to_pattern():
     rows = make_candles()
     result = run_ensemble_search(
-        rows, query_start_index=8, query_end_index=12,
+        rows, query_start_index=5, query_end_index=6,
         horizons=(1, 2), include_stumpy=True,
     )
     assert result.stumpy_candidate_count == 0
