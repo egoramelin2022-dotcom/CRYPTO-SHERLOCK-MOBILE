@@ -423,13 +423,12 @@ class ResearchPanel(QWidget):
                     directional = score.get("directional_hit_rate_percent")
                     coverage = score.get("coverage_percent")
                     balanced = score.get("balanced_accuracy")
+                    directional_text = f"{directional:.1f}%" if directional is not None else "n/a"
+                    balanced_text = f"{balanced:.1%}" if balanced is not None else "n/a"
                     summary.append(
                         f"    +{horizon}: accuracy {accuracy:.1f}% ({score['correct']}/{score['samples']}) · "
-                        f"directional hit {directional:.1f}% ({score['directional_hits']}/{score['directional_calls']}) · "
-                        f"coverage {coverage:.1f}% · "
-                        f"balanced accuracy {balanced:.1%}" if balanced is not None else
-                        f"    +{horizon}: accuracy {accuracy:.1f}% ({score['correct']}/{score['samples']}) · "
-                        f"directional hit {directional:.1f}% · coverage {coverage:.1f}% · balanced accuracy n/a"
+                        f"directional hit {directional_text} ({score['directional_hits']}/{score['directional_calls']}) · "
+                        f"coverage {coverage:.1f}% · balanced accuracy {balanced_text}"
                     )
                 summary.append("  These are historical out-of-sample rates, not future probabilities or guarantees.")
             if result.get("temporal_stability_by_horizon"):
