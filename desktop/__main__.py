@@ -20,7 +20,7 @@ API_DEFAULT = os.getenv("SHERLOCK_API_URL", "http://127.0.0.1:8000")
 
 
 class HealthWorker(QThread):
-    finished = Signal(bool, str)
+    result_ready = Signal(bool, str)
 
     def __init__(self, base_url: str):
         super().__init__()
@@ -30,7 +30,7 @@ class HealthWorker(QThread):
         try:
             response = httpx.get(f"{self.base_url}/health", timeout=3.0)
             response.raise_for_status()
-            self.finished.emit(True, "Backend connected")
+            self.result_ready.emit(True, "Backend connected")
         except Exception as exc:
             self.finished.emit(False, f"Backend unavailable: {type(exc).__name__}")
 
@@ -270,7 +270,7 @@ class MainWindow(QMainWindow):
     def check_backend(self):
         self.connection.setText("●  CONNECTING")
         self.health_worker = HealthWorker(self.api_url)
-        self.health_worker.finished.connect(self.on_health)
+        self.health_worker.result_ready.connect(self.on_health)
         self.health_worker.start()
 
     def on_health(self, ok: bool, message: str):
