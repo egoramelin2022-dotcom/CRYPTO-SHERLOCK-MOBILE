@@ -14,6 +14,8 @@ If Python 3.12 is not installed, install it before setup. The desktop environmen
 
 ## Current scope
 
+The desktop now includes live market charts, historical Pattern Intelligence search (free and five-stage modes), the multi-timeframe scan, descriptive ensemble evidence, and a persistent manual Paper Trading ledger. The Backtesting Lab currently runs historical analog forward-outcome evaluation; it is not yet a strategy-level walk-forward optimizer.
+
 - Dark professional desktop shell and navigation.
 - Local backend health check without blocking the UI.\n- Live Binance Spot ticker and OHLC candlestick chart for BTCUSDT, ETHUSDT, BNBUSDT and SOLUSDT, with 15m / 1h / 4h / 1d intervals.\n- Candle payload validation (finite values, OHLC bounds, timestamp ordering) before rendering.\n- Market requests run in a worker thread; API failures are displayed instead of fabricating data.
 - Explicit status labels; no fabricated prices, candle counts, scan results or progress.
