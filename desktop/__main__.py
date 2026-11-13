@@ -345,8 +345,14 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.health_timer.stop()
-        if self.health_worker is not None and self.health_worker.isRunning():
-            self.health_worker.wait(3500)
+        workers = self.findChildren(QThread)
+        for worker in workers:
+            if worker.isRunning():
+                worker.requestInterruption()
+        for worker in workers:
+            if worker.isRunning() and not worker.wait(4000):
+                worker.terminate()
+                worker.wait(1000)
         if self.server_process.state() != QProcess.ProcessState.NotRunning:
             self.server_process.terminate()
             if not self.server_process.waitForFinished(3000):
