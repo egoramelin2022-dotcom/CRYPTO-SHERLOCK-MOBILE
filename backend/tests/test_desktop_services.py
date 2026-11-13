@@ -237,3 +237,27 @@ def test_walk_forward_desktop_service_uses_verified_local_history(tmp_path, monk
     assert result["evaluated_folds"] >= 2
     assert result["data_sources"] == ["source"]
     assert result["anti_leakage"]["candidate_forward_outcomes_end_before_test_start"]
+
+
+def test_robustness_desktop_service_uses_verified_local_history(tmp_path, monkeypatch):
+    from app.research.desktop_services import run_robustness_research
+
+    source = tmp_path / "source.db"
+    analytics = tmp_path / "analytics.db"
+    connection = sqlite3.connect(source)
+    repository = CandleRepository(connection)
+    repository.ensure_schema()
+    repository.insert_many(make_candles(500))
+    connection.close()
+    monkeypatch.setenv("SHERLOCK_SOURCE_DB", str(source))
+    monkeypatch.setenv("SHERLOCK_ANALYTICS_DB", str(analytics))
+
+    result = run_robustness_research(
+        query_window=10, top_k=2, max_folds=2,
+        min_training_candles=100, candidate_budget=100,
+        history_limit=500,
+    )
+    assert result["history_candles"] == 500
+    assert result["data_sources"] == ["source"]
+    assert result["configurations_evaluated"] >= 3
+    assert result["method"] == "bounded_one_factor_at_a_time_sensitivity"
