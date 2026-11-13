@@ -90,7 +90,7 @@ class DownloadPanel(QWidget):
         answer = QMessageBox.question(
             self, "Confirm current-month sync",
             "Fetch the current UTC month's fully closed BTCUSDT 15m, 4h and 1d candles "
-            "from public Binance Spot data?\\n\\n"
+            "from public Binance Spot data?\n\n"
             "Only the staging database will be updated. The source database remains untouched.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
