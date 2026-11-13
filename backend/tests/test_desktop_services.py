@@ -164,3 +164,32 @@ def test_pattern_research_rejects_nonexistent_historical_query_start(tmp_path, m
         assert "does not match an available closed candle" in str(exc)
     else:
         raise AssertionError("non-candle timestamps must not be silently rounded")
+
+
+def test_adaptive_pattern_search_keeps_query_end_fixed_and_rankings_separate(tmp_path, monkeypatch):
+    configure_db(tmp_path, monkeypatch)
+    result = run_pattern_research(
+        query_window=20, top_k=2, history_limit=120, adaptive_search=True,
+        adaptive_min_window=10, adaptive_max_window=30, adaptive_step=10,
+        adaptive_candidate_budget=100,
+    )
+    assert result["adaptive_search"] is True
+    completed = [item for item in result["adaptive_results"] if item["status"] == "completed"]
+    assert [item["window_length"] for item in completed] == [10, 20, 30]
+    assert len({item["query_end_time"] for item in completed}) == 1
+    assert all(item["ranking_scope"] == "independent_within_this_window_length" for item in completed)
+    assert "not pooled" in result["adaptive_comparison_note"]
+    assert all(item["candidate_stride"] >= 1 for item in completed)
+
+
+def test_adaptive_pattern_search_rejects_invalid_controls(tmp_path, monkeypatch):
+    configure_db(tmp_path, monkeypatch)
+    try:
+        run_pattern_research(
+            query_window=20, history_limit=120, adaptive_search=True,
+            adaptive_min_window=40, adaptive_max_window=20,
+        )
+    except ValueError as exc:
+        assert "window bounds" in str(exc)
+    else:
+        raise AssertionError("invalid adaptive window bounds must fail")
