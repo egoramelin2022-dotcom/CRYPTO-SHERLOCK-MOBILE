@@ -31,7 +31,19 @@ def test_five_stage_requires_five_candles_and_returns_equal_stage_mode():
                             horizons=(1,), embargo=0)
     assert result.mode == "five_stage"
     assert result.segment_length == 5
+    assert result.to_dict()["stage_weights"] == {
+        "preliminary_decline": 0.2,
+        "recovery": 0.2,
+        "peak": 0.2,
+        "sharp_collapse": 0.2,
+        "sideways_lower_wicks": 0.2,
+    }
     assert result.analogs
+    assert set(result.analogs[0].stage_similarities) == {
+        "preliminary_decline", "recovery", "peak",
+        "sharp_collapse", "sideways_lower_wicks",
+    }
+    assert all(0.0 < score <= 1.0 for score in result.analogs[0].stage_similarities.values())
 
 
 def test_no_candidate_is_returned_when_history_is_too_short():
