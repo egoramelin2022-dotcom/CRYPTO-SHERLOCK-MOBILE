@@ -274,7 +274,6 @@ class ExperimentLedger:
         if interval is not None:
             clauses.append("r.interval=?")
             values.append(interval)
-        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         values.extend([limit, offset])
         with self._connect() as connection:
             rows = connection.execute(
@@ -379,9 +378,13 @@ class ExperimentLedger:
                 if terminal != "completed" and result is not None:
                     issues.append(f"{run_id}: result exists without completed event")
                 if terminal == "completed" and result is not None and events:
-                    completed_payload = json.loads(events[-1]["payload_json"])
-                    if completed_payload.get("result_sha256") != result["result_sha256"]:
-                        issues.append(f"{run_id}: completed event result hash mismatch")
+                    try:
+                        completed_payload = json.loads(events[-1]["payload_json"])
+                    except (TypeError, ValueError):
+                        issues.append(f"{run_id}: completed event payload is not valid JSON")
+                    else:
+                        if completed_payload.get("result_sha256") != result["result_sha256"]:
+                            issues.append(f"{run_id}: completed event result hash mismatch")
                     try:
                         stored_result = json.loads(result["result_json"])
                     except (TypeError, ValueError):
