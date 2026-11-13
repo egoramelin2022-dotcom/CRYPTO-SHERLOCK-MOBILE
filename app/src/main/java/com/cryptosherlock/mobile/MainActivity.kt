@@ -48,6 +48,8 @@ class MainActivity : Activity() {
     private lateinit var patternButton: Button
     private lateinit var fiveStageButton: Button
     private lateinit var cycleButton: Button
+    private lateinit var auditButton: Button
+    private lateinit var pipelineButton: Button
     private lateinit var replayButton: Button
     private lateinit var candleStore: CandleStore
     private var interval = "15m"
@@ -154,6 +156,14 @@ class MainActivity : Activity() {
         lab.addView(fiveStageButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
         cycleButton = button("CYCLE HUNTER  ·  ПОИСК БОЛЬШИХ ЦИКЛОВ") { runCycleHunter() }
         lab.addView(cycleButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
+        auditButton = button("SERVER DATA AUDIT · ПРОВЕРИТЬ БАЗУ") {
+            startResearchJob("/v1/research/audit", "АУДИТ ИСТОРИЧЕСКОЙ БАЗЫ", auditButton)
+        }
+        lab.addView(auditButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
+        pipelineButton = button("SERVER PIPELINE · ПОСТРОИТЬ ПРИЗНАКИ") {
+            startResearchJob("/v1/research/pipeline?symbol=BTCUSDT&interval=15m&window=20", "ИСТОРИЧЕСКИЙ PIPELINE", pipelineButton)
+        }
+        lab.addView(pipelineButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
         val cycleCompareButton = button("СРАВНИТЬ СТРАТЕГИИ · WALK-FORWARD 70/30") { runCycleComparison() }
         lab.addView(cycleCompareButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
         label(lab, "РЕЗУЛЬТАТЫ ИССЛЕДОВАНИЯ")
@@ -439,6 +449,81 @@ class MainActivity : Activity() {
                     status.text = "Загрузка прервана: " + (e.message ?: "ошибка сети") + ". Можно продолжить позже — загрузчик продолжит с последней свечи."
                 }
             }
+        }
+    }
+
+    private fun startResearchJob(path: String, title: String, button: Button) {
+        button.isEnabled = false
+        status.text = "$title · отправляем задание серверу…"
+        analysisExecutor.execute {
+            try {
+                val base = serverBaseUrl()
+                val queued = JSONObject(postUrl(base + path))
+                val jobId = queued.getString("job_id")
+                var finished: JSONObject? = null
+                repeat(400) {
+                    Thread.sleep(1500L)
+                    val current = JSONObject(readUrl("$base/v1/research/jobs/$jobId"))
+                    val state = current.optString("status")
+                    runOnUiThread {
+                        if (!isFinishing) status.text = "$title · $state · $jobId"
+                    }
+                    if (state == "completed" || state == "failed") {
+                        finished = current
+                        return@repeat
+                    }
+                }
+                val finalJob = finished ?: throw IllegalStateException("Задание выполняется дольше 10 минут; проверь статус позже: $jobId")
+                if (finalJob.optString("status") != "completed") {
+                    throw IllegalStateException(finalJob.optString("error", "сервер завершил задание с ошибкой"))
+                }
+                val result = finalJob.optJSONObject("result") ?: JSONObject()
+                val report = if (title.contains("АУДИТ")) {
+                    val datasets = result.optJSONArray("datasets") ?: JSONArray()
+                    val lines = (0 until datasets.length()).map { i ->
+                        val d = datasets.getJSONObject(i)
+                        d.optString("symbol") + " " + d.optString("interval") +
+                            " · строк " + d.optLong("rows") +
+                            " · пропусков " + d.optLong("missing_candles") +
+                            " · повреждённых " + d.optLong("malformed_rows")
+                    }
+                    "SERVER DATA AUDIT\\nIntegrity: " + result.optJSONArray("integrity_check") +
+                        "\\nНаборов: " + datasets.length() + "\\n" + lines.joinToString("\\n")
+                } else {
+                    "HISTORICAL PIPELINE\\nИнструмент: " + result.optString("symbol") +
+                        " · таймфрейм: " + result.optString("interval") +
+                        "\\nСвечей прочитано: " + result.optInt("candles_read") +
+                        "\\nПризнаков рассчитано: " + result.optInt("features_written") +
+                        "\\nРежимов рассчитано: " + result.optInt("regimes_written") +
+                        "\\nНепрерывных сегментов: " + result.optInt("segments") +
+                        "\\nИсходная БД открыта только для чтения. Результаты записаны в отдельную analytics DB."
+                }
+                runOnUiThread {
+                    researchResult.text = report
+                    researchResult.setTextColor(white)
+                    status.text = "$title · ГОТОВО"
+                }
+            } catch (e: Exception) {
+                runOnUiThread { status.text = "$title · ОШИБКА: " + (e.message ?: "неизвестная ошибка") }
+            } finally {
+                runOnUiThread { button.isEnabled = true }
+            }
+        }
+    }
+
+    private fun postUrl(address: String): String {
+        val connection = URL(address).openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.connectTimeout = 8_000
+        connection.readTimeout = 15_000
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Length", "0")
+        return try {
+            connection.outputStream.use { }
+            val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
+            stream.bufferedReader().use { it.readText() }
+        } finally {
+            connection.disconnect()
         }
     }
 
