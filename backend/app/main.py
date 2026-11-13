@@ -142,6 +142,25 @@ async def start_historical_pipeline(
     return job
 
 
+@app.post("/v1/research/ensemble", status_code=202)
+async def start_ensemble_research(
+    background_tasks: BackgroundTasks,
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1M)$"),
+    window: int = Query(20, ge=5, le=500),
+    top_k: int = Query(10, ge=1, le=100),
+    mode: str = Query("free", pattern=r"^(free|five_stage)$"),
+    include_stumpy: bool = Query(False),
+) -> dict[str, Any]:
+    """Queue read-only Pattern Intelligence + optional STUMPY research."""
+    job = research_jobs.queue_ensemble()
+    background_tasks.add_task(
+        research_jobs.run_ensemble_job,
+        job["job_id"], symbol, interval, window, top_k, mode, include_stumpy,
+    )
+    return job
+
+
 @app.get("/v1/research/jobs/{job_id}")
 async def research_job_status(job_id: str) -> dict[str, Any]:
     """Return the current state and result of a research job."""
