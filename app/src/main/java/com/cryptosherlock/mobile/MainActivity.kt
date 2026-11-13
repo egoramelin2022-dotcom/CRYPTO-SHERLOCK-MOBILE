@@ -43,10 +43,13 @@ class MainActivity : Activity() {
     private lateinit var replayResult: TextView
     private lateinit var forecastCard: TextView
     private lateinit var refreshButton: Button
+    private lateinit var serverButton: Button
     private lateinit var historyButton: Button
     private lateinit var patternButton: Button
     private lateinit var fiveStageButton: Button
     private lateinit var cycleButton: Button
+    private lateinit var auditButton: Button
+    private lateinit var pipelineButton: Button
     private lateinit var replayButton: Button
     private lateinit var candleStore: CandleStore
     private var interval = "15m"
@@ -138,6 +141,8 @@ class MainActivity : Activity() {
         market.addView(candleInfo)
         refreshButton = button("↻  ОБНОВИТЬ РЫНОК") { loadMarket(true) }
         market.addView(refreshButton, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
+        serverButton = button("⚙  ПОДКЛЮЧЕНИЕ К СЕРВЕРУ") { configureServer() }
+        market.addView(serverButton, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(6) })
 
         // 02 — SHERLOCK LAB
         val lab = makePage("ШЕРЛОК")
@@ -151,6 +156,14 @@ class MainActivity : Activity() {
         lab.addView(fiveStageButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
         cycleButton = button("CYCLE HUNTER  ·  ПОИСК БОЛЬШИХ ЦИКЛОВ") { runCycleHunter() }
         lab.addView(cycleButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
+        auditButton = button("SERVER DATA AUDIT · ПРОВЕРИТЬ БАЗУ") {
+            startResearchJob("/v1/research/audit", "АУДИТ ИСТОРИЧЕСКОЙ БАЗЫ", auditButton)
+        }
+        lab.addView(auditButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
+        pipelineButton = button("SERVER PIPELINE · ПОСТРОИТЬ ПРИЗНАКИ") {
+            startResearchJob("/v1/research/pipeline?symbol=BTCUSDT&interval=15m&window=20", "ИСТОРИЧЕСКИЙ PIPELINE", pipelineButton)
+        }
+        lab.addView(pipelineButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
         val cycleCompareButton = button("СРАВНИТЬ СТРАТЕГИИ · WALK-FORWARD 70/30") { runCycleComparison() }
         lab.addView(cycleCompareButton, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(7) })
         label(lab, "РЕЗУЛЬТАТЫ ИССЛЕДОВАНИЯ")
@@ -237,9 +250,10 @@ class MainActivity : Activity() {
         refreshButton.isEnabled = false
         marketExecutor.execute {
             try {
-                val ticker = JSONObject(readUrl("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT"))
-                val p = ticker.getString("lastPrice").toDouble()
-                val pct = ticker.getString("priceChangePercent").toDouble()
+                val base = serverBaseUrl()
+                val ticker = JSONObject(readUrl("$base/v1/market/ticker/24hr?symbol=BTCUSDT"))
+                val p = ticker.getDouble("last_price")
+                val pct = ticker.getDouble("price_change_percent")
                 val candles = fetchCandles(interval)
                 if (candles.size < 30) throw IllegalStateException("Недостаточно свечей для анализа")
                 val states = listOf("15m", "1h", "4h", "1d").map { tf ->
@@ -252,7 +266,7 @@ class MainActivity : Activity() {
                     lastSnapshot = snapshot
                     render(snapshot, signal)
                     renderForecast(forecast)
-                    status.text = "Binance Spot · обновлено " + SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(snapshot.fetchedAt)) + " · 4 таймфрейма · авто 30с"
+                    status.text = "SERVER OK · Binance Spot · обновлено " + SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(snapshot.fetchedAt)) + " · 4 таймфрейма · авто 30с"
                 }
             } catch (e: Exception) {
                 runOnUiThread {
@@ -438,12 +452,138 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun startResearchJob(path: String, title: String, button: Button) {
+        button.isEnabled = false
+        status.text = "$title · отправляем задание серверу…"
+        analysisExecutor.execute {
+            try {
+                val base = serverBaseUrl()
+                val queued = JSONObject(postUrl(base + path))
+                val jobId = queued.getString("job_id")
+                var finished: JSONObject? = null
+                for (attempt in 0 until 400) {
+                    Thread.sleep(1500L)
+                    val current = JSONObject(readUrl("$base/v1/research/jobs/$jobId"))
+                    val state = current.optString("status")
+                    runOnUiThread {
+                        if (!isFinishing) status.text = "$title · $state · $jobId"
+                    }
+                    if (state == "completed" || state == "failed") {
+                        finished = current
+                        break
+                    }
+                }
+                val finalJob = finished ?: throw IllegalStateException("Задание выполняется дольше 10 минут; проверь статус позже: $jobId")
+                if (finalJob.optString("status") != "completed") {
+                    throw IllegalStateException(finalJob.optString("error", "сервер завершил задание с ошибкой"))
+                }
+                val result = finalJob.optJSONObject("result") ?: JSONObject()
+                val report = if (title.contains("АУДИТ")) {
+                    val datasets = result.optJSONArray("datasets") ?: JSONArray()
+                    val lines = (0 until datasets.length()).map { i ->
+                        val d = datasets.getJSONObject(i)
+                        d.optString("symbol") + " " + d.optString("interval") +
+                            " · строк " + d.optLong("rows") +
+                            " · пропусков " + d.optLong("missing_candles") +
+                            " · повреждённых " + d.optLong("malformed_rows")
+                    }
+                    "SERVER DATA AUDIT\nIntegrity: " + result.optJSONArray("integrity_check") +
+                        "\nНаборов: " + datasets.length() + "\n" + lines.joinToString("\n")
+                } else {
+                    "HISTORICAL PIPELINE\nИнструмент: " + result.optString("symbol") +
+                        " · таймфрейм: " + result.optString("interval") +
+                        "\nСвечей прочитано: " + result.optInt("candles_read") +
+                        "\nПризнаков рассчитано: " + result.optInt("features_written") +
+                        "\nРежимов рассчитано: " + result.optInt("regimes_written") +
+                        "\nНепрерывных сегментов: " + result.optInt("segments") +
+                        "\nИсходная БД открыта только для чтения. Результаты записаны в отдельную analytics DB."
+                }
+                runOnUiThread {
+                    researchResult.text = report
+                    researchResult.setTextColor(white)
+                    status.text = "$title · ГОТОВО"
+                }
+            } catch (e: Exception) {
+                runOnUiThread { status.text = "$title · ОШИБКА: " + (e.message ?: "неизвестная ошибка") }
+            } finally {
+                runOnUiThread { button.isEnabled = true }
+            }
+        }
+    }
+
+    private fun postUrl(address: String): String {
+        val connection = URL(address).openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.connectTimeout = 8_000
+        connection.readTimeout = 15_000
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Length", "0")
+        return try {
+            connection.outputStream.use { }
+            val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
+            stream.bufferedReader().use { it.readText() }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     private fun fetchCandles(tf: String): List<Candle> {
-        val arr = JSONArray(readUrl("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=" + tf + "&limit=120"))
+        val base = serverBaseUrl()
+        val payload = JSONObject(readUrl("$base/v1/market/klines?symbol=BTCUSDT&interval=$tf&limit=120"))
+        val arr = payload.getJSONArray("candles")
         return (0 until arr.length()).map { i ->
-            val a = arr.getJSONArray(i)
-            Candle(a.getString(1).toFloat(), a.getString(2).toFloat(), a.getString(3).toFloat(),
-                a.getString(4).toFloat(), a.getString(5).toFloat())
+            val a = arr.getJSONObject(i)
+            Candle(a.getDouble("open").toFloat(), a.getDouble("high").toFloat(),
+                a.getDouble("low").toFloat(), a.getDouble("close").toFloat(),
+                a.getDouble("volume").toFloat())
+        }
+    }
+
+    private fun serverBaseUrl(): String {
+        val prefs = getSharedPreferences("sherlock_settings", MODE_PRIVATE)
+        return prefs.getString("server_url", "http://10.0.2.2:8000")!!.trimEnd('/')
+    }
+
+    private fun configureServer() {
+        val input = EditText(this).apply {
+            setSingleLine(true)
+            hint = "http://192.168.1.10:8000"
+            setText(serverBaseUrl())
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(TextView(this@MainActivity).apply {
+                text = "Эмулятор: http://10.0.2.2:8000\nТелефон: http://IP-АДРЕС-ПК:8000 (одна Wi-Fi сеть)"
+                textSize = 12f
+            })
+            addView(input)
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Сервер CRYPTO SHERLOCK")
+            .setView(box)
+            .setNegativeButton("Отмена", null)
+            .setNeutralButton("Проверить") { _, _ -> checkServer(input.text.toString().trim()) }
+            .setPositiveButton("Сохранить") { _, _ ->
+                val value = input.text.toString().trim().trimEnd('/')
+                getSharedPreferences("sherlock_settings", MODE_PRIVATE).edit().putString("server_url", value).apply()
+                status.text = "Адрес сервера сохранён: $value"
+                loadMarket(true)
+            }.show()
+    }
+
+    private fun checkServer(address: String) {
+        historyExecutor.execute {
+            try {
+                val health = JSONObject(readUrl(address.trimEnd('/') + "/health"))
+                runOnUiThread {
+                    status.text = if (health.optString("status") == "ok") "СЕРВЕР ДОСТУПЕН · " + health.optString("service")
+                        else "СЕРВЕР ОТВЕТИЛ, НО СТАТУС НЕ OK"
+                }
+            } catch (e: Exception) {
+                runOnUiThread { status.text = "СЕРВЕР НЕ ДОСТУПЕН: " + (e.message ?: "ошибка сети") }
+            }
         }
     }
 
