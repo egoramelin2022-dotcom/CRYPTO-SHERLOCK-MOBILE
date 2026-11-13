@@ -136,14 +136,15 @@ def test_desktop_pattern_report_exposes_equal_weight_five_stage_evidence(tmp_pat
 
 def test_pattern_research_can_use_an_exact_historical_query_start(tmp_path, monkeypatch):
     configure_db(tmp_path, monkeypatch)
-    selected_open_time = 30 * 900_000
+    selected_open_time = 90 * 900_000
     result = run_pattern_research(
         query_window=10, top_k=2, history_limit=120,
         query_start_time=selected_open_time,
     )
     assert result["query_start_time"] == selected_open_time
-    assert result["query_end_time"] == 39 * 900_000
+    assert result["query_end_time"] == 99 * 900_000
     assert result["query_selection"] == "historical_open_time"
+    assert result["analogs"]
 
 
 def test_pattern_research_rejects_nonexistent_historical_query_start(tmp_path, monkeypatch):
@@ -151,7 +152,7 @@ def test_pattern_research_rejects_nonexistent_historical_query_start(tmp_path, m
     try:
         run_pattern_research(
             query_window=10, top_k=2, history_limit=120,
-            query_start_time=30 * 900_000 + 1,
+            query_start_time=90 * 900_000 + 1,
         )
     except ValueError as exc:
         assert "does not match an available closed candle" in str(exc)
