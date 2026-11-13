@@ -145,6 +145,10 @@ def detect_multitimeframe_setups(
             ]
         ]
         median_body = statistics.median(prior_bodies)
+        if median_body <= 0:
+            # A zero baseline makes every bearish candle appear infinitely large.
+            # Without a measurable prior body distribution, this condition is unknown.
+            continue
         decline_return = (
             bar_1d.close /
             candles_1d[index_1d - config.daily_decline_lookback].close - 1.0
