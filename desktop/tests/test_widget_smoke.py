@@ -23,6 +23,7 @@ def test_desktop_panels_construct_without_backend_or_network():
         SystemPanel("http://127.0.0.1:1"),
     ]
     assert len(widgets) == 7
+    assert not widgets[0].auto_refresh.isActive()  # Market feed is idle until its page is opened.
     for widget in widgets:
         widget.close()
         widget.deleteLater()
