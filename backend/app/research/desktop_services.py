@@ -191,14 +191,25 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
         engines_missing.append("stumpy_runtime")
         stumpy_error = f"{type(exc).__name__}: {exc}"
 
-    report = build_evidence_report(evidence, min_supporting_modules=2)
+    report = (
+        build_evidence_report(evidence, min_supporting_modules=2).to_dict()
+        if evidence else {
+            "interval": interval,
+            "query_start_time": candles[start].open_time,
+            "query_end_time": candles[end].open_time,
+            "evidence_count": 0,
+            "module_count": 0,
+            "candidates": [],
+            "interpretation": "No candidate evidence was produced by the available engines.",
+        }
+    )
     return {
         "symbol": symbol, "mode": mode, "query_window": query_window,
         "data_sources": data_sources,
         "engines_available": engines_available,
         "engines_missing": engines_missing,
         "optional_engine_note": stumpy_error,
-        "evidence_report": report.to_dict(),
+        "evidence_report": report,
         "interpretation": (
             "Only exact candidate windows independently returned by multiple engines "
             "appear in consensus. Consensus is descriptive evidence, not a probability, "
