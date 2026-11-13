@@ -36,7 +36,7 @@ class HealthWorker(QThread):
             response.raise_for_status()
             self.result_ready.emit(True, "Backend connected")
         except Exception as exc:
-            self.finished.emit(False, f"Backend unavailable: {type(exc).__name__}")
+            self.result_ready.emit(False, f"Backend unavailable: {type(exc).__name__}")
 
 
 class MetricCard(QFrame):
@@ -298,9 +298,9 @@ QWidget { color: #E7EDF2; font-family: 'Segoe UI'; font-size: 10pt; }
 #brand { color: #F2F7F8; font-size: 19pt; font-weight: 800; letter-spacing: 1px; }
 #brandSub { color: #56D6B1; font-size: 11pt; font-weight: 700; letter-spacing: 3px; }
 #eyebrow { color: #718392; font-size: 8pt; font-weight: 700; letter-spacing: 1.5px; }
-.navButton { text-align: left; color: #9EACB7; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 12px 10px; font-size: 9.5pt; }
-.navButton:hover { background: #15222B; color: #EAF4F5; }
-.navButton:checked { background: #142B2A; color: #67E0BC; border: 1px solid #24564B; font-weight: 700; }
+#navButton { text-align: left; color: #9EACB7; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 12px 10px; font-size: 9.5pt; }
+#navButton:hover { background: #15222B; color: #EAF4F5; }
+#navButton:checked { background: #142B2A; color: #67E0BC; border: 1px solid #24564B; font-weight: 700; }
 #sidebarFoot { color: #61717D; font-size: 8pt; line-height: 1.6; }
 #topbar { background: #0D141B; border-bottom: 1px solid #1C2933; }
 #topLabel { color: #7F919F; font-size: 8pt; font-weight: 700; letter-spacing: 1px; }
