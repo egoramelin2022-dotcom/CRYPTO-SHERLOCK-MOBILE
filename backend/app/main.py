@@ -215,7 +215,19 @@ def _run_desktop_research_job(job_id: str, function, kwargs: dict[str, Any]) -> 
 @app.get("/v1/paper/portfolio")
 async def get_paper_portfolio() -> dict[str, Any]:
     """Read the persistent local virtual spot portfolio; never touches exchange accounts."""
-    return paper_portfolio.portfolio_snapshot()
+    base = paper_portfolio.portfolio_snapshot()
+    marks: dict[str, float] = {}
+    for position in base.get("positions", []):
+        try:
+            ticker = await binance_get(
+                "/api/v3/ticker/price", {"symbol": position["symbol"]}
+            )
+            marks[position["symbol"]] = float(ticker["price"])
+        except (HTTPException, KeyError, TypeError, ValueError):
+            # If the public quote is unavailable, the ledger reports entry
+            # price as a conservative display fallback and labels it.
+            continue
+    return paper_portfolio.portfolio_snapshot(marks)
 
 
 @app.post("/v1/paper/orders", status_code=201)
