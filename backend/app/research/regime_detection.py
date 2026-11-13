@@ -5,6 +5,7 @@ from statistics import pstdev
 from typing import Sequence, Any
 
 from app.market_data.candles import Candle, find_gaps
+from math import isfinite
 
 
 def classify_regime(
@@ -18,6 +19,17 @@ def classify_regime(
 ) -> dict[str, Any]:
     if isinstance(lookback, bool) or not isinstance(lookback, int) or not 20 <= lookback <= 2000:
         raise ValueError("lookback must be an integer in [20, 2000]")
+    for name, value in (
+        ("high_volatility_threshold", high_volatility_threshold),
+        ("trend_return_threshold", trend_return_threshold),
+        ("accumulation_volume_ratio", accumulation_volume_ratio),
+    ):
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not isfinite(value) or value < 0):
+            raise ValueError(f"{name} must be finite and nonnegative")
+    if accumulation_volume_ratio <= 0:
+        raise ValueError("accumulation_volume_ratio must be positive")
+
     if not candles:
         raise ValueError("candles must not be empty")
     end = len(candles) - 1 if end_index is None else end_index
@@ -27,6 +39,15 @@ def classify_regime(
     rows = list(candles[start:end + 1])
     if len(rows) < 20:
         raise ValueError("at least 20 trailing candles are required")
+    first_symbol, first_interval = rows[0].symbol, rows[0].interval
+    previous_time = None
+    for row in rows:
+        row.validate()
+        if row.symbol != first_symbol or row.interval != first_interval:
+            raise ValueError("regime window candles must share symbol and interval")
+        if previous_time is not None and row.open_time <= previous_time:
+            raise ValueError("regime window timestamps must be strictly increasing")
+        previous_time = row.open_time
     if find_gaps([row.open_time for row in rows], rows[0].interval):
         raise ValueError("regime window crosses a missing-candle gap")
     first, last = rows[0], rows[-1]
@@ -59,6 +80,8 @@ def classify_regime(
         regime = "SIDEWAYS"
 
     return {
+        "symbol": first_symbol,
+        "interval": first_interval,
         "regime": regime,
         "start_index": start,
         "end_index": end,
@@ -70,6 +93,11 @@ def classify_regime(
         "directional_efficiency": efficiency,
         "range_position": range_position,
         "volume_ratio_late_vs_early": volume_ratio,
+        "thresholds": {
+            "high_volatility_per_candle": high_volatility_threshold,
+            "trend_net_return": trend_return_threshold,
+            "accumulation_late_volume_ratio": accumulation_volume_ratio,
+        },
         "causal": True,
         "interpretation": (
             "Rule-based trailing-window descriptor using candles available through "
