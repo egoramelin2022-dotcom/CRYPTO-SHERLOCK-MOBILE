@@ -307,7 +307,7 @@ class ResearchPanel(QWidget):
             ])
         if result.get("core_version"):
             summary.extend([
-                "\\nSHERLOCK INTELLIGENCE CORE · v" + str(result.get("core_version")),
+                "\nSHERLOCK INTELLIGENCE CORE · v" + str(result.get("core_version")),
                 "Research status: " + str(result.get("research_status")),
                 "Core always abstains · no forecast or trading signal is emitted.",
                 f"Pattern analogs: {result.get('modules', {}).get('pattern_intelligence', {}).get('analogs_returned', 0)} · "
