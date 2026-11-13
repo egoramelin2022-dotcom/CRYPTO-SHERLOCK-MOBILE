@@ -47,7 +47,7 @@ def test_detects_simultaneous_three_timeframe_setup():
     signals = detect_multitimeframe_setups(m15, h4, d1)
     assert len(signals) == 1
     signal = signals[0]
-    assert signal.timestamp == m15[15].open_time
+    assert signal.timestamp == m15[15].close_time
     assert signal.support_4h == 95
     assert signal.sweep_depth_4h == 5
     assert signal.daily_body_return == pytest.approx(-0.09)
@@ -64,3 +64,12 @@ def test_rejects_gaps_and_mixed_symbols():
     broken = m15[:2] + m15[3:]
     with pytest.raises(ValueError, match="missing"):
         detect_multitimeframe_setups(broken, h4, d1)
+
+
+def test_does_not_use_unclosed_higher_timeframe_bars():
+    m15, h4, d1 = fixture()
+    # Put the wick earlier in the same 4h/day. At that time, neither the
+    # reclaim bar nor the large daily candle has closed and become observable.
+    m15[15] = make("BTCUSDT", "15m", 61 * 6 * 16 - 1, 96, 97, 95, 96)
+    m15[3] = make("BTCUSDT", "15m", 61 * 6 * 16 - 13, 96, 97, 88, 96)
+    assert detect_multitimeframe_setups(m15, h4, d1) == []
