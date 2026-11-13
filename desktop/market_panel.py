@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import httpx
 import pyqtgraph as pg
-from PySide6.QtCore import QThread, Signal, QRectF
+from PySide6.QtCore import QThread, Signal, QRectF, QTimer
 from PySide6.QtGui import QPicture, QPainter
 from PySide6.QtWidgets import (
     QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget,
@@ -89,6 +89,8 @@ class MarketPanel(QWidget):
         self.symbol.addItems(["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT"])
         self.interval = QComboBox()
         self.interval.addItems(["15m", "1h", "4h", "1d"])
+        self.symbol.currentTextChanged.connect(self.refresh)
+        self.interval.currentTextChanged.connect(self.refresh)
         self.refresh_button = QPushButton("REFRESH MARKET")
         self.refresh_button.clicked.connect(self.refresh)
         controls.addWidget(QLabel("SYMBOL"))
@@ -119,6 +121,9 @@ class MarketPanel(QWidget):
         self.status = QLabel("No market data loaded")
         self.status.setObjectName("muted")
         root.addWidget(self.status)
+        self.auto_refresh = QTimer(self)
+        self.auto_refresh.timeout.connect(self.refresh)
+        self.auto_refresh.start(30_000)
 
     def refresh(self):
         if self.worker is not None and self.worker.isRunning():
