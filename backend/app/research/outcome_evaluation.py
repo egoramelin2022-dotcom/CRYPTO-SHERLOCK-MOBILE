@@ -111,18 +111,26 @@ def evaluate_forward_path(
         raise ValueError("combined per-side costs must be below 10000 bps")
 
     first = candles[0]
-    interval_to_ms(first.interval)
+    step = interval_to_ms(first.interval)
+    previous_time = None
     for candle in candles:
         candle.validate()
         if candle.symbol != first.symbol or candle.interval != first.interval:
             raise ValueError("all candles must share symbol and interval")
+        if previous_time is not None and candle.open_time <= previous_time:
+            raise ValueError("candle timestamps must be strictly increasing")
+        previous_time = candle.open_time
 
+    # Historical data may contain gaps elsewhere. Only the candidate-to-outcome
+    # path is relevant here; reject a gap inside that path, not in an unrelated
+    # older segment of the same loaded history.
     available_end = min(len(candles) - 1,
                         candidate_end_index + max(normalized_horizons))
-    relevant = candles[:available_end + 1]
-    gaps = find_gaps([c.open_time for c in relevant], first.interval)
-    if gaps:
-        raise ValueError("candle sequence contains missing intervals")
+    relevant = candles[candidate_end_index:available_end + 1]
+    if len(relevant) > 1:
+        gaps = find_gaps([c.open_time for c in relevant], first.interval)
+        if gaps:
+            raise ValueError("candidate forward path contains missing intervals")
 
     entry_index = candidate_end_index + 1
     if entry_index >= len(candles):
