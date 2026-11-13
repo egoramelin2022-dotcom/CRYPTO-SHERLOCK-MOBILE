@@ -11,6 +11,7 @@ import math
 from typing import Literal, Sequence
 
 from app.market_data.candles import Candle
+from app.market_data.intervals import interval_to_ms
 
 SearchMode = Literal["free", "five_stage"]
 
@@ -147,12 +148,27 @@ def search_analogs(
     if gap < 0:
         raise ValueError("embargo must be nonnegative")
 
+    step = interval_to_ms(candles[0].interval)
+
+    def is_contiguous(start: int, end: int) -> bool:
+        if start < 0 or end >= len(candles) or start > end:
+            return False
+        return candles[end].open_time - candles[start].open_time == (end - start) * step
+
+    if not is_contiguous(query_start, query_end):
+        raise ValueError("query window crosses a missing-candle gap; choose a fully contiguous latest window")
+
     query = _shape(candles[query_start:query_end + 1])
     last_candidate_end = query_start - gap - 1
     examined = 0
     ranked: list[tuple[float, int]] = []
     for end in range(length - 1, last_candidate_end + 1):
         start = end - length + 1
+        # Both the candidate shape and its maximum forward outcome must be continuous.
+        if not is_contiguous(start, end):
+            continue
+        if max_horizon and not is_contiguous(end, end + max_horizon):
+            continue
         candidate = _shape(candles[start:end + 1])
         distance = _distance(query, candidate, mode)
         ranked.append((distance, start))
