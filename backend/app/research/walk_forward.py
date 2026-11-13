@@ -13,6 +13,7 @@ from typing import Any, Sequence
 from app.market_data.candles import Candle
 from app.research.outcome_evaluation import evaluate_forward_path
 from app.research.pattern_intelligence import search_analogs
+from app.research.regime_detection import classify_regime, summarize_regime_outcomes
 
 DEFAULT_HORIZONS = (1, 4, 16, 32, 64)
 
@@ -210,8 +211,12 @@ def run_walk_forward(
                 "flat_return": 0.0,
             }
 
+        regime = classify_regime(
+            candles, end_index=query_end, lookback=min(96, query_end + 1)
+        )
         fold_rows.append({
             "fold": fold_number,
+            "regime": regime,
             "query_start_index": query_start,
             "query_end_index": query_end,
             "query_start_time": candles[query_start].open_time,
@@ -297,6 +302,11 @@ def run_walk_forward(
         "folds": fold_rows,
         "metrics_by_horizon": metrics,
         "temporal_stability_by_horizon": temporal_stability,
+        "regime_outcomes": summarize_regime_outcomes(fold_rows),
+        "regime_detection_note": (
+            "Causal trailing-window rule labels at each query close; "
+            "ACCUMULATION_CANDIDATE is heuristic, not verified accumulation."
+        ),
         "temporal_stability_note": "Early, middle and recent are chronological thirds of evaluated folds, not inferred market regimes.",
         "baselines": ["always_long", "always_short_theoretical", "flat"],
         "return_accounting": "equal_notional_per_fold_sum; not compounded",
