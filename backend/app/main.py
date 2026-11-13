@@ -4,7 +4,7 @@ import os
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 
 BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL", "https://api.binance.com")
 TIMEOUT = httpx.Timeout(10.0, connect=5.0)
@@ -30,6 +30,25 @@ async def binance_get(path: str, params: dict[str, Any]) -> Any:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "service": "sherlock-data-gateway", "version": "0.1.0"}
+
+
+@app.get("/v1/market/ticker/24hr")
+async def ticker_24hr(
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+) -> dict[str, Any]:
+    """24-hour rolling ticker from public Binance Spot data."""
+    raw = await binance_get("/api/v3/ticker/24hr", {"symbol": symbol})
+    return {
+        "symbol": symbol,
+        "last_price": float(raw["lastPrice"]),
+        "price_change": float(raw["priceChange"]),
+        "price_change_percent": float(raw["priceChangePercent"]),
+        "high_price": float(raw["highPrice"]),
+        "low_price": float(raw["lowPrice"]),
+        "volume": float(raw["volume"]),
+        "quote_volume": float(raw["quoteVolume"]),
+        "trade_count": int(raw["count"]),
+    }
 
 
 @app.get("/v1/market/klines")
@@ -93,3 +112,40 @@ async def aggregate_trades(
         for t in raw
     ]
     return {"symbol": symbol, "count": len(trades), "trades": trades}
+
+
+# Research endpoints use only server-configured local database paths. The
+# source market database is opened read-only by the research modules.
+from app.research import jobs as research_jobs
+
+
+@app.post("/v1/research/audit", status_code=202)
+async def start_data_audit(background_tasks: BackgroundTasks) -> dict[str, Any]:
+    """Queue a structural audit of the configured local source database."""
+    job = research_jobs.queue_audit()
+    background_tasks.add_task(research_jobs.run_audit_job, job["job_id"])
+    return job
+
+
+@app.post("/v1/research/pipeline", status_code=202)
+async def start_historical_pipeline(
+    background_tasks: BackgroundTasks,
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1M)$"),
+    window: int = Query(20, ge=2, le=500),
+) -> dict[str, Any]:
+    """Queue point-in-time feature and regime extraction from local history."""
+    job = research_jobs.queue_pipeline()
+    background_tasks.add_task(
+        research_jobs.run_pipeline_job, job["job_id"], symbol, interval, window
+    )
+    return job
+
+
+@app.get("/v1/research/jobs/{job_id}")
+async def research_job_status(job_id: str) -> dict[str, Any]:
+    """Return the current state and result of a research job."""
+    job = research_jobs.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Research job not found")
+    return job

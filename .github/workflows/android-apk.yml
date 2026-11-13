@@ -2,6 +2,8 @@ name: Build CRYPTO SHERLOCK Android APK
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,22 +19,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Prepare persistent signing key
-        env:
-          KEYSTORE_BASE64: ${{ secrets.CRYPTO_SIGNING_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.CRYPTO_SIGNING_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.CRYPTO_SIGNING_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.CRYPTO_SIGNING_KEY_PASSWORD }}
-        run: |
-          test -n "$KEYSTORE_BASE64" || (echo "Missing GitHub secret CRYPTO_SIGNING_KEYSTORE_BASE64" && exit 1)
-          test -n "$STORE_PASSWORD" || (echo "Missing GitHub secret CRYPTO_SIGNING_STORE_PASSWORD" && exit 1)
-          test -n "$KEY_ALIAS" || (echo "Missing GitHub secret CRYPTO_SIGNING_KEY_ALIAS" && exit 1)
-          test -n "$KEY_PASSWORD" || (echo "Missing GitHub secret CRYPTO_SIGNING_KEY_PASSWORD" && exit 1)
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/crypto-sherlock-release.p12"
-          echo "CRYPTO_SIGNING_STORE_FILE=$RUNNER_TEMP/crypto-sherlock-release.p12" >> "$GITHUB_ENV"
-          echo "CRYPTO_SIGNING_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "CRYPTO_SIGNING_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "CRYPTO_SIGNING_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
       - name: Run research engine tests
         run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK
@@ -40,10 +26,10 @@ jobs:
       - name: Verify APK
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
-          jarsigner -verify app/build/outputs/apk/debug/app-debug.apk
+          $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -n 1)/apksigner verify app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: CRYPTO-SHERLOCK-MOBILE-stable-signed-APK
+          name: CRYPTO-SHERLOCK-MOBILE-debug-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
