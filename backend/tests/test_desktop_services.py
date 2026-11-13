@@ -2,7 +2,7 @@ import sqlite3
 
 from app.market_data.candles import Candle
 from app.market_data.repository import CandleRepository
-from app.research.desktop_services import run_pattern_research, run_ensemble_research, _load_candles
+from app.research.desktop_services import run_pattern_research, run_ensemble_research, _load_candles, _split_contiguous
 
 
 def make_candles(count=120):
@@ -102,3 +102,13 @@ def test_verified_history_is_retained_before_gaps(tmp_path, monkeypatch):
     assert candles[0].open_time == rows[0].open_time
     assert candles[-1].open_time == rows[-1].open_time
     assert sources == ["source"]
+
+
+
+def test_contiguous_segment_split_preserves_each_side_of_gap():
+    rows = make_candles(12)
+    rows = rows[:6] + rows[7:]
+    chunks = _split_contiguous(rows)
+    assert [len(chunk) for chunk in chunks] == [6, 5]
+    assert chunks[0][-1].open_time < chunks[1][0].open_time
+    assert chunks[0][-1].open_time + 900_000 < chunks[1][0].open_time
