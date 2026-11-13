@@ -72,7 +72,10 @@ def test_does_not_use_unclosed_higher_timeframe_bars():
     # reclaim bar nor the large daily candle has closed and become observable.
     m15[15] = make("BTCUSDT", "15m", 61 * 6 * 16 - 1, 96, 97, 95, 96)
     m15[3] = make("BTCUSDT", "15m", 61 * 6 * 16 - 13, 96, 97, 88, 96)
-    assert detect_multitimeframe_setups(m15, h4, d1) == []
+    assert detect_multitimeframe_setups(
+        m15, h4, d1,
+        config=MultiTimeframeConfig(daily_body_lookback=59),
+    ) == []
 
 
 def test_daily_body_minimum_floor_rejects_ordinary_red_candle():
