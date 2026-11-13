@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 
 from app.market_data.candles import Candle, find_gaps
+from app.market_data.intervals import interval_to_ms
 from app.research.pattern_intelligence import search_analogs
 from app.research.multitimeframe_detector import (
     MultiTimeframeConfig, detect_multitimeframe_setups,
@@ -109,9 +110,12 @@ def run_pattern_research(
                 slippage_bps_per_side=slippage_bps_per_side,
             ).to_dict(),
         })
+    history_gaps = find_gaps([item.open_time for item in candles], interval)
     return {
         "symbol": symbol, "interval": interval, "mode": mode,
         "history_candles": len(candles),
+        "historical_gaps": len(history_gaps),
+        "contiguous_segments": len(history_gaps) + 1,
         "data_sources": data_sources,
         "query_start_time": candles[query_start].open_time,
         "query_end_time": candles[query_end].open_time,
@@ -160,15 +164,25 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
         import numpy as np
 
         embargo = 32
-        history = candles[:max(0, start - embargo)]
-        query = candles[start:end + 1]
+        # STUMPY operates on one continuous segment only; never let its matrix
+        # profile bridge missing candle slots from the retained full history.
+        step = interval_to_ms(interval)
+        segment_start = len(candles) - 1
+        while segment_start > 0 and candles[segment_start].open_time - candles[segment_start - 1].open_time == step:
+            segment_start -= 1
+        continuous = candles[segment_start:]
+        stumpy_start = len(continuous) - query_window
+        if stumpy_start <= 0:
+            raise RuntimeError("not enough candles in the latest continuous segment for STUMPY")
+        history = continuous[:max(0, stumpy_start - embargo)]
+        query = continuous[stumpy_start:]
         if len(history) < len(query):
             raise RuntimeError("not enough pre-query history for STUMPY with the configured embargo")
         history_close = np.asarray([item.close for item in history], dtype=np.float64)
         # Include the close immediately before the query so its first return
         # is measured from the true prior candle, not replaced with zero.
         query_close = np.asarray(
-            [candles[start - 1].close, *[item.close for item in query]],
+            [continuous[stumpy_start - 1].close, *[item.close for item in query]],
             dtype=np.float64,
         )
         history_values = np.diff(np.log(history_close), prepend=np.log(history_close[0]))
@@ -183,7 +197,6 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
             query_open_times=[item.open_time for item in query],
             interval=interval,
         ))
-        engines_available.append("stumpy")
     except (ImportError, RuntimeError) as exc:
         engines_missing.append("stumpy")
         stumpy_error = f"{type(exc).__name__}: {exc}"
