@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
 
 from app.main import app
 
@@ -194,7 +195,11 @@ def test_walk_forward_endpoint_queues_research_job(monkeypatch):
         "error": None,
     }
     captured = {}
-    monkeypatch.setattr(main.research_jobs, "_new_job", lambda kind: queued)
+    monkeypatch.setattr(
+        main.research_jobs, "_new_job",
+        lambda kind: SimpleNamespace(job_id=queued["job_id"]),
+    )
+    monkeypatch.setattr(main.research_jobs, "get_job", lambda job_id: queued)
     monkeypatch.setattr(
         main, "_run_desktop_research_job",
         lambda job_id, function, kwargs: captured.update(
