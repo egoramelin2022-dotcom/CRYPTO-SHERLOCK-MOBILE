@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from app.market_data.intervals import floor_to_interval, interval_to_ms
+from app.market_data.intervals import floor_to_interval
 from app.market_data.sync import HistoricalSyncEngine
 from app.research import jobs as base_jobs
 from scripts.download_binance_spot_klines import run as download_archives
