@@ -90,3 +90,12 @@ def test_rejects_duplicate_or_invalid_horizons_and_costs():
             rows, query_start_index=30, query_end_index=34,
             fee_bps_per_side=-1,
         )
+
+
+def test_invalid_minimum_support_is_rejected_even_without_candidates():
+    rows = make_candles()
+    with pytest.raises(ValueError, match="min_supporting_modules"):
+        run_ensemble_search(
+            rows, query_start_index=0, query_end_index=4,
+            min_supporting_modules=0,
+        )
