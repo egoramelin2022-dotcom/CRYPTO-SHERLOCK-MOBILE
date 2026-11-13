@@ -211,9 +211,18 @@ def run_walk_forward(
                 "flat_return": 0.0,
             }
 
-        regime = classify_regime(
-            candles, end_index=query_end, lookback=min(96, query_end + 1)
-        )
+        try:
+            regime = classify_regime(
+                candles, end_index=query_end, lookback=min(96, query_end + 1)
+            )
+        except ValueError as exc:
+            regime = {
+                "regime": "UNCLASSIFIED_GAP_OR_SHORT_HISTORY",
+                "causal": True,
+                "reason": str(exc),
+                "end_index": query_end,
+                "end_time": candles[query_end].close_time,
+            }
         fold_rows.append({
             "fold": fold_number,
             "regime": regime,
