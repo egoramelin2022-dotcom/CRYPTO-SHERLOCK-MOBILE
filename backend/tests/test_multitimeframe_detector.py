@@ -19,7 +19,7 @@ def make(symbol, interval, index, op, high, low, close):
 
 def fixture():
     # Daily history: 60 small-body candles, then a large red day.
-    daily = [make("BTCUSDT", "1d", i, 100, 101, 99, 100) for i in range(60)]
+    daily = [make("BTCUSDT", "1d", i, 100, 101, 99, 100.05) for i in range(60)]
     daily.append(make("BTCUSDT", "1d", 60, 100, 101, 90, 91))
 
     # 4h history: 20 prior support bars at 95; current bar sweeps to 90,
@@ -54,7 +54,7 @@ def test_detects_simultaneous_three_timeframe_setup():
 
 def test_rejects_when_daily_candle_is_not_large_red():
     m15, h4, d1 = fixture()
-    d1[-1] = make("BTCUSDT", "1d", 60, 100, 101, 98, 99)
+    d1[-1] = make("BTCUSDT", "1d", 60, 100, 101, 98.5, 99.99)
     assert detect_multitimeframe_setups(m15, h4, d1) == []
 
 
