@@ -29,6 +29,7 @@ def _summary(returns: list[float]) -> dict[str, float | int]:
         "folds": len(returns),
         "cumulative_return_sum": cumulative,
         "average_return_per_fold": sum(returns) / len(returns) if returns else 0.0,
+        "median_return_per_fold": median(returns) if returns else 0.0,
         "positive_fold_rate": (
             sum(value > 0 for value in returns) / len(returns) if returns else 0.0
         ),
@@ -111,6 +112,7 @@ def run_walk_forward(
         horizon: {"model": [], "always_long": [], "always_short": [], "flat": []}
         for horizon in horizons
     }
+    trade_returns = {horizon: [] for horizon in horizons}
     decision_counts = {
         horizon: {"LONG": 0, "SHORT": 0, "FLAT": 0} for horizon in horizons
     }
@@ -188,6 +190,8 @@ def run_walk_forward(
                 model_return = 0.0
 
             decision_counts[horizon][side] += 1
+            if side != "FLAT":
+                trade_returns[horizon].append(model_return)
             per_horizon[horizon]["model"].append(model_return)
             per_horizon[horizon]["always_long"].append(realized.long_net_return)
             per_horizon[horizon]["always_short"].append(realized.short_net_return)
@@ -211,6 +215,8 @@ def run_walk_forward(
             "query_start_time": candles[query_start].open_time,
             "query_end_time": candles[query_end].open_time,
             "training_candles_available": query_start,
+            "training_end_index": query_start - 1,
+            "training_end_time": candles[query_start - 1].open_time,
             "known_data_end_index": query_end,
             "known_data_end_time": candles[query_end].open_time,
             "candidates_examined": search.candidates_examined,
@@ -240,6 +246,10 @@ def run_walk_forward(
         model_metrics["trade_rate"] = (
             model_metrics["trades"] / model_metrics["folds"]
             if model_metrics["folds"] else 0.0
+        )
+        model_metrics["positive_trade_rate"] = (
+            sum(value > 0 for value in trade_returns[horizon]) / len(trade_returns[horizon])
+            if trade_returns[horizon] else 0.0
         )
 
     return {
