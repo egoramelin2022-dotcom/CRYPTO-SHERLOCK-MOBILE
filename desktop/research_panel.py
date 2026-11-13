@@ -409,6 +409,29 @@ class ResearchPanel(QWidget):
                     )
                     if strategy == "model":
                         summary.append(f"      Trades: {values.get('trades', 0)} · FLAT folds: {values.get('flat_folds', 0)} · positive trades: {values.get('positive_trade_rate', 0):.0%}")
+            if result.get("prediction_scorecard_by_horizon"):
+                summary.append("  HIDDEN-HISTORY PREDICTION SCORECARD · OUT-OF-SAMPLE")
+                summary.append(
+                    "  Accuracy includes FLAT calls; directional hit rate excludes FLAT calls. "
+                    "Coverage shows how often the model takes a direction."
+                )
+                for horizon, score in result["prediction_scorecard_by_horizon"].items():
+                    if score.get("status") != "evaluated":
+                        summary.append(f"    +{horizon}: score unavailable · insufficient sample")
+                        continue
+                    accuracy = score.get("accuracy_percent")
+                    directional = score.get("directional_hit_rate_percent")
+                    coverage = score.get("coverage_percent")
+                    balanced = score.get("balanced_accuracy")
+                    summary.append(
+                        f"    +{horizon}: accuracy {accuracy:.1f}% ({score['correct']}/{score['samples']}) · "
+                        f"directional hit {directional:.1f}% ({score['directional_hits']}/{score['directional_calls']}) · "
+                        f"coverage {coverage:.1f}% · "
+                        f"balanced accuracy {balanced:.1%}" if balanced is not None else
+                        f"    +{horizon}: accuracy {accuracy:.1f}% ({score['correct']}/{score['samples']}) · "
+                        f"directional hit {directional:.1f}% · coverage {coverage:.1f}% · balanced accuracy n/a"
+                    )
+                summary.append("  These are historical out-of-sample rates, not future probabilities or guarantees.")
             if result.get("temporal_stability_by_horizon"):
                 summary.append("  TEMPORAL STABILITY · EARLY / MIDDLE / RECENT")
                 summary.append(result.get("temporal_stability_note", ""))
