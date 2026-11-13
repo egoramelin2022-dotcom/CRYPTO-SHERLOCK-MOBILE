@@ -1,11 +1,10 @@
 """Causal, rule-based market regime descriptors from trailing closed candles."""
 from __future__ import annotations
 
-from math import sqrt
 from statistics import pstdev
 from typing import Sequence, Any
 
-from app.market_data.candles import Candle
+from app.market_data.candles import Candle, find_gaps
 
 
 def classify_regime(
@@ -28,13 +27,15 @@ def classify_regime(
     rows = list(candles[start:end + 1])
     if len(rows) < 20:
         raise ValueError("at least 20 trailing candles are required")
+    if find_gaps([row.open_time for row in rows], rows[0].interval):
+        raise ValueError("regime window crosses a missing-candle gap")
     first, last = rows[0], rows[-1]
     close_returns = [
         rows[i].close / rows[i - 1].close - 1.0
         for i in range(1, len(rows))
     ]
     net_return = last.close / first.close - 1.0
-    realized_volatility = pstdev(close_returns) * sqrt(len(close_returns)) if close_returns else 0.0
+    realized_volatility = pstdev(close_returns) if close_returns else 0.0
     path_length = sum(abs(value) for value in close_returns)
     efficiency = abs(net_return) / path_length if path_length else 0.0
     highest = max(row.high for row in rows)
@@ -65,7 +66,7 @@ def classify_regime(
         "end_time": last.close_time,
         "lookback_candles": len(rows),
         "net_return": net_return,
-        "realized_volatility": realized_volatility,
+        "realized_volatility_per_candle": realized_volatility,
         "directional_efficiency": efficiency,
         "range_position": range_position,
         "volume_ratio_late_vs_early": volume_ratio,
