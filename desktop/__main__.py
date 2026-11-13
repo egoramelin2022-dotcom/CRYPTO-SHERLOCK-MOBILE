@@ -331,6 +331,7 @@ class MainWindow(QMainWindow):
         environment.insert("SHERLOCK_ANALYTICS_DB", str(analytics.resolve()))
         environment.insert("SHERLOCK_ARCHIVE_RAW_DIR", str(data_dir / "binance_public_raw"))
         environment.insert("SHERLOCK_ARCHIVE_STAGING_DB", str(data_dir / "binance_archive_staging.db"))
+        environment.insert("SHERLOCK_SERVER_LOG", str(data_dir / "server.log"))
         self.server_process.setProcessEnvironment(environment)
         self.server_process.setWorkingDirectory(str(server_exe.parent))
         self.server_process.setProgram(str(server_exe))
