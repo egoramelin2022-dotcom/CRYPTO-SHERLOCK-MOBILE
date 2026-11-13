@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from app.market_data.intervals import floor_to_interval
+from app.market_data.intervals import floor_to_interval, interval_to_ms
 from app.market_data.sync import HistoricalSyncEngine
 from app.research import jobs as base_jobs
 from scripts.download_binance_spot_klines import run as download_archives
@@ -53,7 +53,9 @@ def run_archive_download(job_id: str, start: str, end: str) -> None:
 
 
 
-def run_recent_sync_job(\n    job_id: str, symbol: str = "BTCUSDT", *, now: datetime | None = None\n) -> None:
+def run_recent_sync_job(
+    job_id: str, symbol: str = "BTCUSDT", *, now: datetime | None = None
+) -> None:
     """Sync the current UTC month of closed candles into isolated staging storage."""
     base_jobs._set_job(job_id, status="running", result={
         "progress": "Preparing current-month public Binance Spot sync"
@@ -70,7 +72,10 @@ def run_recent_sync_job(\n    job_id: str, symbol: str = "BTCUSDT", *, now: date
                 "Recent sync staging database must be separate from source and analytics databases"
             )
 
-        now = datetime.now(timezone.utc)
+        now = now or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            raise ValueError("sync reference time must be timezone-aware")
+        now = now.astimezone(timezone.utc)
         now_ms = int(now.timestamp() * 1000)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         month_start_ms = int(month_start.timestamp() * 1000)
@@ -79,6 +84,7 @@ def run_recent_sync_job(\n    job_id: str, symbol: str = "BTCUSDT", *, now: date
         try:
             with HistoricalSyncEngine(connection) as engine:
                 for interval in ("15m", "4h", "1d"):
+                    step = interval_to_ms(interval)
                     start_ms = floor_to_interval(month_start_ms, interval)
                     end_ms = floor_to_interval(now_ms, interval) - step
                     if end_ms < start_ms:
