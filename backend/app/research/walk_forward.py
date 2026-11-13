@@ -233,6 +233,7 @@ def run_walk_forward(
     for horizon, rows in per_horizon.items():
         metrics[str(horizon)] = {
             name: _summary(values) for name, values in rows.items()
+        }
         model_metrics = metrics[str(horizon)]["model"]
         model_metrics["trades"] = decision_counts[horizon]["LONG"] + decision_counts[horizon]["SHORT"]
         model_metrics["flat_folds"] = decision_counts[horizon]["FLAT"]
@@ -240,7 +241,6 @@ def run_walk_forward(
             model_metrics["trades"] / model_metrics["folds"]
             if model_metrics["folds"] else 0.0
         )
-        }
 
     return {
         "symbol": first_candle.symbol,
