@@ -114,6 +114,9 @@ def run_pattern_research(
     return {
         "symbol": symbol, "interval": interval, "mode": mode,
         "stage_weights": result.to_dict()["stage_weights"],
+        "forward_return_basis": result.to_dict()["forward_return_basis"],
+        "excursion_basis": result.to_dict()["excursion_basis"],
+        "forward_path_basis": "next_candle_open_to_horizon_close_with_fees_and_slippage",
         "history_candles": len(candles),
         "historical_gaps": len(history_gaps),
         "contiguous_segments": len(history_gaps) + 1,
