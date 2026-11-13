@@ -91,6 +91,10 @@ def run_ensemble_search(
     """
     if not candles:
         raise ValueError("candles must not be empty")
+    if (isinstance(min_supporting_modules, bool)
+            or not isinstance(min_supporting_modules, int)
+            or min_supporting_modules < 1):
+        raise ValueError("min_supporting_modules must be an integer >= 1")
     if not horizons:
         raise ValueError("at least one forward horizon is required")
     normalized_horizons: list[int] = []
