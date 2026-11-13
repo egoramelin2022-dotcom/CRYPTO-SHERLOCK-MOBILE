@@ -182,6 +182,14 @@ class ResearchPanel(QWidget):
         )
         result = job.get("result") or {}
         summary = []
+        freshness = result.get("data_freshness")
+        if freshness:
+            freshness_state = "STALE — historical search uses old local data" if freshness.get("is_stale") else "Fresh within configured threshold"
+            summary.extend([
+                f"DATA FRESHNESS · {freshness_state}",
+                f"Latest closed candle age: {freshness.get('age_hours', 0):.1f}h · "
+                f"stale threshold: {freshness.get('stale_after_hours', 0):.1f}h",
+            ])
         if "history_candles" in result:
             query_label = (
                 "Historical sample" if result.get("query_selection") == "historical_open_time"
