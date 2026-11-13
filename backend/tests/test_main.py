@@ -141,3 +141,27 @@ def test_research_endpoints_reject_calendar_month_interval():
     ):
         response = client.post(endpoint, params=params)
         assert response.status_code == 422, (endpoint, response.text)
+
+
+
+def test_current_month_sync_job_is_queued(monkeypatch):
+    import app.main as main
+
+    called = []
+    monkeypatch.setattr(
+        main.archive_jobs, "run_recent_sync_job",
+        lambda job_id, symbol: called.append((job_id, symbol)),
+    )
+    response = client.post(
+        "/v1/data/sync-current-month", params={"symbol": "BTCUSDT"}
+    )
+    assert response.status_code == 202
+    assert response.json()["kind"] == "binance_recent_sync"
+    assert called == [(response.json()["job_id"], "BTCUSDT")]
+
+
+def test_current_month_sync_rejects_invalid_symbol():
+    response = client.post(
+        "/v1/data/sync-current-month", params={"symbol": "BTC/USDT"}
+    )
+    assert response.status_code == 422
