@@ -16,9 +16,16 @@ Default rule thresholds are 0.6% realized volatility per candle, 1.5% trailing n
 
 ## 3. Strategy portfolio diagnostics
 
-The robustness audit compares the baseline, fewer-analogs and more-analogs variants on identical fold timestamps. It reports pairwise return correlations and an equal-weight combination of their per-fold returns. This reveals whether parameter variants tend to repeat or offset each other's errors.
+The Backtesting Lab compares four causal methods on the same walk-forward fold outcomes and horizons:
 
-The equal-weight series is a diagnostic only. It does not simulate simultaneous positions, cash allocation, turnover, compounding, sizing, market impact or execution interactions. It is not a deployable portfolio.
+- **Pattern analogs:** the median cost-adjusted forward outcome of historical matches; LONG / SHORT is selected only when its median is positive and exceeds the opposite side.
+- **Trend following:** LONG / SHORT when the query-window close-to-close move exceeds +/-0.5%; otherwise FLAT.
+- **Mean reversion baseline:** the opposite of the trailing-momentum direction; this is a deliberately simple contrarian reference, not a full moving-average or statistical-arbitrage model.
+- **Range breakout:** LONG / SHORT when the query close breaks the high / low of the 20 candles immediately before the query window; otherwise FLAT.
+
+All signals use only data available by the query close. Their realized returns are measured on the exact same future fold path, with the same configured fees and slippage. The panel reports individual fold returns, pairwise correlations and an equal-weight combination. This reveals whether methods repeat or offset each other's errors.
+
+The robustness audit separately compares baseline, fewer-analogs and more-analogs variants on identical fold timestamps, reporting their correlations and equal-weight diagnostic. Neither equal-weight series simulates simultaneous positions, cash allocation, turnover, compounding, sizing, market impact or execution interactions. These are not deployable portfolios.
 
 ## Safety and interpretation
 
