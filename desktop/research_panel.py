@@ -290,7 +290,7 @@ class ResearchPanel(QWidget):
                     summary.append(f"    #{rank} similarity {analog.get('similarity', 0):.4f} · {analog.get('start_time')} → {analog.get('end_time')}")
         if result.get("method") == "bounded_one_factor_at_a_time_sensitivity":
             summary.extend([
-                "\\nROBUSTNESS AUDIT · BOUNDED PARAMETER SENSITIVITY",
+                "\nROBUSTNESS AUDIT · BOUNDED PARAMETER SENSITIVITY",
                 f"Configurations evaluated: {result.get('configurations_evaluated', 0)} / {result.get('configurations_requested', 0)}",
                 result.get("selection_policy", ""),
                 "Not PBO/CSCV; no winning configuration is selected.",
