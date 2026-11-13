@@ -431,6 +431,22 @@ class ResearchPanel(QWidget):
                         f"coverage {coverage:.1f}% · balanced accuracy {balanced_text}"
                     )
                 summary.append("  These are historical out-of-sample rates, not future probabilities or guarantees.")
+
+                baseline_scores = result.get("baseline_prediction_scorecards_by_horizon") or {}
+                if baseline_scores:
+                    summary.append("  BASELINE COMPARISON · SAME HIDDEN FOLDS")
+                    for baseline_name, horizon_scores in baseline_scores.items():
+                        parts = []
+                        for horizon, baseline in horizon_scores.items():
+                            accuracy = baseline.get("accuracy_percent")
+                            calls = baseline.get("directional_calls", 0)
+                            hits = baseline.get("directional_hits", 0)
+                            label = f"{accuracy:.1f}%" if accuracy is not None else "n/a"
+                            parts.append(
+                                f"+{horizon}: {label} ({baseline.get('correct', 0)}/{baseline.get('samples', 0)})"
+                                f" · directional {hits}/{calls}"
+                            )
+                        summary.append(f"    {baseline_name}: " + " | ".join(parts))
             if result.get("temporal_stability_by_horizon"):
                 summary.append("  TEMPORAL STABILITY · EARLY / MIDDLE / RECENT")
                 summary.append(result.get("temporal_stability_note", ""))
