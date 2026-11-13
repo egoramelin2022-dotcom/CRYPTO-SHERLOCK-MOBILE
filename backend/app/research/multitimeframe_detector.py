@@ -80,8 +80,9 @@ def detect_multitimeframe_setups(
 
     A large bearish daily candle has a body return below zero whose absolute
     size is at least both the configured multiple of the median absolute body
-    return over prior daily bars and the configured absolute minimum. The broader decline is measured from the
-    close N daily bars earlier to the current daily close.
+    return over prior daily bars and the configured absolute minimum. The
+    broader decline is measured from the close N daily bars earlier to the
+    current daily close.
 
     Only complete historical candles should be supplied. No unfinished
     current candles are inferred or fetched here.
@@ -164,7 +165,8 @@ def detect_multitimeframe_setups(
             continue
 
         results.append(MultiTimeframeSignal(
-            timestamp=candle_15m.open_time,
+            # The event becomes observable only when the 15m candle closes.
+            timestamp=candle_15m.close_time,
             price=candle_15m.close,
             wick_15m_fraction=lower_wick / span,
             wick_15m_to_body=wick_to_body,
