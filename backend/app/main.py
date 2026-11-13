@@ -218,7 +218,7 @@ def _run_desktop_research_job(job_id: str, function, kwargs: dict[str, Any]) -> 
 @app.post("/v1/data/archive-download", status_code=202)
 async def start_archive_download(
     background_tasks: BackgroundTasks,
-    start: str = Query("2017-08", pattern=r"\d{4}-(0[1-9]|1[0-2])$"),
+    start: str = Query("2017-08", pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     end: str = Query("2026-10", pattern=r"\d{4}-(0[1-9]|1[0-2])$"),
 ) -> dict[str, Any]:
     """Download official monthly Binance Spot archives into a separate staging DB."""
