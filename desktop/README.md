@@ -14,6 +14,8 @@ The backend must be running with `SHERLOCK_SOURCE_DB` and `SHERLOCK_ANALYTICS_DB
 
 ## Connected workflows
 
+The archive loader runs asynchronously and writes only to the staging database. The application polls job status instead of freezing the UI.
+
 - Live Binance Spot candles and 24-hour ticker; symbols BTCUSDT, ETHUSDT, BNBUSDT and SOLUSDT; 15m, 1h, 4h and 1d.
 - Historical Pattern Intelligence with free search and preserved five-stage mode.
 - Multi-Timeframe scanner for aligned 15m / 4h / closed 1d data.
