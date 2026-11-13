@@ -75,7 +75,8 @@ def run_recent_sync_job(job_id: str, symbol: str = "BTCUSDT") -> None:
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         month_start_ms = int(month_start.timestamp() * 1000)
         results = {}
-        with sqlite3.connect(staging_path) as connection:
+        connection = sqlite3.connect(staging_path)
+        try:
             with HistoricalSyncEngine(connection) as engine:
                 for interval in ("15m", "4h", "1d"):
                     step = interval_to_ms(interval)
@@ -97,6 +98,8 @@ def run_recent_sync_job(job_id: str, symbol: str = "BTCUSDT") -> None:
                         f"{interval}: {result.status}; fetched={result.fetched}; "
                         f"inserted={result.inserted}; pages={result.pages}",
                     )
+        finally:
+            connection.close()
 
         status = (
             "completed" if all(
