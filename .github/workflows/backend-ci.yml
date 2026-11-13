@@ -27,7 +27,7 @@ jobs:
       - name: Install core dependencies
         run: pip install -r requirements.txt
       - name: Run backend tests
-        run: pytest -q
+        run: pytest -q --ignore=tests/test_stumpy_adapter_integration.py
 
   research-integration:
     runs-on: ubuntu-latest
@@ -42,6 +42,6 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-research.txt
       - name: Install optional research dependencies
-        run: pip install -r requirements-research.txt
+        run: pip install -r requirements.txt -r requirements-research.txt
       - name: Run real STUMPY integration tests
         run: pytest -q tests/test_stumpy_adapter_integration.py
