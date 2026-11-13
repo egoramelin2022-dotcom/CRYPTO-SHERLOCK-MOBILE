@@ -130,3 +130,14 @@ def test_audit_job_is_queued(monkeypatch):
     assert response.status_code == 202
     assert response.json()["job_id"] == "audit-job-001"
     assert called == ["audit-job-001"]
+
+
+
+def test_research_endpoints_reject_calendar_month_interval():
+    for endpoint, params in (
+        ("/v1/research/pipeline", {"interval": "1M"}),
+        ("/v1/research/pattern", {"interval": "1M"}),
+        ("/v1/research/ensemble", {"interval": "1M"}),
+    ):
+        response = client.post(endpoint, params=params)
+        assert response.status_code == 422, (endpoint, response.text)
