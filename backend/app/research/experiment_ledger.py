@@ -80,6 +80,9 @@ class ExperimentLedger:
 
     def _initialize(self) -> None:
         with self._connect() as connection:
+            already_initialized = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='experiment_runs'"
+            ).fetchone() is not None
             connection.executescript("""
                 CREATE TABLE IF NOT EXISTS experiment_runs (
                     run_id TEXT PRIMARY KEY,
@@ -124,25 +127,30 @@ class ExperimentLedger:
                 CREATE INDEX IF NOT EXISTS idx_experiment_events_run
                     ON experiment_events(run_id, sequence);
 
-                CREATE TRIGGER IF NOT EXISTS experiment_runs_no_update
-                BEFORE UPDATE ON experiment_runs
-                BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
-                CREATE TRIGGER IF NOT EXISTS experiment_runs_no_delete
-                BEFORE DELETE ON experiment_runs
-                BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
-                CREATE TRIGGER IF NOT EXISTS experiment_results_no_update
-                BEFORE UPDATE ON experiment_results
-                BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
-                CREATE TRIGGER IF NOT EXISTS experiment_results_no_delete
-                BEFORE DELETE ON experiment_results
-                BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
-                CREATE TRIGGER IF NOT EXISTS experiment_events_no_update
-                BEFORE UPDATE ON experiment_events
-                BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
-                CREATE TRIGGER IF NOT EXISTS experiment_events_no_delete
-                BEFORE DELETE ON experiment_events
-                BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
             """)
+            # Do not silently recreate missing guards on an existing ledger:
+            # the integrity endpoint must be able to report their removal.
+            if not already_initialized:
+                connection.executescript("""
+                    CREATE TRIGGER experiment_runs_no_update
+                    BEFORE UPDATE ON experiment_runs
+                    BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
+                    CREATE TRIGGER experiment_runs_no_delete
+                    BEFORE DELETE ON experiment_runs
+                    BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
+                    CREATE TRIGGER experiment_results_no_update
+                    BEFORE UPDATE ON experiment_results
+                    BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
+                    CREATE TRIGGER experiment_results_no_delete
+                    BEFORE DELETE ON experiment_results
+                    BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
+                    CREATE TRIGGER experiment_events_no_update
+                    BEFORE UPDATE ON experiment_events
+                    BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
+                    CREATE TRIGGER experiment_events_no_delete
+                    BEFORE DELETE ON experiment_events
+                    BEGIN SELECT RAISE(ABORT, 'experiment ledger is append-only'); END;
+                """)
 
     @staticmethod
     def _event_hash(
