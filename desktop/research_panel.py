@@ -291,6 +291,17 @@ class ResearchPanel(QWidget):
                     )
                     if strategy == "model":
                         summary.append(f"      Trades: {values.get('trades', 0)} · FLAT folds: {values.get('flat_folds', 0)} · positive trades: {values.get('positive_trade_rate', 0):.0%}")
+            if result.get("temporal_stability_by_horizon"):
+                summary.append("  TEMPORAL STABILITY · EARLY / MIDDLE / RECENT")
+                summary.append(result.get("temporal_stability_note", ""))
+                for horizon, periods in result["temporal_stability_by_horizon"].items():
+                    for period_name, period_metrics in periods.items():
+                        model = period_metrics["model"]
+                        summary.append(
+                            f"    +{horizon} {period_name}: model sum {model['cumulative_return_sum']:+.2%} · "
+                            f"positive folds {model['positive_fold_rate']:.0%} · "
+                            f"trade rate {model['trade_rate']:.0%}"
+                        )
         if "history_candles" in result and result.get("query_selection") is not None:
             query_label = (
                 "Historical sample" if result.get("query_selection") == "historical_open_time"
