@@ -115,7 +115,7 @@ def run_walk_forward(
 
     for fold_number, query_start in enumerate(fold_starts, start=1):
         query_end = query_start + query_window - 1
-        eligible_candidates = max(0, query_start - query_window - max_horizon)
+        eligible_candidates = max(0, query_start - query_window - max_horizon + 1)
         stride = max(1, (eligible_candidates + candidate_budget - 1) // candidate_budget)
         try:
             search = search_analogs(
