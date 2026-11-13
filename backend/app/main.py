@@ -145,6 +145,7 @@ async def start_historical_pipeline(
 
 from app.research import desktop_services
 from app.research import paper_portfolio
+from app.research import archive_jobs
 
 
 @app.post("/v1/research/pattern", status_code=202)
@@ -210,6 +211,21 @@ def _run_desktop_research_job(job_id: str, function, kwargs: dict[str, Any]) -> 
     except Exception as exc:
         research_jobs._set_job(job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
 
+
+
+
+@app.post("/v1/data/archive-download", status_code=202)
+async def start_archive_download(
+    background_tasks: BackgroundTasks,
+    start: str = Query("2017-08", pattern=r"^\\d{4}-(0[1-9]|1[0-2])$"),
+    end: str = Query("2026-10", pattern=r"^\\d{4}-(0[1-9]|1[0-2])$"),
+) -> dict[str, Any]:
+    """Download official monthly Binance Spot archives into a separate staging DB."""
+    if tuple(map(int, start.split("-"))) > tuple(map(int, end.split("-"))):
+        raise HTTPException(status_code=422, detail="start month must not be after end month")
+    job = research_jobs._new_job("binance_archive_download")
+    background_tasks.add_task(archive_jobs.run_archive_download, job.job_id, start, end)
+    return research_jobs.get_job(job.job_id)
 
 
 @app.get("/v1/paper/portfolio")
