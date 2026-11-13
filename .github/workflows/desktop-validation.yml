@@ -1,0 +1,27 @@
+name: Desktop validation
+
+on:
+  pull_request:
+    paths:
+      - "desktop/**"
+
+jobs:
+  desktop-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: desktop/requirements.txt
+      - name: Install desktop dependencies and test runner
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r desktop/requirements.txt pytest
+      - name: Run desktop parser tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest desktop/tests -q
+      - name: Compile desktop Python modules
+        run: python -m compileall -q desktop

@@ -10,7 +10,8 @@ from dataclasses import asdict, dataclass
 import math
 from typing import Literal, Sequence
 
-from app.market_data.candles import Candle
+from app.market_data.candles import Candle, find_gaps
+from app.market_data.intervals import interval_to_ms
 
 SearchMode = Literal["free", "five_stage"]
 
@@ -97,11 +98,13 @@ def _distance(a: Sequence[tuple[float, ...]],
 
 def _outcomes(candles: Sequence[Candle], end: int,
               horizons: Sequence[int]) -> tuple[dict[int, float | None], float | None, float | None]:
-    entry = candles[end].close
+    """Measure forward path from the next candle open, never candidate close."""
+    entry_index = end + 1
     max_h = max(horizons, default=0)
-    if end + 1 >= len(candles):
+    if entry_index >= len(candles):
         return ({h: None for h in horizons}, None, None)
-    future = candles[end + 1:min(len(candles), end + max_h + 1)]
+    entry = candles[entry_index].open
+    future = candles[entry_index:min(len(candles), end + max_h + 1)]
     if not future:
         return ({h: None for h in horizons}, None, None)
     returns = {
@@ -109,8 +112,8 @@ def _outcomes(candles: Sequence[Candle], end: int,
         if end + h < len(candles) else None
         for h in horizons
     }
-    mfe = max(c.high for c in future) / entry - 1.0
-    mae = min(c.low for c in future) / entry - 1.0
+    mfe = max(0.0, max(c.high for c in future) / entry - 1.0)
+    mae = min(0.0, min(c.low for c in future) / entry - 1.0)
     return returns, mfe, mae
 
 
@@ -132,18 +135,39 @@ def search_analogs(
     """
     if mode not in ("free", "five_stage"):
         raise ValueError("mode must be 'free' or 'five_stage'")
-    if isinstance(top_k, bool) or top_k < 1:
-        raise ValueError("top_k must be >= 1")
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 1:
+        raise ValueError("top_k must be an integer >= 1")
+    if (isinstance(query_start, bool) or not isinstance(query_start, int)
+            or isinstance(query_end, bool) or not isinstance(query_end, int)):
+        raise ValueError("query bounds must be integers")
     if not candles or query_start < 0 or query_end >= len(candles) or query_start > query_end:
         raise ValueError("invalid query bounds")
+    if not horizons:
+        raise ValueError("at least one forward horizon is required")
+    normalized_horizons = []
+    for horizon in horizons:
+        if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon < 1:
+            raise ValueError("horizons must be positive integers")
+        if horizon in normalized_horizons:
+            raise ValueError("horizons must not contain duplicates")
+        normalized_horizons.append(horizon)
     length = query_end - query_start + 1
     if mode == "five_stage" and length < 5:
         raise ValueError("five_stage mode requires at least five candles")
-    if any(h < 1 for h in horizons):
-        raise ValueError("horizons must be positive")
-    gap = max(horizons, default=0) if embargo is None else embargo
-    if gap < 0:
-        raise ValueError("embargo must be nonnegative")
+
+    first = candles[0]
+    interval_to_ms(first.interval)
+    for candle in candles:
+        candle.validate()
+        if candle.symbol != first.symbol or candle.interval != first.interval:
+            raise ValueError("all candles must share symbol and interval")
+    if find_gaps([c.open_time for c in candles], first.interval):
+        raise ValueError("candle sequence contains missing intervals")
+
+    required_embargo = max(normalized_horizons)
+    gap = required_embargo if embargo is None else embargo
+    if isinstance(gap, bool) or not isinstance(gap, int) or gap < required_embargo:
+        raise ValueError("embargo must be an integer >= maximum forward horizon")
 
     query = _shape(candles[query_start:query_end + 1])
     last_candidate_end = query_start - gap - 1
