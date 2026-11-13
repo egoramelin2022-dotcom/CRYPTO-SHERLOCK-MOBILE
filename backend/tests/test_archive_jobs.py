@@ -28,7 +28,7 @@ def test_archive_job_writes_only_to_separate_staging_database(tmp_path, monkeypa
     assert result["status"] == "completed"
     assert result["result"]["inserted_this_run"] == 12
     assert "staging" in result["result"]["staging_database"]
-    assert "source market database was not modified" in result["result"]["note"]
+    assert "Source market database was not modified" in result["result"]["note"]
 
 
 def test_archive_job_rejects_source_database_as_staging(tmp_path, monkeypatch):
