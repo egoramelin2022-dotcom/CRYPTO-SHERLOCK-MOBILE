@@ -13,7 +13,7 @@ For each chronological test fold:
 5. The realized forward path after the test query is measured separately, using next-candle-open entry, horizon-close exit, fees and slippage.
 6. The fold is compared with always-LONG, always-SHORT and FLAT baselines.
 
-Test query windows and their forward outcome paths are non-overlapping. Training is expanding: data from a completed earlier fold may be used as historical information in a later fold, but never before its timestamp.
+Test query windows and their forward outcome paths are non-overlapping. Training is expanding: data from a completed earlier fold may be used as historical information in a later fold, but never before its timestamp. The matcher and analog-outcome evaluator receive only the candle prefix ending at the current query sample; future test candles are not passed into those calculations.
 
 ## Controls
 
@@ -37,8 +37,9 @@ This is a transparent baseline decision rule, not a calibrated probability model
 Each horizon reports:
 
 - **Cumulative return sum:** sum of equal-notional fold returns; not compounded.
-- **Average return per fold.**
+- **Average and median return per fold.**
 - **Positive fold rate:** share of folds with a return above zero. For the model this includes FLAT folds in the denominator.
+- **Positive trade rate:** share of non-FLAT model trades with a positive realized net return. FLAT decisions are excluded.
 - **Maximum drawdown on cumulative-sum basis.**
 
 The same measures are calculated for the analog model and three simple baselines. Returns are not compounded because this research pass does not model capital allocation, sizing or concurrent positions.
