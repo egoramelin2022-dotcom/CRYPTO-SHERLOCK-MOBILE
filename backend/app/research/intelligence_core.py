@@ -9,7 +9,7 @@ from __future__ import annotations
 from statistics import mean, median
 import math
 from typing import Any, Sequence
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.market_data.candles import Candle, find_gaps
 from app.research.outcome_evaluation import evaluate_forward_path
@@ -50,6 +50,7 @@ def run_intelligence_core(
     fee_bps_per_side: float = 5.0,
     slippage_bps_per_side: float = 2.0,
     regime_lookback: int = 96,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     """Coordinate the core research modules for one fixed query window.
 
@@ -221,9 +222,16 @@ def run_intelligence_core(
         research_status = "INSUFFICIENT_FORWARD_OUTCOMES"
 
     gap_count = len(find_gaps([item.open_time for item in candles], first.interval))
+    if run_id is None:
+        run_id = str(uuid4())
+    else:
+        try:
+            run_id = str(UUID(run_id))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise ValueError("run_id must be a UUID") from exc
     return {
         "core_version": CORE_VERSION,
-        "run_id": str(uuid4()),
+        "run_id": run_id,
         "research_status": research_status,
         "symbol": query[-1].symbol,
         "interval": query[-1].interval,
