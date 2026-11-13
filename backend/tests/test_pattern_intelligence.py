@@ -62,3 +62,26 @@ def test_selected_analogs_do_not_overlap_their_forward_outcome_horizons():
     # Five-candle analog plus four-candle forward horizon must not overlap.
     assert all(abs(a - b) >= 9 for i, a in enumerate(starts) for b in starts[i + 1:])
     assert all(item.end_index + 4 < result.query_start_index for item in result.analogs)
+
+
+
+def test_search_skips_candidates_and_forward_paths_crossing_data_gaps():
+    # There is a missing 15m candle between indices 14 and 16.
+    rows = [candle(i, 100 + (i % 7)) for i in list(range(15)) + list(range(16, 40))]
+    result = search_analogs(
+        rows, query_start=30, query_end=34, top_k=10,
+        horizons=(1, 2), embargo=0,
+    )
+    assert result.analogs
+    assert all(item.start_index >= 16 for item in result.analogs)
+    assert all(item.end_index + 2 < result.query_start_index for item in result.analogs)
+
+
+def test_search_rejects_query_window_that_crosses_a_gap():
+    rows = [candle(i, 100 + i) for i in list(range(15)) + list(range(16, 30))]
+    try:
+        search_analogs(rows, query_start=13, query_end=17, horizons=(1,))
+    except ValueError as exc:
+        assert "crosses a missing-candle gap" in str(exc)
+    else:
+        raise AssertionError("query windows must not bridge missing candles")
