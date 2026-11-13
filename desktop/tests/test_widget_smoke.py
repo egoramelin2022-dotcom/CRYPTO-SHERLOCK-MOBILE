@@ -18,11 +18,12 @@ def test_desktop_panels_construct_without_backend_or_network():
         ResearchPanel("http://127.0.0.1:1", "/v1/research/pattern", "pattern"),
         ResearchPanel("http://127.0.0.1:1", "/v1/research/multitimeframe", "mtf"),
         ResearchPanel("http://127.0.0.1:1", "/v1/research/ensemble", "ensemble"),
+        ResearchPanel("http://127.0.0.1:1", "/v1/research/walk-forward", "walk_forward"),
         PaperPanel("http://127.0.0.1:1"),
         DownloadPanel("http://127.0.0.1:1"),
         SystemPanel("http://127.0.0.1:1"),
     ]
-    assert len(widgets) == 7
+    assert len(widgets) == 8
     assert not widgets[0].auto_refresh.isActive()  # Market feed is idle until its page is opened.
     for widget in widgets:
         widget.close()
@@ -85,5 +86,36 @@ def test_download_panel_exposes_separate_archive_and_recent_sync_actions():
     panel = DownloadPanel("http://127.0.0.1:1")
     assert panel.run_button.text() == "DOWNLOAD ARCHIVES TO STAGING"
     assert panel.sync_button.text() == "SYNC CURRENT MONTH"
+    panel.close()
+    app.processEvents()
+
+
+def test_walk_forward_panel_renders_out_of_sample_baselines():
+    app = QApplication.instance() or QApplication([])
+    panel = ResearchPanel("http://127.0.0.1:1", "/v1/research/walk-forward", "walk_forward")
+    panel.on_completed({
+        "kind": "walk_forward_research",
+        "updated_at": "test",
+        "result": {
+            "method": "expanding_window_historical_analog_median",
+            "evaluated_folds": 4,
+            "skipped_folds": [],
+            "anti_leakage": {"embargo_candles": 64},
+            "metrics_by_horizon": {
+                "4": {
+                    "model": {"cumulative_return_sum": 0.025, "average_return_per_fold": 0.00625, "positive_fold_rate": 0.5, "max_drawdown_sum_basis": 0.01},
+                    "always_long": {"cumulative_return_sum": 0.01, "average_return_per_fold": 0.0025, "positive_fold_rate": 0.5, "max_drawdown_sum_basis": 0.02},
+                    "always_short": {"cumulative_return_sum": -0.01, "average_return_per_fold": -0.0025, "positive_fold_rate": 0.25, "max_drawdown_sum_basis": 0.03},
+                    "flat": {"cumulative_return_sum": 0.0, "average_return_per_fold": 0.0, "positive_fold_rate": 0.0, "max_drawdown_sum_basis": 0.0},
+                }
+            },
+        },
+    })
+    rendered = panel.output.toPlainText()
+    assert "WALK-FORWARD" in rendered
+    assert "Evaluated folds: 4" in rendered
+    assert "embargo: 64 candles" in rendered
+    assert "Model: sum +2.50%" in rendered
+    assert "Always Long: sum +1.00%" in rendered
     panel.close()
     app.processEvents()
