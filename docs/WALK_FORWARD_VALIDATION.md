@@ -57,3 +57,20 @@ The same measures are calculated for the analog model and three simple baselines
 ## API
 
 `POST /v1/research/walk-forward` queues a background job. The job result includes fold-level analogs and decisions, per-horizon model/baseline metrics, skipped folds, data freshness and explicit anti-leakage declarations.
+
+
+## Bounded robustness / sensitivity audit
+
+The separate `POST /v1/research/robustness` job runs a small predeclared
+one-factor-at-a-time neighborhood: baseline settings, a shorter and longer
+query window, and fewer/more analogs. Each configuration runs the same
+leakage-aware walk-forward engine independently. The report preserves each
+configuration's metrics, compares its average model return with the best of
+always-long, theoretical always-short and flat baselines, and summarizes the
+share of configurations with positive returns or positive baseline excess.
+
+This is deliberately a diagnostic, not an optimizer: no "winner" is selected,
+scores from different parameterizations are never pooled, and the audit does
+not retune the model. It is not PBO, CSCV, a significance test, or an
+independent final holdout. Shared history means the sensitivity runs are
+correlated. Results remain historical research only.
