@@ -303,10 +303,9 @@ class MainWindow(QMainWindow):
             button.setChecked(i == index)
         self.breadcrumb.setText(f"{self.NAV_ITEMS[index][0].upper()}  /  CRYPTO SHERLOCK")
         if hasattr(self, "market_panel"):
-            if index == 1:
+            if index == 1 and self.backend_online:
                 self.market_panel.auto_refresh.start(30_000)
-                if self.backend_online:
-                    self.market_panel.refresh()
+                self.market_panel.refresh()
             else:
                 self.market_panel.auto_refresh.stop()
     
@@ -407,11 +406,15 @@ class MainWindow(QMainWindow):
         self.connection.style().polish(self.connection)
         if hasattr(self, "backend_detail"):
             self.backend_detail.setText(f"{message}  ·  {self.api_url}")
-        if just_connected:
-            if hasattr(self, "market_panel"):
-                self.market_panel.refresh()
-            if hasattr(self, "paper_panel"):
-                self.paper_panel.load_snapshot()
+        if hasattr(self, "market_panel") and self.stack.currentIndex() == 1:
+            if ok:
+                self.market_panel.auto_refresh.start(30_000)
+                if just_connected:
+                    self.market_panel.refresh()
+            else:
+                self.market_panel.auto_refresh.stop()
+        if just_connected and hasattr(self, "paper_panel"):
+            self.paper_panel.load_snapshot()
 
 
 STYLE = """
