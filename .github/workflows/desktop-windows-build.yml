@@ -87,6 +87,7 @@ jobs:
             $paths = $openapi.paths.PSObject.Properties.Name
             if ($paths -notcontains '/v1/research/pattern' -or
                 $paths -notcontains '/v1/data/archive-download' -or
+                $paths -notcontains '/v1/data/sync-current-month' -or
                 $paths -notcontains '/v1/paper/orders') {
               throw 'Bundled backend is missing one or more required desktop API routes'
             }
