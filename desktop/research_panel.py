@@ -309,6 +309,29 @@ class ResearchPanel(QWidget):
                 )
                 if run.get("status") == "skipped":
                     summary.append(f"    reason: {run.get('reason', 'not enough usable history')}")
+            summary.append("  ANTI-OVERFITTING · CSCV / PBO")
+            for horizon, diagnostic in result.get("pbo_by_horizon", {}).items():
+                if diagnostic.get("status") != "completed":
+                    summary.append(f"    +{horizon}: PBO unavailable · {diagnostic.get('aligned_folds', 0)} aligned folds")
+                    continue
+                summary.append(
+                    f"    +{horizon}: PBO {diagnostic['pbo']:.1%} · "
+                    f"median rank-logit {diagnostic['median_logit_rank']:+.3f} · "
+                    f"partitions {diagnostic['partitions_evaluated']:,}/{diagnostic['partitions_possible']:,}"
+                )
+            summary.append("  STRATEGY PORTFOLIO · PAIRED ANALOG-COUNT VARIANTS")
+            for horizon, diagnostic in result.get("strategy_portfolio_by_horizon", {}).items():
+                if diagnostic.get("status") != "completed":
+                    summary.append(f"    +{horizon}: portfolio unavailable · {diagnostic.get('aligned_folds', 0)} aligned folds")
+                    continue
+                portfolio = diagnostic["equal_weight_portfolio"]
+                summary.append(
+                    f"    +{horizon}: equal-weight avg/fold {portfolio['average_return_per_fold']:+.2%} · "
+                    f"volatility {portfolio['volatility_per_fold']:.2%} · "
+                    f"positive folds {portfolio['positive_fold_rate']:.0%}"
+                )
+                for pair, correlation in diagnostic["pairwise_return_correlation"].items():
+                    summary.append(f"      corr {pair}: {correlation if correlation is not None else 'n/a'}")
         if result.get("method") == "expanding_window_historical_analog_median":
             summary.extend([
                 "\nWALK-FORWARD · EXPANDING TRAINING WINDOW",
@@ -339,6 +362,15 @@ class ResearchPanel(QWidget):
                             f"positive folds {model['positive_fold_rate']:.0%} · "
                             f"trade rate {model['trade_rate']:.0%}"
                         )
+            summary.append("  REGIME-CONDITIONAL OUTCOMES · CAUSAL TRAILING WINDOW")
+            summary.append(result.get("regime_detection_note", ""))
+            for key, values in result.get("regime_outcomes", {}).items():
+                regime_name, horizon = key.split("|", 1)
+                summary.append(
+                    f"    {regime_name} · +{horizon}: {values['folds']} folds · "
+                    f"avg {values['average_model_return']:+.2%} · "
+                    f"positive {values['positive_fold_rate']:.0%}"
+                )
         if "history_candles" in result and result.get("query_selection") is not None:
             query_label = (
                 "Historical sample" if result.get("query_selection") == "historical_open_time"
