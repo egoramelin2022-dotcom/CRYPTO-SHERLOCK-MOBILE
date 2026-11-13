@@ -146,6 +146,8 @@ def run_ensemble_job(
     top_k: int = 10,
     mode: str = "free",
     include_stumpy: bool = False,
+    fee_bps_per_side: float = 0.0,
+    slippage_bps_per_side: float = 0.0,
 ) -> None:
     """Run read-only ensemble research and persist only to analytics SQLite."""
     _set_job(job_id, status="running")
@@ -172,6 +174,8 @@ def run_ensemble_job(
             mode=mode,
             top_k=top_k,
             include_stumpy=include_stumpy,
+            fee_bps_per_side=fee_bps_per_side,
+            slippage_bps_per_side=slippage_bps_per_side,
         )
         run_id = str(uuid4())
         result = {
@@ -182,6 +186,11 @@ def run_ensemble_job(
             "candles_excluded_before_latest_segment": excluded,
             "active_segment_start_time": segment[0].open_time,
             "active_segment_end_time": segment[-1].open_time,
+            "cost_model": {
+                "fee_bps_per_side": fee_bps_per_side,
+                "slippage_bps_per_side": slippage_bps_per_side,
+                "note": "Configured proportional assumptions; not inferred from exchange account or fee tier.",
+            },
             "run": run.to_dict(),
             "limitations": [
                 "Only the latest contiguous segment is searched; earlier segments are not bridged across data gaps.",
