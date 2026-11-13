@@ -1,6 +1,9 @@
 name: Windows desktop package
 
 on:
+  push:
+    branches:
+      - "desktop-live-market-integration-v0.2.0"
   pull_request:
     paths:
       - "desktop/**"
