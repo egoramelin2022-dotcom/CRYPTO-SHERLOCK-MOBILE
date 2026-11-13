@@ -155,6 +155,7 @@ async def start_pattern_research(
     symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
     interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w)$"),
     query_window: int = Query(40, ge=5, le=500),
+    query_start_time: int | None = Query(None, ge=0),
     mode: str = Query("free", pattern=r"^(free|five_stage)$"),
     top_k: int = Query(10, ge=1, le=100),
 ) -> dict[str, Any]:
@@ -165,7 +166,8 @@ async def start_pattern_research(
     background_tasks.add_task(
         _run_desktop_research_job, job.job_id, desktop_services.run_pattern_research,
         {"symbol": symbol, "interval": interval, "query_window": query_window,
-         "mode": mode, "top_k": top_k},
+         "mode": mode, "top_k": top_k,
+         "query_start_time": query_start_time},
     )
     return research_jobs.get_job(job.job_id)
 
