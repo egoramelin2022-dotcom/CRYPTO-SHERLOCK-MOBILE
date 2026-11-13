@@ -99,3 +99,26 @@ def test_search_rejects_query_window_that_crosses_a_gap():
         assert "crosses a missing-candle gap" in str(exc)
     else:
         raise AssertionError("query windows must not bridge missing candles")
+
+
+
+def test_search_rejects_non_integer_controls_and_duplicate_timestamps():
+    rows = [candle(i, 100 + i) for i in range(12)]
+    for kwargs in (
+        {"top_k": 1.5},
+        {"horizons": (1.5,)},
+    ):
+        try:
+            search_analogs(rows, query_start=8, query_end=10, **kwargs)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("invalid search controls must be rejected")
+
+    rows[4] = candle(3, 104)
+    try:
+        search_analogs(rows, query_start=8, query_end=10)
+    except ValueError as exc:
+        assert "strictly increasing" in str(exc)
+    else:
+        raise AssertionError("duplicate candle timestamps must be rejected")
