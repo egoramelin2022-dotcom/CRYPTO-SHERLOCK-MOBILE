@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 import httpx
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
+from desktop.market_panel import MarketPanel
+
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
     QMainWindow, QPushButton, QScrollArea, QSizePolicy, QStackedWidget,
@@ -122,7 +124,7 @@ class MainWindow(QMainWindow):
             side.addWidget(button)
             self.nav_buttons.append(button)
         side.addStretch(1)
-        version = QLabel("DESKTOP  •  v0.1.0\nPAPER RESEARCH ONLY")
+        version = QLabel("DESKTOP  •  v0.2.0\nPAPER RESEARCH ONLY")
         version.setObjectName("sidebarFoot")
         side.addWidget(version)
 
@@ -233,25 +235,10 @@ class MainWindow(QMainWindow):
         return page
 
     def make_data_page(self):
-        page = Page("Market Data Center", "Manage verified Binance Spot history. The production/source database is never overwritten by staging imports.")
-        panel = QFrame()
-        panel.setObjectName("panel")
-        layout = QVBoxLayout(panel)
-        title = QLabel("BINANCE SPOT · BTCUSDT")
-        title.setObjectName("panelTitle")
-        detail = QLabel("Target intervals: 15m, 4h, 1d    •    Start: August 2017    •    Archive integrity: SHA256")
-        detail.setObjectName("bodyText")
-        detail.setWordWrap(True)
-        status = QLabel("DOWNLOAD WORKFLOW  •  IMPLEMENTED IN RESEARCH BRANCH — DESKTOP ACTION WIRING PENDING")
-        status.setObjectName("statusPill")
-        layout.addWidget(title)
-        layout.addWidget(detail)
-        layout.addWidget(status)
-        page.body.addWidget(panel)
-        note = QLabel("This screen is intentionally not showing invented row counts or progress. The next integration step will launch the verified archive downloader as a background task and display real progress.")
-        note.setObjectName("muted")
-        note.setWordWrap(True)
-        page.body.addWidget(note)
+        page = Page("Market Data Center", "Live public Binance Spot data routed through the local read-only Sherlock backend.")
+        self.market_panel = MarketPanel(self.api_url)
+        page.body.addWidget(self.market_panel, 1)
+        self.market_panel.refresh()
         return page
 
     def make_module_page(self, title, subtitle, items):
