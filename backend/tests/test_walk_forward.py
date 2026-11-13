@@ -52,6 +52,10 @@ def test_walk_forward_uses_strictly_prior_analogs_and_reports_baselines():
         }
         model = result["metrics_by_horizon"][horizon]["model"]
         assert model["trades"] + model["flat_folds"] == model["folds"]
+        periods = result["temporal_stability_by_horizon"][horizon]
+        assert set(periods) == {"early", "middle", "recent"}
+        assert sum(period["model"]["folds"] for period in periods.values()) == model["folds"]
+        assert all(period["model"]["trades"] + period["model"]["flat_folds"] == period["model"]["folds"] for period in periods.values())
         assert 0.0 <= model["positive_trade_rate"] <= 1.0
 
 
