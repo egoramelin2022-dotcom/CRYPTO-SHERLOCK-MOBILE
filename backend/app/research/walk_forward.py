@@ -215,6 +215,7 @@ def run_walk_forward(
             regime = classify_regime(
                 known_at_query_close, end_index=query_end,
                 lookback=min(96, query_end + 1),
+            )
         except ValueError as exc:
             regime = {
                 "regime": "UNCLASSIFIED_GAP_OR_SHORT_HISTORY",
