@@ -30,6 +30,7 @@ class Job:
 
 _jobs: dict[str, Job] = {}
 _lock = Lock()
+_pipeline_lock = Lock()
 
 
 def _now() -> str:
@@ -96,9 +97,12 @@ def run_pipeline_job(job_id: str, symbol: str, interval: str, window: int) -> No
     _set_job(job_id, status="running")
     try:
         source, analytics = _configured_paths()
-        result = run_historical_pipeline(
-            source, analytics, symbol=symbol, interval=interval, window=window
-        )
+        # The analytics SQLite file is shared. Serialize writers so two
+        # background jobs cannot interleave schema creation and transactions.
+        with _pipeline_lock:
+            result = run_historical_pipeline(
+                source, analytics, symbol=symbol, interval=interval, window=window
+            )
         _set_job(job_id, status="completed", result=asdict(result))
     except Exception as exc:
         _set_job(job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
