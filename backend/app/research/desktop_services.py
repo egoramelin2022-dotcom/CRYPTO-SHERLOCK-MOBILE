@@ -16,6 +16,7 @@ from app.research.multitimeframe_detector import (
 from app.research.evidence_adapters import pattern_search_evidence, stumpy_matches_evidence
 from app.research.ensemble import build_evidence_report
 from app.research.outcome_evaluation import evaluate_forward_path
+from app.research.stumpy_adapter import find_query_matches
 
 from app.research import jobs as base_jobs
 
@@ -131,8 +132,6 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
     stumpy_error = None
     try:
         import numpy as np
-        import stumpy
-        from types import SimpleNamespace
 
         history = candles[:start]
         query = candles[start:end + 1]
@@ -140,14 +139,10 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
         query_close = np.asarray([item.close for item in query], dtype=np.float64)
         history_values = np.diff(np.log(history_close), prepend=np.log(history_close[0]))
         query_values = np.diff(np.log(query_close), prepend=np.log(query_close[0]))
-        raw_matches = stumpy.match(
-            query_values, history_values, max_matches=top_k,
-            max_distance=np.inf, ignore_trivial=False,
+        matches = find_query_matches(
+            history_values, query_values, top_k=top_k,
+            exclusion_zone=len(query_values),
         )
-        matches = [
-            SimpleNamespace(distance=float(item[0]), start_index=int(item[1]))
-            for item in raw_matches
-        ]
         evidence.extend(stumpy_matches_evidence(
             matches,
             history_open_times=[item.open_time for item in history],
@@ -155,9 +150,9 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
             interval=interval,
         ))
         engines_available.append("stumpy")
-    except ImportError as exc:
+    except (ImportError, RuntimeError) as exc:
         engines_missing.append("stumpy")
-        stumpy_error = f"{type(exc).__name__}: optional research dependency is not installed"
+        stumpy_error = f"{type(exc).__name__}: {exc}"
     except Exception as exc:
         engines_missing.append("stumpy_runtime")
         stumpy_error = f"{type(exc).__name__}: {exc}"
