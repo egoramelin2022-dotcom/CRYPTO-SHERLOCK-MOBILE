@@ -306,9 +306,9 @@ class ResearchPanel(QWidget):
                 summary.append(
                     f"  {run['configuration']}: {run.get('status', 'completed')} · window {run['query_window']} · top_k {run['top_k']} · "
                     f"folds {run['evaluated_folds']} · candidates/fold {run.get('candidate_budget', '—')} · skipped {run['skipped_fold_count']}"
+                )
                 if run.get("status") == "skipped":
                     summary.append(f"    reason: {run.get('reason', 'not enough usable history')}")
-                )
         if result.get("method") == "expanding_window_historical_analog_median":
             summary.extend([
                 "\nWALK-FORWARD · EXPANDING TRAINING WINDOW",
