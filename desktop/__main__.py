@@ -314,14 +314,6 @@ class MainWindow(QMainWindow):
         if source.resolve() == analytics.resolve():
             QMessageBox.warning(self, "Unsafe database paths", "Source and analytics databases must be separate.")
             return
-        app_dir = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
-        server_exe = app_dir / "Server" / "CRYPTO-SHERLOCK-Server.exe"
-        if not server_exe.is_file():
-            QMessageBox.warning(
-                self, "Local server package missing",
-                "The bundled CRYPTO-SHERLOCK-Server.exe was not found. Rebuild the complete Windows package."
-            )
-            return
         analytics.parent.mkdir(parents=True, exist_ok=True)
         data_dir = analytics.parent
         environment = QProcessEnvironment.systemEnvironment()
@@ -330,9 +322,27 @@ class MainWindow(QMainWindow):
         environment.insert("SHERLOCK_ARCHIVE_RAW_DIR", str(data_dir / "binance_public_raw"))
         environment.insert("SHERLOCK_ARCHIVE_STAGING_DB", str(data_dir / "binance_archive_staging.db"))
         self.server_process.setProcessEnvironment(environment)
-        self.server_process.setWorkingDirectory(str(server_exe.parent))
-        self.server_process.setProgram(str(server_exe))
-        self.server_process.setArguments([])
+        if getattr(sys, "frozen", False):
+            app_dir = Path(sys.executable).resolve().parent
+            server_exe = app_dir / "Server" / "CRYPTO-SHERLOCK-Server.exe"
+            if not server_exe.is_file():
+                QMessageBox.warning(
+                    self, "Local server package missing",
+                    "The bundled CRYPTO-SHERLOCK-Server.exe was not found. Rebuild the complete Windows package."
+                )
+                return
+            self.server_process.setWorkingDirectory(str(server_exe.parent))
+            self.server_process.setProgram(str(server_exe))
+            self.server_process.setArguments([])
+        else:
+            backend_dir = Path(__file__).resolve().parents[1] / "backend"
+            server_script = backend_dir / "desktop_server.py"
+            if not server_script.is_file():
+                QMessageBox.warning(self, "Backend script missing", str(server_script))
+                return
+            self.server_process.setWorkingDirectory(str(backend_dir))
+            self.server_process.setProgram(sys.executable)
+            self.server_process.setArguments([str(server_script)])
         self.connection.setText("●  STARTING LOCAL SERVER")
         self.server_process.start()
         QTimer.singleShot(2500, self.check_backend)
