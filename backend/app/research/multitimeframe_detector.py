@@ -59,11 +59,10 @@ def _validate_series(candles: Sequence[Candle], interval: str, label: str) -> No
         raise ValueError(f"{label} candle sequence contains missing intervals")
 
 
-def _containing_index(candles: Sequence[Candle], open_times: list[int], timestamp: int) -> int | None:
-    index = bisect_right(open_times, timestamp) - 1
-    if index < 0 or timestamp > candles[index].close_time:
-        return None
-    return index
+def _last_closed_index(candles: Sequence[Candle], close_times: list[int], timestamp: int) -> int | None:
+    """Return the latest higher-timeframe candle closed by timestamp."""
+    index = bisect_right(close_times, timestamp) - 1
+    return index if index >= 0 else None
 
 
 def detect_multitimeframe_setups(
@@ -107,8 +106,8 @@ def detect_multitimeframe_setups(
     if candles_4h[0].symbol != symbol or candles_1d[0].symbol != symbol:
         raise ValueError("all timeframes must use the same symbol")
 
-    times_4h = [c.open_time for c in candles_4h]
-    times_1d = [c.open_time for c in candles_1d]
+    closes_4h = [c.close_time for c in candles_4h]
+    closes_1d = [c.close_time for c in candles_1d]
     results: list[MultiTimeframeSignal] = []
 
     for candle_15m in candles_15m:
@@ -121,7 +120,8 @@ def detect_multitimeframe_setups(
         if wick_to_body < config.lower_wick_to_body_min:
             continue
 
-        index_4h = _containing_index(candles_4h, times_4h, candle_15m.open_time)
+        # Only use higher-timeframe bars already closed by this 15m bar close.
+        index_4h = _last_closed_index(candles_4h, closes_4h, candle_15m.close_time)
         if index_4h is None or index_4h < config.support_lookback_4h:
             continue
         bar_4h = candles_4h[index_4h]
@@ -134,7 +134,7 @@ def detect_multitimeframe_setups(
         if not (bar_4h.low < sweep_line and bar_4h.close > prior_support):
             continue
 
-        index_1d = _containing_index(candles_1d, times_1d, candle_15m.open_time)
+        index_1d = _last_closed_index(candles_1d, closes_1d, candle_15m.close_time)
         if index_1d is None:
             continue
         if index_1d < max(config.daily_body_lookback, config.daily_decline_lookback):
