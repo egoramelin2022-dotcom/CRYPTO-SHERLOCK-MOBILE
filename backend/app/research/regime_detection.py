@@ -83,7 +83,7 @@ def summarize_regime_outcomes(folds: Sequence[dict[str, Any]]) -> dict[str, Any]
     grouped: dict[str, list[float]] = {}
     for fold in folds:
         regime = fold.get("regime", {}).get("regime")
-        if not regime:
+        if not regime or regime.startswith("UNCLASSIFIED"):
             continue
         for horizon, outcome in fold.get("horizons", {}).items():
             if outcome.get("predicted_side") == "FLAT":
