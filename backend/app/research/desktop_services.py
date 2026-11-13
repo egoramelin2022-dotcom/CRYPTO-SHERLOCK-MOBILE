@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+import os
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -21,9 +22,8 @@ from app.research.stumpy_adapter import find_query_matches
 from app.research import jobs as base_jobs
 
 
-def _load_candles(symbol: str, interval: str, limit: int) -> list[Candle]:
-    source, _ = base_jobs._configured_paths()
-    uri = f"file:{quote(source.as_posix(), safe='/:')}?mode=ro"
+def _read_database(path: Path, symbol: str, interval: str, limit: int) -> list[Candle]:
+    uri = f"file:{quote(path.as_posix(), safe='/:')}?mode=ro"
     connection = sqlite3.connect(uri, uri=True)
     connection.row_factory = sqlite3.Row
     try:
@@ -36,17 +36,42 @@ def _load_candles(symbol: str, interval: str, limit: int) -> list[Candle]:
                ORDER BY open_time DESC LIMIT ?""",
             (symbol, interval, now_ms, limit),
         ).fetchall()
+        return [Candle(**dict(row)) for row in reversed(rows)]
     finally:
         connection.close()
-    candles = [Candle(**dict(row)) for row in reversed(rows)]
+
+
+def _load_candles(symbol: str, interval: str, limit: int) -> tuple[list[Candle], list[str]]:
+    source, _ = base_jobs._configured_paths()
+    paths = [("source", source)]
+    staging_value = os.getenv("SHERLOCK_ARCHIVE_STAGING_DB")
+    if staging_value:
+        staging = Path(staging_value).expanduser().resolve()
+        if staging.is_file() and staging != source:
+            paths.append(("archive_staging", staging))
+
+    merged: dict[int, Candle] = {}
+    used_sources: list[str] = []
+    for label, path in paths:
+        rows = _read_database(path, symbol, interval, limit)
+        if not rows:
+            continue
+        used_sources.append(label)
+        for candle in rows:
+            candle.validate()
+            previous = merged.get(candle.open_time)
+            if previous is not None and previous != candle:
+                raise ValueError(
+                    f"Conflicting {symbol} {interval} candle at {candle.open_time} "
+                    "between source and archive staging databases"
+                )
+            merged[candle.open_time] = candle
+
+    candles = sorted(merged.values(), key=lambda item: item.open_time)[-limit:]
     if not candles:
         raise ValueError(f"No local candles for {symbol} {interval}")
-    for candle in candles:
-        candle.validate()
     gaps = find_gaps([c.open_time for c in candles], interval)
     if gaps:
-        # Keep only the most recent contiguous suffix. Never interpolate,
-        # synthesize, or let a candidate window cross a missing candle.
         last_gap = gaps[-1]
         first_after_gap = next(
             i for i, candle in enumerate(candles)
@@ -55,8 +80,7 @@ def _load_candles(symbol: str, interval: str, limit: int) -> list[Candle]:
         candles = candles[first_after_gap:]
     if not candles:
         raise ValueError(f"No contiguous local candles for {symbol} {interval}")
-    return candles
-
+    return candles, used_sources
 
 def run_pattern_research(
     symbol: str = "BTCUSDT", interval: str = "15m", query_window: int = 40,
@@ -65,7 +89,7 @@ def run_pattern_research(
 ) -> dict[str, Any]:
     if history_limit < query_window + 2 or history_limit > 50000:
         raise ValueError("history_limit must be between query_window + 2 and 50000")
-    candles = _load_candles(symbol, interval, history_limit)
+    candles, data_sources = _load_candles(symbol, interval, history_limit)
     if len(candles) <= query_window:
         raise ValueError("Not enough local history for query window and earlier analogs")
     query_start = len(candles) - query_window
@@ -89,6 +113,7 @@ def run_pattern_research(
     return {
         "symbol": symbol, "interval": interval, "mode": mode,
         "history_candles": len(candles),
+        "data_sources": data_sources,
         "query_start_time": candles[query_start].open_time,
         "query_end_time": candles[query_end].open_time,
         "query_window": query_window,
@@ -102,14 +127,15 @@ def run_pattern_research(
 def run_multitimeframe_research(symbol: str = "BTCUSDT") -> dict[str, Any]:
     # These are intentionally bounded, recent contiguous windows. Daily
     # candles are historical closed bars in the local source database.
-    m15 = _load_candles(symbol, "15m", 30000)
-    h4 = _load_candles(symbol, "4h", 3000)
-    d1 = _load_candles(symbol, "1d", 1000)
+    m15, sources_15m = _load_candles(symbol, "15m", 30000)
+    h4, sources_4h = _load_candles(symbol, "4h", 3000)
+    d1, sources_1d = _load_candles(symbol, "1d", 1000)
     results = detect_multitimeframe_setups(m15, h4, d1, config=MultiTimeframeConfig())
     return {
         "symbol": symbol,
         "config": asdict(MultiTimeframeConfig()),
         "rows_loaded": {"15m": len(m15), "4h": len(h4), "1d": len(d1)},
+        "data_sources": {"15m": sources_15m, "4h": sources_4h, "1d": sources_1d},
         "setups": [item.to_dict() for item in results],
         "interpretation": "Aligned historical observations only; not a forecast or trading signal. Daily bars must be closed.",
     }
@@ -118,7 +144,7 @@ def run_multitimeframe_research(symbol: str = "BTCUSDT") -> dict[str, Any]:
 def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
                           query_window: int = 40, mode: str = "free",
                           top_k: int = 20) -> dict[str, Any]:
-    candles = _load_candles(symbol, interval, 20000)
+    candles, data_sources = _load_candles(symbol, interval, 20000)
     if len(candles) <= query_window:
         raise ValueError("Not enough local history for ensemble query")
     start, end = len(candles) - query_window, len(candles) - 1
@@ -165,6 +191,7 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
     report = build_evidence_report(evidence, min_supporting_modules=2)
     return {
         "symbol": symbol, "mode": mode, "query_window": query_window,
+        "data_sources": data_sources,
         "engines_available": engines_available,
         "engines_missing": engines_missing,
         "optional_engine_note": stumpy_error,
