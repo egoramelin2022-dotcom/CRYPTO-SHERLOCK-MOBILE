@@ -285,7 +285,7 @@ class ExperimentLedger:
                     WHERE e.sequence=(SELECT MAX(x.sequence) FROM experiment_events x
                                       WHERE x.run_id=r.run_id)
                     {('AND ' + ' AND '.join(clauses)) if clauses else ''}
-                    ORDER BY r.created_at DESC LIMIT ? OFFSET ?""",
+                    ORDER BY r.created_at DESC, r.rowid DESC LIMIT ? OFFSET ?""",
                 values,
             ).fetchall()
         return [{
