@@ -124,8 +124,8 @@ def _distance(
             for i in range(n)
         ]
         return math.sqrt(sum(squared) / n)
-    # Each of the five named stages contributes exactly one fifth, regardless
-    # of the number of candles assigned to that stage.
+    # Each positional stage has equal weight (20%) regardless of its candle
+    # count. Per-stage similarities are descriptive shape scores, not odds.
     return math.sqrt(sum(_stage_mean_squared_errors(a, b)) / 5)
 
 
