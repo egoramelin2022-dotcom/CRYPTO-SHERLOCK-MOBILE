@@ -10,9 +10,9 @@ Because the candidate set is intentionally small and correlated, this is a limit
 
 ## 2. Causal regime detection
 
-Each walk-forward test fold receives a rule-based regime label using only closed candles through that fold's query close. The current labels are HIGH_VOLATILITY, TREND_UP, TREND_DOWN, ACCUMULATION_CANDIDATE and SIDEWAYS. Features include trailing net return, realized volatility, directional efficiency, range position and relative volume.
+Each walk-forward test fold receives a rule-based regime label using only closed candles through that fold's query close. The current labels are HIGH_VOLATILITY, TREND_UP, TREND_DOWN, ACCUMULATION_CANDIDATE and SIDEWAYS. Features include trailing net return, realized volatility per candle, directional efficiency, range position and late-versus-early volume. The default lookback is up to 96 closed candles. Any window crossing a missing-candle gap is marked unclassified rather than bridged.
 
-The regime labels are descriptive heuristics, not trained classifiers. ACCUMULATION_CANDIDATE is not evidence of institutional buying. The engine reports model outcomes by regime and horizon to reveal where historical behavior differed; it does not use future returns to assign a regime.
+Default rule thresholds are 0.6% realized volatility per candle, 1.5% trailing net return for directional trends, and a 1.10 late/early volume ratio for accumulation candidates. They are explicit configuration metadata, not statistically calibrated thresholds; regime labels should not be compared across intervals without recalibration. The regime labels are descriptive heuristics, not trained classifiers. ACCUMULATION_CANDIDATE is not evidence of institutional buying. The engine reports model outcomes by regime and horizon to reveal where historical behavior differed; it does not use future returns to assign a regime.
 
 ## 3. Strategy portfolio diagnostics
 
