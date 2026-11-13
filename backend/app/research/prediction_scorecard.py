@@ -101,10 +101,8 @@ def build_prediction_scorecard(
         ),
         "coverage": directional_calls / total if total else None,
         "coverage_percent": 100.0 * directional_calls / total if total else None,
-        "balanced_accuracy": (
-            sum(available_recalls) / len(available_recalls) if available_recalls else None
-        ),
-        "macro_f1": sum(f1_values) / len(f1_values) if f1_values else None,
+        "balanced_accuracy": balanced_accuracy,
+        "macro_f1": macro_f1,
         "class_metrics": recalls,
         "confusion_matrix": matrix,
         "warning": (
