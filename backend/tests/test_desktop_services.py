@@ -81,3 +81,24 @@ def test_verified_archive_staging_is_merged_with_source_without_duplicates(tmp_p
     assert len(candles) == 120
     assert [item.open_time for item in candles] == [item.open_time for item in rows]
     assert sources == ["source", "archive_staging"]
+
+
+
+def test_verified_history_is_retained_before_gaps(tmp_path, monkeypatch):
+    source = tmp_path / "source.db"
+    analytics = tmp_path / "analytics.db"
+    rows = make_candles(120)
+    rows.pop(60)  # Simulate one missing 15m candle in the middle of history.
+    connection = sqlite3.connect(source)
+    repository = CandleRepository(connection)
+    repository.ensure_schema()
+    repository.insert_many(rows)
+    connection.close()
+    monkeypatch.setenv("SHERLOCK_SOURCE_DB", str(source))
+    monkeypatch.setenv("SHERLOCK_ANALYTICS_DB", str(analytics))
+
+    candles, sources = _load_candles("BTCUSDT", "15m", 200)
+    assert len(candles) == 119
+    assert candles[0].open_time == rows[0].open_time
+    assert candles[-1].open_time == rows[-1].open_time
+    assert sources == ["source"]
