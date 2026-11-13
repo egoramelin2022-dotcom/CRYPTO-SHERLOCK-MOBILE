@@ -13,6 +13,7 @@ from app.market_data.candles import Candle
 from app.research.ensemble import EnsembleEvidenceReport, ResearchEvidence, build_evidence_report
 from app.research.evidence_adapters import pattern_search_evidence, stumpy_matches_evidence
 from app.research.outcome_evaluation import ForwardEvaluation, evaluate_forward_path
+from app.research.outcome_summary import HorizonOutcomeSummary, summarize_forward_outcomes
 from app.research.pattern_intelligence import SearchMode, search_analogs
 from app.research.stumpy_adapter import find_query_matches
 
@@ -69,6 +70,7 @@ class EnsembleSearchRun:
     ensemble: EnsembleEvidenceReport | None
     ablations: tuple[ModuleAblation, ...]
     forward_evaluations: tuple[CandidateForwardReport, ...]
+    outcome_summary: tuple[HorizonOutcomeSummary, ...]
 
     def to_dict(self) -> dict:
         return {
@@ -85,6 +87,12 @@ class EnsembleSearchRun:
             "ensemble": self.ensemble.to_dict() if self.ensemble else None,
             "ablations": [item.to_dict() for item in self.ablations],
             "forward_evaluations": [item.to_dict() for item in self.forward_evaluations],
+            "outcome_summary": [item.to_dict() for item in self.outcome_summary],
+            "outcome_summary_method": (
+                "Per-horizon descriptive aggregates over available candidate outcomes. "
+                "SIDEWAYS requires both max range and absolute close move thresholds; "
+                "LONG/SHORT positive rates are net of configured costs."
+            ),
             "interpretation": (
                 "Historical analogue agreement and forward outcomes only; "
                 "not a probability, forecast, or trading signal."
@@ -226,6 +234,10 @@ def run_ensemble_search(
                 forward=forward,
             ))
 
+    outcome_summary = summarize_forward_outcomes(
+        [item.forward for item in forward_reports]
+    )
+
     query_start = candles[query_start_index]
     query_end = candles[query_end_index]
     return EnsembleSearchRun(
@@ -242,4 +254,5 @@ def run_ensemble_search(
         ensemble=report,
         ablations=tuple(ablation_reports),
         forward_evaluations=tuple(forward_reports),
+        outcome_summary=outcome_summary,
     )
