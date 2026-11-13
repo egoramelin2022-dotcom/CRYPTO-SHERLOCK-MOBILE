@@ -19,9 +19,26 @@ $env:SHERLOCK_ANALYTICS_DB = $analyticsDb
 
 $venvPython = Join-Path $backendDir ".venv\Scripts\python.exe"
 if (-not (Test-Path $venvPython)) {
+    $venvPath = Join-Path $backendDir ".venv"
     Write-Host "Creating backend virtual environment..."
-    py -3.12 -m venv (Join-Path $backendDir ".venv")
-    if ($LASTEXITCODE -ne 0) { throw "Could not create Python 3.12 environment. Install Python 3.12 or create backend\.venv manually." }
+    $created = $false
+
+    # Prefer the CI-tested Python 3.12, but do not fail when the PC only has
+    # another installed Python (for example, the user's existing 3.14 setup).
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        & py -3.12 -m venv $venvPath
+        $created = ($LASTEXITCODE -eq 0)
+    }
+    if (-not $created) {
+        if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+            throw "Python launcher and python command were not found. Install Python 3.12+ and retry."
+        }
+        & python -m venv $venvPath
+        $created = ($LASTEXITCODE -eq 0)
+    }
+    if (-not $created -or -not (Test-Path $venvPython)) {
+        throw "Could not create backend virtual environment. Install Python 3.12+ and retry."
+    }
 }
 
 Write-Host "Installing/checking backend dependencies..."
