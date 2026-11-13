@@ -157,18 +157,25 @@ def test_robustness_panel_formats_parameter_stability_without_picking_winner():
                     "median_average_return_per_fold": 0.001,
                 }
             },
-            "runs": [{
-                "configuration": "baseline",
-                "query_window": 40,
-                "top_k": 10,
-                "evaluated_folds": 8,
-                "skipped_fold_count": 1,
-            {
-                "configuration": "longer_window", "query_window": 48, "top_k": 10,
-                "status": "skipped", "reason": "not enough history",
-                "evaluated_folds": 0, "skipped_fold_count": 0,
-            },
-            }],
+            "runs": [
+                {
+                    "configuration": "baseline",
+                    "query_window": 40,
+                    "top_k": 10,
+                    "status": "completed",
+                    "evaluated_folds": 8,
+                    "skipped_fold_count": 1,
+                },
+                {
+                    "configuration": "longer_window",
+                    "query_window": 48,
+                    "top_k": 10,
+                    "status": "skipped",
+                    "reason": "not enough history",
+                    "evaluated_folds": 0,
+                    "skipped_fold_count": 0,
+                },
+            ],
         },
     })
     rendered = panel.output.toPlainText()
