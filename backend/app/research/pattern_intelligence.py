@@ -44,6 +44,8 @@ class SearchResult:
             "query_start_index": self.query_start_index,
             "query_end_index": self.query_end_index,
             "segment_length": self.segment_length,
+            "forward_return_basis": "candidate_end_close_to_future_close",
+            "excursion_basis": "candidate_end_close_to_future_high_low",
             "stage_weights": (
                 {
                     "preliminary_decline": 0.2,
@@ -174,10 +176,16 @@ def search_analogs(
 ) -> SearchResult:
     """Find earlier same-length windows and score their subsequent outcomes.
 
-    The query is [query_start, query_end], inclusive. Candidates must end before query_start by at least the maximum forward
-    horizon (and any larger requested embargo). Returned analog windows and
-    their forward-outcome horizons are mutually non-overlapping. The caller should pass one contiguous,
-    chronologically ordered segment so no candidate crosses a data gap.
+    forward_returns and legacy excursion fields are descriptive close-based
+    measures anchored at the candidate end close. They are not execution
+    simulations. Use outcome_evaluation for next-open entries and costs.
+
+    The query is inclusive. Candidates must end before query_start by at least
+    the maximum forward horizon (and any larger requested embargo). Selected
+    analog-plus-outcome ranges are non-overlapping. The input may contain
+    historical gaps: query windows crossing a gap are rejected, while
+    candidate windows and forward paths crossing a gap are skipped.
+    Input candles must be strictly chronological.
     """
     if mode not in ("free", "five_stage"):
         raise ValueError("mode must be 'free' or 'five_stage'")
@@ -191,6 +199,8 @@ def search_analogs(
     length = query_end - query_start + 1
     if mode == "five_stage" and length < 5:
         raise ValueError("five_stage mode requires at least five candles")
+    if not horizons:
+        raise ValueError("at least one forward horizon is required")
     if any(isinstance(h, bool) or not isinstance(h, int) or h < 1 for h in horizons):
         raise ValueError("horizons must be positive integers")
     if embargo is not None and (
