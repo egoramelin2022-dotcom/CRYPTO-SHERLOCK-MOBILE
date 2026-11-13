@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
 from desktop.market_panel import MarketPanel
 from desktop.research_panel import ResearchPanel
+from desktop.paper_panel import PaperPanel
 
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -153,11 +154,7 @@ class MainWindow(QMainWindow):
             self.make_research_page("Multi-Timeframe Scanner", "Aligned 15m lower-wick, 4h support sweep/reclaim and closed 1d bearish-context scan.", "/v1/research/multitimeframe", "mtf"),
             self.make_research_page("Ensemble Engine", "Evidence aggregation with explicit engine availability. No uncalibrated probabilities or signal averaging.", "/v1/research/ensemble", "ensemble"),
             self.make_research_page("Backtesting Lab", "Historical forward-outcome audit for analogs. Full strategy walk-forward backtesting remains a separate validation stage.", "/v1/research/pattern", "pattern"),
-            self.make_module_page("Paper Trading", "Paper-only portfolio controls are being integrated separately. No live orders or exchange credentials are present.", [
-                "No live exchange execution endpoints",
-                "No leverage or automated capital allocation",
-                "Virtual portfolio persistence and risk controls are next",
-            ]),
+            self.make_paper_page(),
             self.make_module_page("System Monitor", "Local services, data integrity and research job health.", [
                 "Backend health endpoint",
                 "Source database and analytics database status",
@@ -220,6 +217,16 @@ class MainWindow(QMainWindow):
         self.market_panel = MarketPanel(self.api_url)
         page.body.addWidget(self.market_panel, 1)
         self.market_panel.refresh()
+        return page
+
+    def make_paper_page(self):
+        page = Page("Paper Trading", "Persistent virtual spot portfolio. All actions are manually confirmed and simulated locally.")
+        panel = QFrame()
+        panel.setObjectName("panel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.addWidget(PaperPanel(self.api_url))
+        page.body.addWidget(panel, 1)
         return page
 
     def make_research_page(self, title, subtitle, endpoint, kind):
