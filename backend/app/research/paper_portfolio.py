@@ -181,6 +181,9 @@ def portfolio_snapshot(marks: dict[str, float] | None = None) -> dict[str, Any]:
         })
     return {
         "mode": "PAPER_ONLY",
+        "quote_currency": "USDT",
+        "fee_bps_per_side": FEE_BPS,
+        "slippage_bps_per_side": SLIPPAGE_BPS,
         "initial_cash": float(account_data["initial_cash"]),
         "cash": float(account_data["cash"]),
         "equity": equity,
