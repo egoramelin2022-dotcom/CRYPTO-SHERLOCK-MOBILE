@@ -5,7 +5,7 @@ It never turns similarity into a probability or trading signal.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 import math
 from typing import Sequence
 
