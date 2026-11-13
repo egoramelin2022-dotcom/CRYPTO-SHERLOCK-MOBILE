@@ -123,6 +123,8 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
     rendered = panel.output.toPlainText()
     assert "WALK-FORWARD" in rendered
     assert "evaluated folds: 4" in rendered
+    assert panel.robustness_button is not None
+    assert panel.robustness_button.text() == "RUN ROBUSTNESS AUDIT"
     assert "embargo: 64 candles" in rendered
     assert "Model: sum +2.50%" in rendered
     assert "Always Long: sum +1.00%" in rendered
