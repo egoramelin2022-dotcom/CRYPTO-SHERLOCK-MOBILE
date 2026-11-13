@@ -1,7 +1,6 @@
 """CRYPTO SHERLOCK Windows desktop research terminal."""
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
@@ -22,7 +21,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-API_DEFAULT = os.getenv("SHERLOCK_API_URL", "http://127.0.0.1:8000")
+API_DEFAULT = "http://127.0.0.1:8000"
 
 
 class HealthWorker(QThread):
