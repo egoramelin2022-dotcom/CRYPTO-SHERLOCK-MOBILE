@@ -111,6 +111,9 @@ def run_walk_forward(
         horizon: {"model": [], "always_long": [], "always_short": [], "flat": []}
         for horizon in horizons
     }
+    decision_counts = {
+        horizon: {"LONG": 0, "SHORT": 0, "FLAT": 0} for horizon in horizons
+    }
     skipped: list[dict[str, Any]] = []
 
     for fold_number, query_start in enumerate(fold_starts, start=1):
@@ -181,6 +184,7 @@ def run_walk_forward(
                 side = "FLAT"
                 model_return = 0.0
 
+            decision_counts[horizon][side] += 1
             per_horizon[horizon]["model"].append(model_return)
             per_horizon[horizon]["always_long"].append(realized.long_net_return)
             per_horizon[horizon]["always_short"].append(realized.short_net_return)
@@ -224,6 +228,13 @@ def run_walk_forward(
     for horizon, rows in per_horizon.items():
         metrics[str(horizon)] = {
             name: _summary(values) for name, values in rows.items()
+        model_metrics = metrics[str(horizon)]["model"]
+        model_metrics["trades"] = decision_counts[horizon]["LONG"] + decision_counts[horizon]["SHORT"]
+        model_metrics["flat_folds"] = decision_counts[horizon]["FLAT"]
+        model_metrics["trade_rate"] = (
+            model_metrics["trades"] / model_metrics["folds"]
+            if model_metrics["folds"] else 0.0
+        )
         }
 
     return {
