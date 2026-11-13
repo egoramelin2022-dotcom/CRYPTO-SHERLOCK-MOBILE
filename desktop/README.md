@@ -17,7 +17,7 @@ The Windows package includes a local backend executable. Open **Server Settings*
 The archive loader runs asynchronously and writes only to the staging database. The application polls job status instead of freezing the UI.
 
 - Live Binance Spot candles and 24-hour ticker; symbols BTCUSDT, ETHUSDT, BNBUSDT and SOLUSDT; 15m, 1h, 4h and 1d.
-- Historical Pattern Intelligence with free search and preserved five-stage mode.
+- Historical Pattern Intelligence with free search and preserved five-stage mode. Research reads the immutable source database plus verified archive staging data as a read-only merged view; conflicting duplicate candles are rejected.
 - Multi-Timeframe scanner for aligned 15m / 4h / closed 1d data.
 - Ensemble evidence aggregation. STUMPY is an optional research dependency; the UI reports when it is unavailable. Consensus is exact-window agreement only, not a probability.
 - Backtesting Lab currently evaluates historical analog forward outcomes with configured fees and slippage. It is not yet a strategy-level walk-forward optimizer.
@@ -27,7 +27,7 @@ The archive loader runs asynchronously and writes only to the staging database. 
 ## Safety and current limitations
 
 - No exchange API credentials or live order endpoints are implemented. The local backend binds to loopback only; do not expose port 8000 publicly.
-- Research only uses closed local candles and a contiguous suffix; missing intervals are not interpolated.
+- Research only uses closed local candles and a contiguous suffix; missing intervals are not interpolated. Archive staging candles become available to research automatically after verification, without modifying the source database.
 - The Paper Trading account is virtual and persisted in the separate analytics database. Default virtual starting cash is configurable with `SHERLOCK_PAPER_INITIAL_CASH`.
 - Archive download can consume substantial disk space and time. It requires explicit confirmation and writes only to staging.
 - This build still requires Windows smoke testing on the target PC. The generated application is a portable folder build, not yet a signed MSI installer.
