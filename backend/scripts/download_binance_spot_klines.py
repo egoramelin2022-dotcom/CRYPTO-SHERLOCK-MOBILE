@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import calendar
+from datetime import datetime, timezone, timedelta
 import csv
 import hashlib
 import io
@@ -191,8 +192,12 @@ def run(start: str, end: str, raw_dir: Path, db_path: Path, progress_callback: C
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    latest_complete_month = (
+        datetime.now(timezone.utc).replace(day=1) - timedelta(days=1)
+    ).strftime("%Y-%m")
     parser.add_argument("--start", default="2017-08", help="first YYYY-MM (default: 2017-08)")
-    parser.add_argument("--end", default="2026-10", help="last YYYY-MM (default: 2026-10; current month may not be published yet)")
+    parser.add_argument("--end", default=latest_complete_month,
+                        help=f"last YYYY-MM (default: {latest_complete_month})")
     parser.add_argument("--raw-dir", type=Path, default=Path("data/binance_public_raw"))
     parser.add_argument("--db-path", type=Path, default=Path("data/binance_archive_staging.db"))
     args = parser.parse_args()
