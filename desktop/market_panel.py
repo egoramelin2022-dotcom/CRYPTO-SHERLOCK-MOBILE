@@ -65,7 +65,7 @@ class CandlestickItem(pg.GraphicsObject):
             bottom = min(candle.open, candle.close)
             height = max(top - bottom, max(candle.close * 0.00003, 1e-9))
             painter.setBrush(pg.mkBrush(pen_color))
-            painter.drawRect(pg.QtCore.QRectF(index - 0.32, bottom, 0.64, height))
+            painter.drawRect(QRectF(index - 0.32, bottom, 0.64, height))
         painter.end()
 
     def paint(self, painter, *args):
