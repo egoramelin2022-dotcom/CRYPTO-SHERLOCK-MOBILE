@@ -2,7 +2,7 @@ import sqlite3
 
 from app.market_data.candles import Candle
 from app.market_data.repository import CandleRepository
-from app.research.desktop_services import run_pattern_research, run_ensemble_research, run_walk_forward_research, _load_candles, _split_contiguous
+from app.research.desktop_services import run_pattern_research, run_ensemble_research, run_walk_forward_research, run_intelligence_core_research, _load_candles, _split_contiguous
 
 
 def make_candles(count=120):
@@ -261,3 +261,24 @@ def test_robustness_desktop_service_uses_verified_local_history(tmp_path, monkey
     assert result["data_sources"] == ["source"]
     assert result["configurations_evaluated"] >= 3
     assert result["method"] == "bounded_one_factor_at_a_time_sensitivity"
+
+
+
+def test_intelligence_core_service_runs_on_read_only_verified_history(tmp_path, monkeypatch):
+    configure_db(tmp_path, monkeypatch)
+    result = run_intelligence_core_research(
+        query_window=10,
+        query_start_time=90 * 900_000,
+        top_k=3,
+        min_analogs=1,
+        candidate_budget=100,
+        history_limit=120,
+    )
+    assert result["core_version"] == "0.1.0"
+    assert result["query_selection"] == "historical_open_time"
+    assert result["query"]["start_time"] == 90 * 900_000
+    assert result["data_sources"] == ["source"]
+    assert result["history_candles"] == 120
+    assert result["decision"]["trading_signal"] is None
+    assert result["decision"]["paper_trade_eligible"] is False
+    assert result["provenance"]["candidate_stride"] >= 1
