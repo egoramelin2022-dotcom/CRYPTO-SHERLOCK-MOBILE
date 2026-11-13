@@ -179,3 +179,42 @@ def test_adaptive_pattern_endpoint_rejects_invalid_bounds_and_too_many_windows()
         params={"adaptive_search": "true", "adaptive_min_window": 5, "adaptive_max_window": 100, "adaptive_step": 5},
     )
     assert too_many.status_code == 422
+
+
+def test_walk_forward_endpoint_queues_research_job(monkeypatch):
+    import app.main as main
+
+    queued = {
+        "job_id": "walk-forward-job",
+        "kind": "walk_forward_research",
+        "status": "queued",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+        "result": None,
+        "error": None,
+    }
+    captured = {}
+    monkeypatch.setattr(main.research_jobs, "_new_job", lambda kind: queued)
+    monkeypatch.setattr(
+        main, "_run_desktop_research_job",
+        lambda job_id, function, kwargs: captured.update(
+            job_id=job_id, function=function, kwargs=kwargs
+        ),
+    )
+    response = client.post(
+        "/v1/research/walk-forward",
+        params={
+            "query_window": 30, "max_folds": 12,
+            "min_training_candles": 200, "candidate_budget": 1000,
+        },
+    )
+    assert response.status_code == 202
+    assert response.json()["job_id"] == "walk-forward-job"
+    assert captured["kwargs"]["query_window"] == 30
+    assert captured["kwargs"]["max_folds"] == 12
+    assert captured["function"] is main.desktop_services.run_walk_forward_research
+
+
+def test_walk_forward_endpoint_rejects_calendar_month_interval():
+    response = client.post("/v1/research/walk-forward", params={"interval": "1M"})
+    assert response.status_code == 422
