@@ -261,7 +261,7 @@ class ResearchPanel(QWidget):
                     pen=pg.mkPen(palette[index % len(palette)], width=1.2),
                     name=f"Analog {index + 1} · {similarity:.3f}",
                 )
-            self.plot.setTitle("Current pattern vs top historical analogs")
+            self.plot.setTitle("Selected pattern sample vs top historical analogs")
 
     def on_failed(self, message: str):
         self.status.setText("Research job failed")
