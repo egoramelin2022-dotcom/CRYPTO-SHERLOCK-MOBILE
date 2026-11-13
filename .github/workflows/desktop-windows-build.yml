@@ -132,7 +132,44 @@ jobs:
           $installer = Get-ChildItem 'dist/installer/*.exe' | Select-Object -First 1
           if (-not $installer) { throw 'Windows installer was not produced.' }
           Write-Host "Installer: $($installer.FullName) · $([math]::Round($installer.Length / 1MB)) MB"
-      - name: Upload Windows installer only
+      - name: Assemble complete release bundle and manifest
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/release/Installer, dist/release/Portable | Out-Null
+          Copy-Item -Path 'dist/installer/*.exe' -Destination 'dist/release/Installer/' -Force
+          Copy-Item -Path 'dist/CRYPTO-SHERLOCK/*' -Destination 'dist/release/Portable/' -Recurse -Force
+          $installerPath = (Get-ChildItem 'dist/release/Installer/*.exe' | Select-Object -First 1).FullName
+          $desktopPath = (Resolve-Path 'dist/release/Portable/CRYPTO-SHERLOCK.exe').Path
+          $serverPath = (Resolve-Path 'dist/release/Portable/Server/CRYPTO-SHERLOCK-Server.exe').Path
+          $manifest = @"
+          CRYPTO SHERLOCK DESKTOP 0.3.0
+          Complete Windows x64 release bundle
+
+          Installer\
+            Contains the per-user Windows installer.
+
+          Portable\
+            Self-contained desktop application and bundled local research server.
+            No Python installation is required.
+
+          SHA256
+          Installer: $((Get-FileHash $installerPath -Algorithm SHA256).Hash)
+          Desktop:   $((Get-FileHash $desktopPath -Algorithm SHA256).Hash)
+          Server:    $((Get-FileHash $serverPath -Algorithm SHA256).Hash)
+
+          Safety: research and Paper Trading only. No live exchange orders.
+          "@
+          Set-Content -Path 'dist/release/RELEASE-MANIFEST.txt' -Value $manifest -Encoding UTF8
+          $total = (Get-ChildItem 'dist/release' -File -Recurse | Measure-Object -Property Length -Sum).Sum
+          Write-Host "Complete release payload: $([math]::Round($total / 1MB)) MB"
+      - name: Upload complete Windows release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: CRYPTO-SHERLOCK-Full-Release-Windows-x64
+          path: dist/release/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload Windows installer separately
         uses: actions/upload-artifact@v4
         with:
           name: CRYPTO-SHERLOCK-Installer-Windows-x64
