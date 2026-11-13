@@ -27,11 +27,11 @@ def path():
 
 
 def test_entry_is_next_open_and_horizon_exits_are_forward_only():
-    result = evaluate_forward_path(path(), candidate_end_index=0, horizons=(1, 2, 4))
+    result = evaluate_forward_path(path(), candidate_end_index=0, horizons=(1, 2, 5))
     one, two, missing = result.outcomes
     assert one.entry_price == 102
-    assert one.exit_price == 99
-    assert one.gross_return == pytest.approx(99 / 102 - 1)
+    assert one.exit_price == 104
+    assert one.gross_return == pytest.approx(104 / 102 - 1)
     assert two.exit_time == 2 * STEP
     assert missing is None
 
@@ -40,11 +40,11 @@ def test_long_short_excursions_and_neutral_range_metrics():
     result = evaluate_forward_path(path(), candidate_end_index=0, horizons=(2,))
     item = result.outcomes[0]
     assert item.long_mfe == pytest.approx(106 / 102 - 1)
-    assert item.long_mae == pytest.approx(97 / 102 - 1)
-    assert item.short_mfe == pytest.approx(102 / 97 - 1)
+    assert item.long_mae == pytest.approx(98 / 102 - 1)
+    assert item.short_mfe == pytest.approx(102 / 98 - 1)
     assert item.short_mae == pytest.approx(102 / 106 - 1)
-    assert item.max_high_low_range == pytest.approx(106 / 97 - 1)
-    assert item.absolute_close_return == pytest.approx(abs(101 / 102 - 1))
+    assert item.max_high_low_range == pytest.approx(106 / 98 - 1)
+    assert item.absolute_close_return == pytest.approx(abs(99 / 102 - 1))
 
 
 def test_round_trip_fees_and_slippage_reduce_both_directions():
@@ -78,3 +78,15 @@ def test_rejects_invalid_costs_horizons_and_candidate_index():
         evaluate_forward_path(rows, candidate_end_index=0, fee_bps_per_side=-1)
     with pytest.raises(ValueError, match="candidate_end_index"):
         evaluate_forward_path(rows, candidate_end_index=99)
+
+
+
+def test_unrelated_older_gap_does_not_block_contiguous_forward_path():
+    rows = [candle(0, 100, 101, 99, 100),
+            candle(1, 100, 101, 99, 100),
+            candle(3, 100, 102, 99, 101),
+            candle(4, 101, 104, 100, 103)]
+    result = evaluate_forward_path(rows, candidate_end_index=2, horizons=(1,))
+    assert result.outcomes[0] is not None
+    assert result.outcomes[0].entry_price == 101
+    assert result.outcomes[0].exit_price == 103

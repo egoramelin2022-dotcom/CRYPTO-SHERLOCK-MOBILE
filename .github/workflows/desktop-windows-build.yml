@@ -34,7 +34,7 @@ jobs:
           desktop/__main__.py
       - name: Build bundled local backend executable
         run: >
-          pyinstaller --noconfirm --clean --console
+          pyinstaller --noconfirm --clean --windowed
           --name CRYPTO-SHERLOCK-Server
           --paths backend
           --collect-all fastapi
@@ -42,6 +42,7 @@ jobs:
           --collect-all httpx
           --collect-all stumpy
           --collect-all numba
+          --collect-all scipy
           --collect-submodules app
           --collect-submodules scripts
           --hidden-import app.main
@@ -55,10 +56,66 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist/CRYPTO-SHERLOCK/Server | Out-Null
           Copy-Item -Path dist/server/CRYPTO-SHERLOCK-Server/* -Destination dist/CRYPTO-SHERLOCK/Server -Recurse -Force
-      - name: Upload Windows application
+      - name: Smoke test bundled local backend
+        shell: pwsh
+        run: |
+          $server = (Resolve-Path 'dist/CRYPTO-SHERLOCK/Server/CRYPTO-SHERLOCK-Server.exe').Path
+          $env:SHERLOCK_SERVER_LOG = Join-Path $env:RUNNER_TEMP 'sherlock-server-smoke.log'
+          $process = Start-Process -FilePath $server -PassThru -WindowStyle Hidden
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              Start-Sleep -Seconds 1
+              if ($process.HasExited) {
+                throw "Bundled backend exited early with code $($process.ExitCode)"
+              }
+              try {
+                $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 2
+                if ($health.status -eq 'ok' -and $health.service -eq 'sherlock-data-gateway') {
+                  $ready = $true
+                  break
+                }
+              } catch {}
+            }
+            if (-not $ready) {
+              if (Test-Path $env:SHERLOCK_SERVER_LOG) {
+                Get-Content $env:SHERLOCK_SERVER_LOG -Tail 100
+              }
+              throw 'Bundled backend did not become healthy on 127.0.0.1:8000'
+            }
+            $openapi = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/openapi.json' -TimeoutSec 5
+            $paths = $openapi.paths.PSObject.Properties.Name
+            if ($paths -notcontains '/v1/research/pattern' -or
+                $paths -notcontains '/v1/research/walk-forward' -or
+                $paths -notcontains '/v1/research/robustness' -or
+                $paths -notcontains '/v1/data/archive-download' -or
+                $paths -notcontains '/v1/data/sync-current-month' -or
+                $paths -notcontains '/v1/paper/orders') {
+              throw 'Bundled backend is missing one or more required desktop API routes'
+            }
+            Write-Host 'Bundled backend health and desktop API route checks passed.'
+          } finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Build per-user Windows installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/installer | Out-Null
+          $programFilesX86 = [Environment]::GetFolderPath('ProgramFilesX86')
+          $compiler = Join-Path $programFilesX86 'Inno Setup 6\ISCC.exe'
+          & $compiler 'desktop\installer.iss'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload Windows installer and portable folder
         uses: actions/upload-artifact@v4
         with:
           name: CRYPTO-SHERLOCK-Windows-x64
-          path: dist/CRYPTO-SHERLOCK/
+          path: |
+            dist/installer/*.exe
+            dist/CRYPTO-SHERLOCK/
           if-no-files-found: error
           retention-days: 14

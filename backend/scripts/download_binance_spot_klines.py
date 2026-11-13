@@ -6,7 +6,7 @@ separate staging database and never overwrites an existing candle row.
 from __future__ import annotations
 
 import argparse
-import calendar
+from datetime import datetime, timezone, timedelta
 import csv
 import hashlib
 import io
@@ -16,7 +16,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Callable
 
 from app.market_data.candles import Candle
 from app.market_data.repository import CandleRepository
@@ -158,13 +158,18 @@ def ingest_month(
     return inserted, "ok"
 
 
-def run(start: str, end: str, raw_dir: Path, db_path: Path) -> int:
+def run(start: str, end: str, raw_dir: Path, db_path: Path, progress_callback: Callable[[str], None] | None = None) -> int:
     start_year, start_month = map(int, start.split("-"))
     end_year, end_month = map(int, end.split("-"))
     if (start_year, start_month) > (end_year, end_month):
         raise ValueError("start month must not be after end month")
     db_path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(db_path)
+    def emit(message: str) -> None:
+        if progress_callback is not None:
+            progress_callback(message)
+        else:
+            print(message)
     try:
         repository = CandleRepository(connection)
         repository.ensure_schema()
@@ -175,10 +180,10 @@ def run(start: str, end: str, raw_dir: Path, db_path: Path) -> int:
                     "BTCUSDT", interval, year, month, raw_dir, repository
                 )
                 total_inserted += inserted
-                print(f"{interval} {year}-{month:02d}: {status}; inserted={inserted}")
+                emit(f"{interval} {year}-{month:02d}: {status}; inserted={inserted}")
         for interval in INTERVALS:
-            print(f"TOTAL BTCUSDT {interval}: {repository.count('BTCUSDT', interval)} rows")
-        print(f"TOTAL inserted this run: {total_inserted}")
+            emit(f"TOTAL BTCUSDT {interval}: {repository.count('BTCUSDT', interval)} rows")
+        emit(f"TOTAL inserted this run: {total_inserted}")
         return total_inserted
     finally:
         connection.close()
@@ -186,8 +191,12 @@ def run(start: str, end: str, raw_dir: Path, db_path: Path) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    latest_complete_month = (
+        datetime.now(timezone.utc).replace(day=1) - timedelta(days=1)
+    ).strftime("%Y-%m")
     parser.add_argument("--start", default="2017-08", help="first YYYY-MM (default: 2017-08)")
-    parser.add_argument("--end", default="2026-10", help="last YYYY-MM (default: 2026-10; current month may not be published yet)")
+    parser.add_argument("--end", default=latest_complete_month,
+                        help=f"last YYYY-MM (default: {latest_complete_month})")
     parser.add_argument("--raw-dir", type=Path, default=Path("data/binance_public_raw"))
     parser.add_argument("--db-path", type=Path, default=Path("data/binance_archive_staging.db"))
     args = parser.parse_args()

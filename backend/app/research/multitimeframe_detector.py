@@ -10,6 +10,7 @@ from __future__ import annotations
 from bisect import bisect_right
 from dataclasses import asdict, dataclass
 import statistics
+import math
 from typing import Sequence
 
 from app.market_data.candles import Candle, find_gaps
@@ -30,6 +31,7 @@ class MultiTimeframeConfig:
 @dataclass(frozen=True, slots=True)
 class MultiTimeframeSignal:
     timestamp: int
+    confirmed_at: int
     price: float
     wick_15m_fraction: float
     wick_15m_to_body: float
@@ -83,8 +85,11 @@ def detect_multitimeframe_setups(
     return over prior daily bars. The broader decline is measured from the
     close N daily bars earlier to the current daily close.
 
-    Only complete historical candles should be supplied. No unfinished
-    current candles are inferred or fetched here.
+    Only complete historical candles should be supplied. The 15m wick may
+    occur before its containing 4h / 1d bars close; therefore confirmed_at
+    records the latest close time among all three bars. The observation must
+    not be treated as available before that timestamp. No unfinished current
+    candles are inferred or fetched here.
     """
     if config.support_lookback_4h < 2:
         raise ValueError("support_lookback_4h must be >= 2")
@@ -94,8 +99,11 @@ def detect_multitimeframe_setups(
         raise ValueError("lower_wick_min_range_fraction must be in (0, 1]")
     if config.lower_wick_to_body_min < 0 or config.daily_body_multiple_of_median <= 0:
         raise ValueError("wick and daily body multipliers must be positive")
-    if config.support_sweep_tolerance < 0:
-        raise ValueError("support_sweep_tolerance must be nonnegative")
+    if not 0 <= config.support_sweep_tolerance < 1:
+        raise ValueError("support_sweep_tolerance must be in [0, 1)")
+    if (not math.isfinite(config.daily_decline_min_return)
+            or not 0 <= config.daily_decline_min_return < 1):
+        raise ValueError("daily_decline_min_return must be finite and in [0, 1)")
 
     _validate_series(candles_15m, "15m", "15m")
     _validate_series(candles_4h, "4h", "4h")
@@ -145,6 +153,10 @@ def detect_multitimeframe_setups(
             ]
         ]
         median_body = statistics.median(prior_bodies)
+        if median_body <= 0:
+            # A zero baseline makes every bearish candle appear infinitely large.
+            # Without a measurable prior body distribution, this condition is unknown.
+            continue
         decline_return = (
             bar_1d.close /
             candles_1d[index_1d - config.daily_decline_lookback].close - 1.0
@@ -153,11 +165,12 @@ def detect_multitimeframe_setups(
             continue
         if abs(daily_body_return) < median_body * config.daily_body_multiple_of_median:
             continue
-        if decline_return > -config.daily_decline_min_return:
+        if decline_return >= -config.daily_decline_min_return:
             continue
 
         results.append(MultiTimeframeSignal(
             timestamp=candle_15m.open_time,
+            confirmed_at=max(candle_15m.close_time, bar_4h.close_time, bar_1d.close_time),
             price=candle_15m.close,
             wick_15m_fraction=lower_wick / span,
             wick_15m_to_body=wick_to_body,

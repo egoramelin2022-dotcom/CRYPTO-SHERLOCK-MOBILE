@@ -11,6 +11,7 @@ import math
 from typing import Literal, Sequence
 
 from app.market_data.candles import Candle
+from app.market_data.intervals import interval_to_ms
 
 SearchMode = Literal["free", "five_stage"]
 
@@ -22,6 +23,7 @@ class Analog:
     start_time: int
     end_time: int
     similarity: float
+    stage_similarities: dict[str, float]
     forward_returns: dict[int, float | None]
     max_favorable_excursion: float | None
     max_adverse_excursion: float | None
@@ -34,6 +36,7 @@ class SearchResult:
     query_end_index: int
     segment_length: int
     candidates_examined: int
+    candidate_stride: int
     analogs: tuple[Analog, ...]
 
     def to_dict(self) -> dict:
@@ -42,7 +45,25 @@ class SearchResult:
             "query_start_index": self.query_start_index,
             "query_end_index": self.query_end_index,
             "segment_length": self.segment_length,
+            "forward_return_basis": "candidate_end_close_to_future_close",
+            "excursion_basis": "candidate_end_close_to_future_high_low",
+            "five_stage_method": (
+                "five equal-length positional partitions; corresponding segments are "
+                "compared with equal 20% weight; stage names are descriptive labels, "
+                "not independently verified semantic classifications"
+            ) if self.mode == "five_stage" else None,
+            "stage_weights": (
+                {
+                    "preliminary_decline": 0.2,
+                    "recovery": 0.2,
+                    "peak": 0.2,
+                    "sharp_collapse": 0.2,
+                    "sideways_lower_wicks": 0.2,
+                } if self.mode == "five_stage" else {}
+            ),
             "candidates_examined": self.candidates_examined,
+            "candidate_stride": self.candidate_stride,
+            "candidate_sampling": "uniform_index_stride" if self.candidate_stride > 1 else "exhaustive",
             "analogs": [asdict(item) for item in self.analogs],
         }
 
@@ -73,26 +94,63 @@ def _shape(candles: Sequence[Candle]) -> list[tuple[float, ...]]:
     return result
 
 
-def _distance(a: Sequence[tuple[float, ...]],
-              b: Sequence[tuple[float, ...]], mode: SearchMode) -> float:
-    n = len(a)
-    if mode == "free":
-        squared = [sum((x - y) ** 2 for x, y in zip(a[i], b[i])) / len(a[i])
-                   for i in range(n)]
-        return math.sqrt(sum(squared) / n)
+_STAGE_NAMES = (
+    "preliminary_decline",
+    "recovery",
+    "peak",
+    "sharp_collapse",
+    "sideways_lower_wicks",
+)
 
-    # Five equally weighted stages. Each stage contributes one fifth of the
-    # total distance, independent of its absolute candle count.
-    stage_errors = []
+
+def _stage_mean_squared_errors(
+    a: Sequence[tuple[float, ...]],
+    b: Sequence[tuple[float, ...]],
+) -> list[float]:
+    n = len(a)
+    errors = []
     for stage in range(5):
         lo = stage * n // 5
         hi = (stage + 1) * n // 5
         if hi <= lo:
             raise ValueError("five_stage mode requires at least five candles")
-        err = [sum((x - y) ** 2 for x, y in zip(a[i], b[i])) / len(a[i])
-               for i in range(lo, hi)]
-        stage_errors.append(sum(err) / len(err))
-    return math.sqrt(sum(stage_errors) / 5)
+        row_errors = [
+            sum((x - y) ** 2 for x, y in zip(a[i], b[i])) / len(a[i])
+            for i in range(lo, hi)
+        ]
+        errors.append(sum(row_errors) / len(row_errors))
+    return errors
+
+
+def _distance(
+    a: Sequence[tuple[float, ...]],
+    b: Sequence[tuple[float, ...]],
+    mode: SearchMode,
+) -> float:
+    n = len(a)
+    if mode == "free":
+        squared = [
+            sum((x - y) ** 2 for x, y in zip(a[i], b[i])) / len(a[i])
+            for i in range(n)
+        ]
+        return math.sqrt(sum(squared) / n)
+    # Each positional stage has equal weight (20%) regardless of its candle
+    # count. Per-stage similarities are descriptive shape scores, not odds.
+    return math.sqrt(sum(_stage_mean_squared_errors(a, b)) / 5)
+
+
+def _stage_similarities(
+    query: Sequence[tuple[float, ...]],
+    candidate: Sequence[tuple[float, ...]],
+    mode: SearchMode,
+) -> dict[str, float]:
+    if mode != "five_stage":
+        return {}
+    errors = _stage_mean_squared_errors(query, candidate)
+    return {
+        name: 1.0 / (1.0 + math.sqrt(error))
+        for name, error in zip(_STAGE_NAMES, errors)
+    }
 
 
 def _outcomes(candles: Sequence[Candle], end: int,
@@ -123,34 +181,83 @@ def search_analogs(
     top_k: int = 10,
     horizons: Sequence[int] = (1, 4, 16),
     embargo: int | None = None,
+    candidate_stride: int = 1,
 ) -> SearchResult:
     """Find earlier same-length windows and score their subsequent outcomes.
 
-    The query is [query_start, query_end], inclusive. Candidates must end
-    before query_start minus embargo. The caller should pass one contiguous,
-    chronologically ordered segment so no candidate crosses a data gap.
+    forward_returns and legacy excursion fields are descriptive close-based
+    measures anchored at the candidate end close. They are not execution
+    simulations. Use outcome_evaluation for next-open entries and costs.
+
+    The query is inclusive. Candidates must end before query_start by at least
+    the maximum forward horizon (and any larger requested embargo). Selected
+    analog-plus-outcome ranges are non-overlapping. The input may contain
+    historical gaps: query windows crossing a gap are rejected, while
+    candidate windows and forward paths crossing a gap are skipped.
+    Input candles must be strictly chronological.
     """
     if mode not in ("free", "five_stage"):
         raise ValueError("mode must be 'free' or 'five_stage'")
-    if isinstance(top_k, bool) or top_k < 1:
-        raise ValueError("top_k must be >= 1")
-    if not candles or query_start < 0 or query_end >= len(candles) or query_start > query_end:
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 1:
+        raise ValueError("top_k must be a positive integer")
+    if (isinstance(candidate_stride, bool) or not isinstance(candidate_stride, int)
+            or candidate_stride < 1):
+        raise ValueError("candidate_stride must be a positive integer")
+    if (isinstance(query_start, bool) or not isinstance(query_start, int)
+            or isinstance(query_end, bool) or not isinstance(query_end, int)
+            or not candles or query_start < 0 or query_end >= len(candles)
+            or query_start > query_end):
         raise ValueError("invalid query bounds")
     length = query_end - query_start + 1
     if mode == "five_stage" and length < 5:
         raise ValueError("five_stage mode requires at least five candles")
-    if any(h < 1 for h in horizons):
-        raise ValueError("horizons must be positive")
-    gap = max(horizons, default=0) if embargo is None else embargo
-    if gap < 0:
-        raise ValueError("embargo must be nonnegative")
+    if not horizons:
+        raise ValueError("at least one forward horizon is required")
+    if any(isinstance(h, bool) or not isinstance(h, int) or h < 1 for h in horizons):
+        raise ValueError("horizons must be positive integers")
+    if embargo is not None and (
+        isinstance(embargo, bool) or not isinstance(embargo, int) or embargo < 0
+    ):
+        raise ValueError("embargo must be a nonnegative integer")
+
+    first = candles[0]
+    step = interval_to_ms(first.interval)
+    previous_time = None
+    for candle in candles:
+        if candle.symbol != first.symbol or candle.interval != first.interval:
+            raise ValueError("all candles must share one symbol and interval")
+        if previous_time is not None and candle.open_time <= previous_time:
+            raise ValueError("candle timestamps must be strictly increasing")
+        previous_time = candle.open_time
+    max_horizon = max(horizons, default=0)
+    gap = max_horizon if embargo is None else max(embargo, max_horizon)
+    # Prefix counts make continuity checks O(1), even when scanning hundreds
+    # of thousands of overlapping candidate windows.
+    gap_prefix = [0] * len(candles)
+    for index in range(1, len(candles)):
+        gap_prefix[index] = gap_prefix[index - 1] + int(
+            candles[index].open_time - candles[index - 1].open_time != step
+        )
+
+    def is_contiguous(start: int, end: int) -> bool:
+        if start < 0 or end >= len(candles) or start > end:
+            return False
+        return gap_prefix[end] == gap_prefix[start]
+
+    if not is_contiguous(query_start, query_end):
+        raise ValueError("query window crosses a missing-candle gap; choose a fully contiguous latest window")
 
     query = _shape(candles[query_start:query_end + 1])
     last_candidate_end = query_start - gap - 1
     examined = 0
     ranked: list[tuple[float, int]] = []
-    for end in range(length - 1, last_candidate_end + 1):
+    for end in range(length - 1, last_candidate_end + 1, candidate_stride):
         start = end - length + 1
+        # Both the candidate shape and its maximum forward outcome must be continuous.
+        if not is_contiguous(start, end):
+            continue
+        if max_horizon and not is_contiguous(end, end + max_horizon):
+            continue
         candidate = _shape(candles[start:end + 1])
         distance = _distance(query, candidate, mode)
         ranked.append((distance, start))
@@ -158,11 +265,28 @@ def search_analogs(
 
     ranked.sort(key=lambda item: (item[0], item[1]))
     analogs = []
-    for distance, start in ranked[:top_k]:
+    selected_ranges: list[tuple[int, int]] = []
+    for distance, start in ranked:
         end = start + length - 1
+        outcome_end = end + max_horizon
+        range_start = candles[start].open_time
+        range_end = (
+            candles[outcome_end].close_time + (gap - max_horizon) * step
+            if max_horizon else candles[end].close_time + gap * step
+        )
+        if any(not (range_end < previous_start or previous_end < range_start)
+               for previous_start, previous_end in selected_ranges):
+            continue
         returns, mfe, mae = _outcomes(candles, end, horizons)
+        candidate_shape = _shape(candles[start:end + 1])
         analogs.append(Analog(
             start, end, candles[start].open_time, candles[end].open_time,
-            1.0 / (1.0 + distance), returns, mfe, mae,
+            1.0 / (1.0 + distance),
+            _stage_similarities(query, candidate_shape, mode),
+            returns, mfe, mae,
         ))
-    return SearchResult(mode, query_start, query_end, length, examined, tuple(analogs))
+        selected_ranges.append((range_start, range_end))
+        if len(analogs) >= top_k:
+            break
+    return SearchResult(mode, query_start, query_end, length, examined,
+                        candidate_stride, tuple(analogs))
