@@ -291,7 +291,7 @@ class ResearchPanel(QWidget):
         if result.get("method") == "bounded_one_factor_at_a_time_sensitivity":
             summary.extend([
                 "\nROBUSTNESS AUDIT · BOUNDED PARAMETER SENSITIVITY",
-                f"Configurations evaluated: {result.get('configurations_evaluated', 0)} / {result.get('configurations_requested', 0)}",
+                f"Configurations evaluated: {result.get('configurations_evaluated', 0)} / {result.get('configurations_requested', 0)} · attempted {result.get('configurations_attempted', 0)} · with OOS folds {result.get('configurations_with_oos_folds', 0)}",
                 result.get("selection_policy", ""),
                 "Not PBO/CSCV; no winning configuration is selected.",
             ])
