@@ -183,3 +183,16 @@ def test_ledger_rejects_invalid_fingerprint_and_non_uuid(tmp_path):
             mode="free", parameters={}, input_fingerprint="INVALID",
             input_candle_count=len(rows),
         )
+
+
+
+def test_new_ledger_starts_with_all_integrity_guards(tmp_path):
+    ledger = ExperimentLedger(tmp_path / "fresh-ledger.db")
+    report = ledger.verify_integrity()
+    assert report == {
+        "ok": True,
+        "runs_checked": 0,
+        "events_checked": 0,
+        "results_checked": 0,
+        "issues": [],
+    }
