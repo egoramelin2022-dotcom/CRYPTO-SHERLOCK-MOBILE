@@ -216,6 +216,20 @@ class ResearchPanel(QWidget):
                 f"Latest closed candle age: {freshness.get('age_hours', 0):.1f}h · "
                 f"stale threshold: {freshness.get('stale_after_hours', 0):.1f}h",
             ])
+        if result.get("adaptive_search"):
+            summary.append("\\nADAPTIVE WINDOW SEARCH · INDEPENDENT RANKINGS")
+            summary.append(result.get("adaptive_comparison_note", ""))
+            for window_result in result.get("adaptive_results", []):
+                if window_result.get("status") != "completed":
+                    summary.append(f"  {window_result.get('window_length')} candles · skipped · {window_result.get('reason', '')}")
+                    continue
+                summary.append(
+                    f"  {window_result['window_length']} candles · {window_result['candidates_examined']:,} candidates · "
+                    f"stride {window_result['candidate_stride']} · {len(window_result['analogs'])} analogs"
+                )
+                for rank, item in enumerate(window_result["analogs"], start=1):
+                    analog = item.get("analog", {})
+                    summary.append(f"    #{rank} similarity {analog.get('similarity', 0):.4f} · {analog.get('start_time')} → {analog.get('end_time')}")
         if "history_candles" in result:
             query_label = (
                 "Historical sample" if result.get("query_selection") == "historical_open_time"
