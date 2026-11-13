@@ -160,6 +160,12 @@ class ResearchPanel(QWidget):
         self.run_button = QPushButton("RUN RESEARCH")
         self.run_button.clicked.connect(self.run_research)
         actions.addWidget(self.run_button)
+        self.robustness_button = None
+        if kind == "walk_forward":
+            self.robustness_button = QPushButton("RUN ROBUSTNESS AUDIT")
+            self.robustness_button.setToolTip("Run bounded independent parameter sensitivity checks; no winner is selected.")
+            self.robustness_button.clicked.connect(lambda: self.run_research("/v1/research/robustness"))
+            actions.addWidget(self.robustness_button)
         actions.addStretch(1)
         root.addLayout(actions)
         self.status = QLabel("No research job started")
@@ -189,7 +195,7 @@ class ResearchPanel(QWidget):
         disclaimer.setWordWrap(True)
         root.addWidget(disclaimer)
 
-    def run_research(self):
+    def run_research(self, endpoint_override: str | None = None):
         if self.worker is not None and self.worker.isRunning():
             return
         params = {"symbol": self.symbol.currentText()}
@@ -237,7 +243,7 @@ class ResearchPanel(QWidget):
         self.run_button.setEnabled(False)
         self.output.clear()
         self.status.setText("Submitting research job…")
-        self.worker = ResearchJobWorker(self.api_url, self.endpoint, params)
+        self.worker = ResearchJobWorker(self.api_url, endpoint_override or self.endpoint, params)
         self.worker.status.connect(self.status.setText)
         self.worker.completed.connect(self.on_completed)
         self.worker.failed.connect(self.on_failed)
@@ -272,6 +278,24 @@ class ResearchPanel(QWidget):
                 for rank, item in enumerate(window_result["analogs"], start=1):
                     analog = item.get("analog", {})
                     summary.append(f"    #{rank} similarity {analog.get('similarity', 0):.4f} · {analog.get('start_time')} → {analog.get('end_time')}")
+        if result.get("method") == "bounded_one_factor_at_a_time_sensitivity":
+            summary.extend([
+                "\\nROBUSTNESS AUDIT · BOUNDED PARAMETER SENSITIVITY",
+                f"Configurations evaluated: {result.get('configurations_evaluated', 0)} / {result.get('configurations_requested', 0)}",
+                result.get("selection_policy", ""),
+                "Not PBO/CSCV; no winning configuration is selected.",
+            ])
+            for horizon, stability in result.get("stability_by_horizon", {}).items():
+                summary.append(
+                    f"  +{horizon}: positive configurations {stability['positive_average_return_share']:.0%} · "
+                    f"positive excess vs best baseline {stability['positive_excess_vs_best_baseline_share']:.0%} · "
+                    f"median avg/fold {stability['median_average_return_per_fold']:+.2%}"
+                )
+            for run in result.get("runs", []):
+                summary.append(
+                    f"  {run['configuration']}: window {run['query_window']} · top_k {run['top_k']} · "
+                    f"folds {run['evaluated_folds']} · skipped {run['skipped_fold_count']}"
+                )
         if result.get("method") == "expanding_window_historical_analog_median":
             summary.extend([
                 "\nWALK-FORWARD · EXPANDING TRAINING WINDOW",
