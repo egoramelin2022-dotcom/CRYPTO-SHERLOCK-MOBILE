@@ -409,6 +409,44 @@ class ResearchPanel(QWidget):
                     )
                     if strategy == "model":
                         summary.append(f"      Trades: {values.get('trades', 0)} · FLAT folds: {values.get('flat_folds', 0)} · positive trades: {values.get('positive_trade_rate', 0):.0%}")
+            if result.get("prediction_scorecard_by_horizon"):
+                summary.append("  HIDDEN-HISTORY PREDICTION SCORECARD · OUT-OF-SAMPLE")
+                summary.append(
+                    "  Accuracy includes FLAT calls; directional hit rate excludes FLAT calls. "
+                    "Coverage shows how often the model takes a direction."
+                )
+                for horizon, score in result["prediction_scorecard_by_horizon"].items():
+                    if score.get("status") != "evaluated":
+                        summary.append(f"    +{horizon}: score unavailable · insufficient sample")
+                        continue
+                    accuracy = score.get("accuracy_percent")
+                    directional = score.get("directional_hit_rate_percent")
+                    coverage = score.get("coverage_percent")
+                    balanced = score.get("balanced_accuracy")
+                    directional_text = f"{directional:.1f}%" if directional is not None else "n/a"
+                    balanced_text = f"{balanced:.1%}" if balanced is not None else "n/a"
+                    summary.append(
+                        f"    +{horizon}: accuracy {accuracy:.1f}% ({score['correct']}/{score['samples']}) · "
+                        f"directional hit {directional_text} ({score['directional_hits']}/{score['directional_calls']}) · "
+                        f"coverage {coverage:.1f}% · balanced accuracy {balanced_text}"
+                    )
+                summary.append("  These are historical out-of-sample rates, not future probabilities or guarantees.")
+
+                baseline_scores = result.get("baseline_prediction_scorecards_by_horizon") or {}
+                if baseline_scores:
+                    summary.append("  BASELINE COMPARISON · SAME HIDDEN FOLDS")
+                    for baseline_name, horizon_scores in baseline_scores.items():
+                        parts = []
+                        for horizon, baseline in horizon_scores.items():
+                            accuracy = baseline.get("accuracy_percent")
+                            calls = baseline.get("directional_calls", 0)
+                            hits = baseline.get("directional_hits", 0)
+                            label = f"{accuracy:.1f}%" if accuracy is not None else "n/a"
+                            parts.append(
+                                f"+{horizon}: {label} ({baseline.get('correct', 0)}/{baseline.get('samples', 0)})"
+                                f" · directional {hits}/{calls}"
+                            )
+                        summary.append(f"    {baseline_name}: " + " | ".join(parts))
             if result.get("temporal_stability_by_horizon"):
                 summary.append("  TEMPORAL STABILITY · EARLY / MIDDLE / RECENT")
                 summary.append(result.get("temporal_stability_note", ""))

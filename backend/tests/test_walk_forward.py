@@ -40,6 +40,20 @@ def test_walk_forward_uses_strictly_prior_analogs_and_reports_baselines():
     assert result["anti_leakage"]["training_is_strictly_before_test_start"] is True
     assert result["anti_leakage"]["future_candles_excluded_from_analog_search"] is True
     assert result["regime_outcomes"]
+    assert set(result["prediction_scorecard_by_horizon"]) == {"1", "4", "8"}
+    for scorecard in result["prediction_scorecard_by_horizon"].values():
+        assert scorecard["samples"] >= 2
+        assert 0.0 <= scorecard["accuracy"] <= 1.0
+        assert 0.0 <= scorecard["coverage"] <= 1.0
+        assert "confusion_matrix" in scorecard
+    baseline_scores = result["baseline_prediction_scorecards_by_horizon"]
+    assert set(baseline_scores) == {"trend_following", "mean_reversion", "range_breakout"}
+    for horizon_scores in baseline_scores.values():
+        assert set(horizon_scores) == {"1", "4", "8"}
+        for scorecard in horizon_scores.values():
+            assert scorecard["samples"] >= 2
+            assert 0.0 <= scorecard["accuracy"] <= 1.0
+            assert 0.0 <= scorecard["coverage"] <= 1.0
     assert result["strategy_portfolio_by_horizon"]
     for horizon, portfolio in result["strategy_portfolio_by_horizon"].items():
         assert set(portfolio["strategies"]) == {
