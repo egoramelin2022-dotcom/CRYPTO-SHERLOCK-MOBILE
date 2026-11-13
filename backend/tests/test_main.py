@@ -107,3 +107,26 @@ def test_pipeline_job_is_queued(monkeypatch):
         "interval": "15m",
         "window": 32,
     }
+
+
+
+def test_audit_job_is_queued(monkeypatch):
+    import app.main as main
+
+    queued = {
+        "job_id": "audit-job-001",
+        "kind": "data_audit",
+        "status": "queued",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+        "result": None,
+        "error": None,
+    }
+    called = []
+    monkeypatch.setattr(main.research_jobs, "queue_audit", lambda: queued)
+    monkeypatch.setattr(main.research_jobs, "run_audit_job", lambda job_id: called.append(job_id))
+
+    response = client.post("/v1/research/audit")
+    assert response.status_code == 202
+    assert response.json()["job_id"] == "audit-job-001"
+    assert called == ["audit-job-001"]
