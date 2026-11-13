@@ -83,6 +83,11 @@ def run_pattern_research(
     mode: str = "free", top_k: int = 10, history_limit: int = 400000,
     fee_bps_per_side: float = 5.0, slippage_bps_per_side: float = 2.0,
     query_start_time: int | None = None,
+    adaptive_search: bool = False,
+    adaptive_min_window: int = 20,
+    adaptive_max_window: int = 100,
+    adaptive_step: int = 20,
+    adaptive_candidate_budget: int = 5000,
 ) -> dict[str, Any]:
     if history_limit < query_window + 2 or history_limit > 500000:
         raise ValueError("history_limit must be between query_window + 2 and 500000")
@@ -122,6 +127,67 @@ def run_pattern_research(
                 slippage_bps_per_side=slippage_bps_per_side,
             ).to_dict(),
         })
+    adaptive_results: list[dict[str, Any]] = []
+    if adaptive_search:
+        controls = (adaptive_min_window, adaptive_max_window, adaptive_step,
+                    adaptive_candidate_budget)
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in controls):
+            raise ValueError("adaptive search controls must be integers")
+        if not (5 <= adaptive_min_window <= adaptive_max_window <= 500):
+            raise ValueError("adaptive window bounds must satisfy 5 <= min <= max <= 500")
+        if adaptive_step < 1 or adaptive_candidate_budget < 100:
+            raise ValueError("adaptive step must be positive and candidate budget at least 100")
+        lengths = list(range(adaptive_min_window, adaptive_max_window + 1, adaptive_step))
+        if len(lengths) > 10:
+            raise ValueError("adaptive search supports at most 10 window lengths per run")
+        fixed_query_end = query_end
+        for window_length in lengths:
+            window_start = fixed_query_end - window_length + 1
+            if window_start < 0:
+                adaptive_results.append({
+                    "window_length": window_length, "status": "skipped",
+                    "reason": "query window begins before available history",
+                })
+                continue
+            eligible = max(0, window_start - 64)
+            stride = max(1, (eligible + adaptive_candidate_budget - 1)
+                         // adaptive_candidate_budget)
+            adaptive = search_analogs(
+                candles, query_start=window_start, query_end=fixed_query_end,
+                mode=mode, top_k=top_k, horizons=(1, 4, 16, 32, 64),
+                candidate_stride=stride,
+            )
+            window_segment = candles[window_start:fixed_query_end + 1]
+            window_analogs = []
+            for analog in adaptive.analogs:
+                segment = candles[analog.start_index:analog.end_index + 1]
+                window_analogs.append({
+                    "analog": asdict(analog),
+                    "chart": {"normalized_close": [
+                        item.close / segment[0].close * 100.0 for item in segment
+                    ]},
+                    "forward_path": evaluate_forward_path(
+                        candles, candidate_end_index=analog.end_index,
+                        horizons=(1, 4, 16, 32, 64),
+                        fee_bps_per_side=fee_bps_per_side,
+                        slippage_bps_per_side=slippage_bps_per_side,
+                    ).to_dict(),
+                })
+            adaptive_results.append({
+                "window_length": window_length,
+                "status": "completed",
+                "query_start_time": candles[window_start].open_time,
+                "query_end_time": candles[fixed_query_end].open_time,
+                "candidates_examined": adaptive.candidates_examined,
+                "candidate_stride": adaptive.candidate_stride,
+                "candidate_sampling": "uniform_index_stride" if stride > 1 else "exhaustive",
+                "query_chart": {"normalized_close": [
+                    item.close / window_segment[0].close * 100.0 for item in window_segment
+                ]},
+                "analogs": window_analogs,
+                "ranking_scope": "independent_within_this_window_length",
+            })
+
     history_gaps = find_gaps([item.open_time for item in candles], interval)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     latest_age_hours = max(0.0, (now_ms - candles[-1].close_time) / 3_600_000)
@@ -155,6 +221,12 @@ def run_pattern_research(
         "query_end_time": candles[query_end].open_time,
         "query_selection": "latest_window" if query_start_time is None else "historical_open_time",
         "query_window": query_window,
+        "adaptive_search": adaptive_search,
+        "adaptive_results": adaptive_results,
+        "adaptive_comparison_note": (
+            "Rankings and similarity scores are independent per window length; "
+            "scores are not pooled or directly compared across lengths."
+        ) if adaptive_search else None,
         "query_chart": {"normalized_close": query_chart},
         "candidates_examined": result.candidates_examined,
         "evidence": [asdict(item) for item in evidence],
