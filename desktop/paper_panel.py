@@ -77,7 +77,6 @@ class PaperPanel(QWidget):
         disclaimer.setObjectName("muted")
         disclaimer.setWordWrap(True)
         root.addWidget(disclaimer)
-        self.load_snapshot()
 
     def _start(self, operation: str, params: dict | None = None):
         if self.worker is not None and self.worker.isRunning():
