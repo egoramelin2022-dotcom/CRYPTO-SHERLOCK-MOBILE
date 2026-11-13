@@ -33,7 +33,7 @@ class ResearchJobWorker(QThread):
                 job = response.json()
                 job_id = job["job_id"]
                 self.status.emit(f"Queued research job {job_id[:8]}…")
-                deadline = time.monotonic() + 900
+                deadline = time.monotonic() + 14400
                 while time.monotonic() < deadline:
                     time.sleep(1.0)
                     response = client.get(
@@ -51,7 +51,7 @@ class ResearchJobWorker(QThread):
                         return
                     if job.get("status") == "failed":
                         raise RuntimeError(job.get("error") or "Research job failed")
-                raise TimeoutError("Research job exceeded 15-minute desktop wait limit")
+                raise TimeoutError("Research job exceeded 4-hour desktop wait limit")
         except Exception as exc:
             self.failed.emit(f"{type(exc).__name__}: {exc}")
 
