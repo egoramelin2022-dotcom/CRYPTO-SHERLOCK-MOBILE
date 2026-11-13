@@ -126,8 +126,9 @@ def search_analogs(
 ) -> SearchResult:
     """Find earlier same-length windows and score their subsequent outcomes.
 
-    The query is [query_start, query_end], inclusive. Candidates must end
-    before query_start minus embargo. The caller should pass one contiguous,
+    The query is [query_start, query_end], inclusive. Candidates must end before query_start by at least the maximum forward
+    horizon (and any larger requested embargo). Returned analog windows and
+    their forward-outcome horizons are mutually non-overlapping. The caller should pass one contiguous,
     chronologically ordered segment so no candidate crosses a data gap.
     """
     if mode not in ("free", "five_stage"):
@@ -141,7 +142,8 @@ def search_analogs(
         raise ValueError("five_stage mode requires at least five candles")
     if any(h < 1 for h in horizons):
         raise ValueError("horizons must be positive")
-    gap = max(horizons, default=0) if embargo is None else embargo
+    max_horizon = max(horizons, default=0)
+    gap = max_horizon if embargo is None else max(embargo, max_horizon)
     if gap < 0:
         raise ValueError("embargo must be nonnegative")
 
@@ -158,11 +160,18 @@ def search_analogs(
 
     ranked.sort(key=lambda item: (item[0], item[1]))
     analogs = []
-    for distance, start in ranked[:top_k]:
+    selected_starts: list[int] = []
+    min_start_separation = length + gap
+    for distance, start in ranked:
+        if any(abs(start - previous) < min_start_separation for previous in selected_starts):
+            continue
         end = start + length - 1
         returns, mfe, mae = _outcomes(candles, end, horizons)
         analogs.append(Analog(
             start, end, candles[start].open_time, candles[end].open_time,
             1.0 / (1.0 + distance), returns, mfe, mae,
         ))
+        selected_starts.append(start)
+        if len(analogs) >= top_k:
+            break
     return SearchResult(mode, query_start, query_end, length, examined, tuple(analogs))
