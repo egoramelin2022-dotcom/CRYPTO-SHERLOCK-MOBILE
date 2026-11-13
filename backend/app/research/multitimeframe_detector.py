@@ -23,6 +23,7 @@ class MultiTimeframeConfig:
     lower_wick_min_range_fraction: float = 0.55
     lower_wick_to_body_min: float = 2.0
     daily_body_multiple_of_median: float = 1.5
+    daily_body_min_return: float = 0.02
     daily_decline_min_return: float = 0.0
     support_sweep_tolerance: float = 0.0
 
@@ -94,6 +95,8 @@ def detect_multitimeframe_setups(
         raise ValueError("lower_wick_min_range_fraction must be in (0, 1]")
     if config.lower_wick_to_body_min < 0 or config.daily_body_multiple_of_median <= 0:
         raise ValueError("wick and daily body multipliers must be positive")
+    if not 0 <= config.daily_body_min_return < 1:
+        raise ValueError("daily_body_min_return must be in [0, 1)")
     if config.support_sweep_tolerance < 0:
         raise ValueError("support_sweep_tolerance must be nonnegative")
 
