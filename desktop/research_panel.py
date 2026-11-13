@@ -7,7 +7,7 @@ import time
 import httpx
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+    QComboBox, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QSpinBox, QTextEdit, QVBoxLayout, QWidget,
 )
 
@@ -87,6 +87,19 @@ class ResearchPanel(QWidget):
         self.top_k.setRange(1, 100)
         self.top_k.setValue(10)
         form.addRow("Top historical analogs", self.top_k)
+        self.fee = QDoubleSpinBox()
+        self.fee.setRange(0, 1000)
+        self.fee.setDecimals(2)
+        self.fee.setValue(5.0)
+        form.addRow("Fee per side (bps)", self.fee)
+        self.slippage = QDoubleSpinBox()
+        self.slippage.setRange(0, 1000)
+        self.slippage.setDecimals(2)
+        self.slippage.setValue(2.0)
+        form.addRow("Slippage per side (bps)", self.slippage)
+        if kind != "pattern":
+            self.fee.setVisible(False)
+            self.slippage.setVisible(False)
         root.addLayout(form)
 
         actions = QHBoxLayout()
@@ -121,6 +134,8 @@ class ResearchPanel(QWidget):
                 "query_window": self.window.value(),
                 "mode": self.mode.currentData(),
                 "top_k": self.top_k.value(),
+                "fee_bps_per_side": self.fee.value(),
+                "slippage_bps_per_side": self.slippage.value(),
             })
         elif self.kind == "ensemble":
             params.update({
