@@ -8,7 +8,7 @@ from __future__ import annotations
 from itertools import combinations
 from math import log
 from random import Random
-from statistics import mean
+from statistics import mean, median
 from typing import Sequence, Any
 
 
@@ -59,7 +59,7 @@ def probability_of_backtest_overfitting(
         rank = next(pos for pos, (_, idx) in enumerate(ordered, start=1) if idx == winner)
         # Mid-rank for exact ties prevents arbitrary ordering from inflating PBO.
         tied = sum(score == oos_scores[winner] for score in oos_scores)
-        rank_fraction = (rank + 0.5 * (tied - 1)) / len(names)
+        rank_fraction = (rank + 0.5 * (tied - 1)) / (len(names) + 1)
         rank_fraction = min(1.0 - 1e-12, max(1e-12, rank_fraction))
         logits.append(log(rank_fraction / (1.0 - rank_fraction)))
         selected.append(names[winner])
@@ -67,7 +67,7 @@ def probability_of_backtest_overfitting(
     return {
         "method": "combinatorially_symmetric_cross_validation_pbo",
         "pbo": sum(value < 0 for value in logits) / len(logits),
-        "median_logit_rank": sorted(logits)[len(logits) // 2],
+        "median_logit_rank": median(logits),
         "partitions_evaluated": len(splits),
         "partitions_possible": total,
         "strategies": names,
