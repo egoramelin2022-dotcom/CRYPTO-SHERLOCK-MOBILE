@@ -200,6 +200,11 @@ async def start_walk_forward_research(
     candidate_budget: int = Query(2000, ge=100, le=5000),
 ) -> dict[str, Any]:
     """Queue fixed-method expanding-window validation on verified local candles."""
+    if min_training_candles < query_window + 65:
+        raise HTTPException(
+            status_code=422,
+            detail="min_training_candles must be at least query_window + 65 for the 64-candle forward embargo",
+        )
     job = research_jobs._new_job("walk_forward_research")
     background_tasks.add_task(
         _run_desktop_research_job, job.job_id,
