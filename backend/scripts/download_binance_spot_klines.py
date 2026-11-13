@@ -187,7 +187,7 @@ def run(start: str, end: str, raw_dir: Path, db_path: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--start", default="2017-08", help="first YYYY-MM (default: 2017-08)")
-    parser.add_argument("--end", default="2026-11", help="last YYYY-MM (default: 2026-11)")
+    parser.add_argument("--end", default="2026-10", help="last YYYY-MM (default: 2026-10; current month may not be published yet)")
     parser.add_argument("--raw-dir", type=Path, default=Path("data/binance_public_raw"))
     parser.add_argument("--db-path", type=Path, default=Path("data/binance_archive_staging.db"))
     args = parser.parse_args()
