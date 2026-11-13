@@ -1,9 +1,7 @@
 """Historical Binance archive download job for the desktop data center."""
 from __future__ import annotations
 
-import io
 import os
-from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any
 
@@ -11,23 +9,8 @@ from app.research import jobs as base_jobs
 from scripts.download_binance_spot_klines import run as download_archives
 
 
-class _ProgressWriter(io.StringIO):
-    def __init__(self, job_id: str):
-        super().__init__()
-        self.job_id = job_id
-        self.pending = ""
-
-    def write(self, value: str) -> int:
-        count = super().write(value)
-        self.pending += value
-        if "\n" in self.pending:
-            lines = self.pending.splitlines()
-            self.pending = self.pending.rsplit("\n", 1)[-1]
-            if lines:
-                base_jobs._set_job(
-                    self.job_id, result={"progress": lines[-1][-500:]}
-                )
-        return count
+def _record_progress(job_id: str, message: str) -> None:
+    base_jobs._set_job(job_id, result={"progress": message[-500:]})
 
 
 def run_archive_download(job_id: str, start: str, end: str) -> None:
@@ -43,14 +26,15 @@ def run_archive_download(job_id: str, start: str, end: str) -> None:
         source, analytics = base_jobs._configured_paths()
         if db_path in (source, analytics):
             raise RuntimeError("Archive staging database must be separate from source and analytics databases")
-        writer = _ProgressWriter(job_id)
-        with redirect_stdout(writer):
-            inserted = download_archives(start, end, raw_dir, db_path)
+        inserted = download_archives(
+            start, end, raw_dir, db_path,
+            progress_callback=lambda message: _record_progress(job_id, message),
+        )
         base_jobs._set_job(job_id, status="completed", result={
             "inserted_this_run": inserted,
             "staging_database": str(db_path),
             "raw_archive_cache": str(raw_dir),
-            "progress_log": writer.getvalue()[-12000:],
+            "progress_log": "See per-month progress messages above.",
             "note": "Staging only. Source market database was not modified.",
         })
     except Exception as exc:
