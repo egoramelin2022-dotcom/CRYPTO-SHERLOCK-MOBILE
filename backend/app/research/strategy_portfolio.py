@@ -23,7 +23,7 @@ def analyze_strategy_portfolio(
         raise ValueError("at least two aligned strategies are required")
     lengths = {len(values) for values in returns_by_strategy.values()}
     if len(lengths) != 1 or not lengths or next(iter(lengths)) < 2:
-        raise ValueError("strategies must have at least two aligned folds")
+        raise ValueError("strategies must have identical aligned folds and at least two observations")
     names = list(returns_by_strategy)
     series = {name: [float(value) for value in values] for name, values in returns_by_strategy.items()}
     if any(not __import__("math").isfinite(value) for values in series.values() for value in values):
