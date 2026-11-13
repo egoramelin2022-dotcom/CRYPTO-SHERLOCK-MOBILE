@@ -10,7 +10,7 @@ py -3.12 -m venv .venv-desktop
 .\\.venv-desktop\\Scripts\\python.exe -m desktop
 ```
 
-The Windows package includes a local backend executable. Open **Server Settings**, select the existing `sherlock_market.db`, choose a separate analytics database path, then save and start the local server. The desktop launches the backend on `127.0.0.1:8000` and stops the process when the app closes. The source database is never used for writes.
+The Windows installer and portable folder include a local backend executable. Run `CRYPTO-SHERLOCK-Setup-0.3.0.exe`, then open **Server Settings**, select the existing `sherlock_market.db`, choose a separate analytics database path, then save and start the local server. The desktop launches the backend on `127.0.0.1:8000` and stops the process when the app closes. The source database is never used for writes.
 
 ## Connected workflows
 
@@ -30,4 +30,4 @@ The archive loader runs asynchronously and writes only to the staging database. 
 - Research only uses closed local candles and a contiguous suffix; missing intervals are not interpolated. Archive staging candles become available to research automatically after verification, without modifying the source database.
 - The Paper Trading account is virtual and persisted in the separate analytics database. Default virtual starting cash is configurable with `SHERLOCK_PAPER_INITIAL_CASH`.
 - Archive download can consume substantial disk space and time. It requires explicit confirmation and writes only to staging.
-- This build still requires Windows smoke testing on the target PC. The generated application is a portable folder build, not yet a signed MSI installer.
+- This build still requires Windows smoke testing on the target PC. The generated installer is an unsigned per-user Inno Setup package; Windows SmartScreen may show the usual warning for an unsigned build.
