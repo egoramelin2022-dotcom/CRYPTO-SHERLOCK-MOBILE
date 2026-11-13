@@ -89,3 +89,15 @@ def test_walk_forward_rejects_invalid_controls():
         run_walk_forward(rows, candidate_budget=99)
     with pytest.raises(ValueError, match="min_training_candles"):
         run_walk_forward(rows, query_window=40, min_training_candles=10)
+
+
+def test_prior_range_breakout_baseline_abstains_when_lookback_crosses_gap():
+    result = run_walk_forward(
+        make_candles(gap_at=79), query_window=10, top_k=3, max_folds=5,
+        min_training_candles=100, candidate_budget=100, horizons=(1, 4, 8),
+    )
+    first_fold = next(fold for fold in result["folds"] if fold["query_start_index"] == 100)
+    assert all(
+        item["range_breakout_side"] == "FLAT"
+        for item in first_fold["horizons"].values()
+    )
