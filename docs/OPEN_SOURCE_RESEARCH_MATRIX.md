@@ -111,3 +111,21 @@ An algorithm is accepted only when:
 - PyBroker repository: https://github.com/edtechre/pybroker
 - tslearn repository: https://github.com/tslearn-team/tslearn
 - aeon repository: https://github.com/aeon-toolkit/aeon
+
+
+## 8. STUMPY package pin and adapter status (verified 2026-11-13)
+
+- Optional package pin: `stumpy==1.14.1`.
+- PyPI metadata reports BSD-3-Clause and Python >=3.10; the release page lists NumPy, SciPy and Numba dependencies.
+- The 1.14.1 release notes include compatibility fixes for newer NumPy and Numba versions.
+- The package is **not** in the core backend requirements. Install it only in an isolated research environment after reviewing the dependency tree and benchmarking.
+- PyPI's release page reported no build provenance for the 1.14.1 wheel/source distribution at the time checked. This is not proof of maliciousness, but it means we should pin and verify the artifact/hash before distributing it.
+- Sherlock now has a lazy optional adapter at `backend/app/research/stumpy_adapter.py`. It uses STUMPY MASS for query-to-history distance ranking, applies a non-overlap exclusion zone, and does not calculate forward outcomes.
+- Adapter tests mock both NumPy and STUMPY, so the regular backend test suite does not require the optional scientific stack.
+
+Sources:
+- https://pypi.org/project/stumpy/
+- https://github.com/stumpy-dev/stumpy/blob/main/CHANGELOG.md
+- https://stumpy.readthedocs.io/en/stable/install.html
+
+This is a prototype boundary, not a production approval. The actual STUMPY implementation still needs an isolated install test and benchmark on the target Windows machine.
