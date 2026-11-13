@@ -42,7 +42,7 @@ def test_desktop_pattern_research_uses_local_verified_history(tmp_path, monkeypa
     assert result["history_candles"] == 120
     assert result["data_freshness"]["is_stale"] is True
     assert result["data_freshness"]["age_hours"] > 0
-    assert result["data_freshness"]["stale_after_hours"] == 11.25
+    assert result["data_freshness"]["stale_after_hours"] == 0.75
     assert result["query_window"] == 10
     assert result["forward_return_basis"] == "candidate_end_close_to_future_close"
     assert result["forward_path_basis"] == "next_candle_open_to_horizon_close_with_fees_and_slippage"
