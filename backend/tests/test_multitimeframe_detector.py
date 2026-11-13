@@ -73,3 +73,20 @@ def test_does_not_use_unclosed_higher_timeframe_bars():
     m15[15] = make("BTCUSDT", "15m", 61 * 6 * 16 - 1, 96, 97, 95, 96)
     m15[3] = make("BTCUSDT", "15m", 61 * 6 * 16 - 13, 96, 97, 88, 96)
     assert detect_multitimeframe_setups(m15, h4, d1) == []
+
+
+def test_daily_body_minimum_floor_rejects_ordinary_red_candle():
+    m15, h4, d1 = fixture()
+    # A 1.9% red body is below the default 2% absolute floor even though
+    # the preceding median body is zero.
+    d1[-1] = make("BTCUSDT", "1d", 60, 100, 101, 98, 98.1)
+    assert detect_multitimeframe_setups(m15, h4, d1) == []
+
+
+def test_invalid_daily_decline_threshold_is_rejected():
+    m15, h4, d1 = fixture()
+    with pytest.raises(ValueError, match="daily_decline_min_return"):
+        detect_multitimeframe_setups(
+            m15, h4, d1,
+            config=MultiTimeframeConfig(daily_decline_min_return=1.0),
+        )
