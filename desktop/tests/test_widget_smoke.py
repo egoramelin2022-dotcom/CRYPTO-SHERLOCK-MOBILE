@@ -147,6 +147,8 @@ def test_robustness_panel_formats_parameter_stability_without_picking_winner():
         "updated_at": "test",
         "result": {
             "method": "bounded_one_factor_at_a_time_sensitivity",
+            "pbo_by_horizon": {"4": {"status": "completed", "pbo": 0.25, "median_logit_rank": 0.3, "partitions_evaluated": 20, "partitions_possible": 70, "aligned_folds": 8}},
+            "strategy_portfolio_by_horizon": {"4": {"status": "completed", "equal_weight_portfolio": {"average_return_per_fold": 0.002, "volatility_per_fold": 0.01, "positive_fold_rate": 0.5}, "pairwise_return_correlation": {"baseline|fewer_analogs": 0.4}}},
             "configurations_requested": 5,
             "configurations_evaluated": 4,
             "selection_policy": "Each configuration remains independent; no winner selected.",
@@ -183,6 +185,10 @@ def test_robustness_panel_formats_parameter_stability_without_picking_winner():
     assert "Configurations evaluated: 4 / 5" in rendered
     assert "positive configurations 50%" in rendered
     assert "no winner selected" in rendered
+    assert "ANTI-OVERFITTING" in rendered
+    assert "PBO 25.0%" in rendered
+    assert "STRATEGY PORTFOLIO" in rendered
+    assert "corr baseline|fewer_analogs: 0.4" in rendered
     assert "reason: not enough history" in rendered
     panel.close()
     app.processEvents()
