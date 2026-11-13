@@ -53,5 +53,5 @@ From the repository root: `docker build -t sherlock-gateway ./backend`, then `do
 - Keep this service read-only. Do not add exchange trading credentials to the mobile APK.
 - For Android on the same Wi-Fi, start with `uvicorn app.main:app --host 0.0.0.0 --port 8000` and set the app server URL to `http://<PC-LAN-IP>:8000` (find the IPv4 address with `ipconfig`). Allow Python/port 8000 through Windows Firewall on Private networks only. Android Emulator uses `http://10.0.2.2:8000`. Do not use `127.0.0.1` from a physical phone: it points to the phone itself.
 
-Bind to localhost for local development. Before exposing it publicly, add authentication, TLS/reverse proxy, request throttling, logging with secrets redacted, and firewall rules.
+Do not expose this unauthenticated development server to the public internet. Keep it behind a trusted private network and Windows Firewall Private profile. Before any public deployment, add authentication, TLS/reverse proxy, request throttling, and logging with secrets redacted.
 - Never expose a development server directly to the public internet.
