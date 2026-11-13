@@ -70,16 +70,10 @@ def _load_candles(symbol: str, interval: str, limit: int) -> tuple[list[Candle],
     candles = sorted(merged.values(), key=lambda item: item.open_time)[-limit:]
     if not candles:
         raise ValueError(f"No local candles for {symbol} {interval}")
-    gaps = find_gaps([c.open_time for c in candles], interval)
-    if gaps:
-        last_gap = gaps[-1]
-        first_after_gap = next(
-            i for i, candle in enumerate(candles)
-            if candle.open_time == last_gap.next_open_time
-        )
-        candles = candles[first_after_gap:]
-    if not candles:
-        raise ValueError(f"No contiguous local candles for {symbol} {interval}")
+    # Keep all verified history. Pattern Intelligence now rejects any candidate
+    # window or forward path that crosses a gap instead of discarding everything
+    # before the newest gap.
+    find_gaps([c.open_time for c in candles], interval)
     return candles, used_sources
 
 def run_pattern_research(
