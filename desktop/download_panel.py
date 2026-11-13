@@ -26,9 +26,12 @@ class DownloadPanel(QWidget):
         form.addRow("Last month (YYYY-MM)", self.end)
         root.addLayout(form)
         actions = QHBoxLayout()
-        self.run_button = QPushButton("DOWNLOAD TO STAGING")
+        self.run_button = QPushButton("DOWNLOAD ARCHIVES TO STAGING")
         self.run_button.clicked.connect(self.start_download)
+        self.sync_button = QPushButton("SYNC CURRENT MONTH")
+        self.sync_button.clicked.connect(self.start_current_month_sync)
         actions.addWidget(self.run_button)
+        actions.addWidget(self.sync_button)
         actions.addStretch(1)
         root.addLayout(actions)
         self.status = QLabel("No archive download started")
@@ -40,8 +43,8 @@ class DownloadPanel(QWidget):
         root.addWidget(self.output, 1)
         note = QLabel(
             "Downloads official Binance Spot monthly ZIP archives and verifies SHA256. "
-            "Data goes to a separate staging database; it never overwrites the source market database. "
-            "The archive download can be large and may take a long time."
+            "SYNC CURRENT MONTH fetches only fully closed 15m / 4h / 1d candles from the public REST API. "
+            "Both operations write to a separate staging database; the source market database is never modified."
         )
         note.setObjectName("muted")
         note.setWordWrap(True)
@@ -68,6 +71,7 @@ class DownloadPanel(QWidget):
         if answer != QMessageBox.StandardButton.Yes:
             return
         self.run_button.setEnabled(False)
+        self.sync_button.setEnabled(False)
         self.output.clear()
         self.status.setText("Submitting archive download…")
         self.worker = ResearchJobWorker(
@@ -77,13 +81,43 @@ class DownloadPanel(QWidget):
         self.worker.status.connect(self.status.setText)
         self.worker.completed.connect(self.on_completed)
         self.worker.failed.connect(self.on_failed)
-        self.worker.finished.connect(lambda: self.run_button.setEnabled(True))
+        self.worker.finished.connect(self._on_finished)
         self.worker.start()
 
+    def start_current_month_sync(self):
+        if self.worker is not None and self.worker.isRunning():
+            return
+        answer = QMessageBox.question(
+            self, "Confirm current-month sync",
+            "Fetch the current UTC month's fully closed BTCUSDT 15m, 4h and 1d candles "
+            "from public Binance Spot data?\\n\\n"
+            "Only the staging database will be updated. The source database remains untouched.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.run_button.setEnabled(False)
+        self.sync_button.setEnabled(False)
+        self.output.clear()
+        self.status.setText("Submitting current-month sync…")
+        self.worker = ResearchJobWorker(
+            self.api_url, "/v1/data/sync-current-month", {"symbol": "BTCUSDT"}
+        )
+        self.worker.status.connect(self.status.setText)
+        self.worker.completed.connect(self.on_completed)
+        self.worker.failed.connect(self.on_failed)
+        self.worker.finished.connect(self._on_finished)
+        self.worker.start()
+
+    def _on_finished(self):
+        self.run_button.setEnabled(True)
+        self.sync_button.setEnabled(True)
+
     def on_completed(self, job: dict):
-        self.status.setText("Archive download completed")
+        self.status.setText(f"{job.get('kind', 'Data job')} completed")
         self.output.setPlainText(json.dumps(job.get("result") or {}, ensure_ascii=False, indent=2))
 
     def on_failed(self, message: str):
-        self.status.setText("Archive download failed")
+        self.status.setText("Data operation failed")
         self.output.setPlainText(message)
