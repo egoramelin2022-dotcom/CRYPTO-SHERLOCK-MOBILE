@@ -228,13 +228,21 @@ class MainWindow(QMainWindow):
         return page
 
     def make_data_page(self):
-        page = Page("Historical Data Center", "Download verified Binance Spot monthly archives into a separate staging database.")
-        panel = QFrame()
-        panel.setObjectName("panel")
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(18, 16, 18, 16)
-        layout.addWidget(DownloadPanel(self.api_url))
-        page.body.addWidget(panel, 1)
+        page = Page("Market Data & History", "Live public Binance Spot market feed and verified historical archive staging.")
+        market_panel = QFrame()
+        market_panel.setObjectName("panel")
+        market_layout = QVBoxLayout(market_panel)
+        market_layout.setContentsMargins(18, 16, 18, 16)
+        self.market_panel = MarketPanel(self.api_url)
+        market_layout.addWidget(self.market_panel)
+        page.body.addWidget(market_panel, 2)
+
+        archive_panel = QFrame()
+        archive_panel.setObjectName("panel")
+        archive_layout = QVBoxLayout(archive_panel)
+        archive_layout.setContentsMargins(18, 16, 18, 16)
+        archive_layout.addWidget(DownloadPanel(self.api_url))
+        page.body.addWidget(archive_panel, 1)
         return page
 
     def make_system_page(self):
