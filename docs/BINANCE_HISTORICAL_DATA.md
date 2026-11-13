@@ -2,7 +2,7 @@
 
 Script: `backend/scripts/download_binance_spot_klines.py`
 
-Downloads monthly BTCUSDT Spot kline ZIP archives for 15m, 4h and 1d from Binance Public Data Vision. The default range is 2017-08 through 2026-11; it can be narrowed with `--start` and `--end`.
+Downloads monthly BTCUSDT Spot kline ZIP archives for 15m, 4h and 1d from Binance Public Data Vision. The default range is 2017-08 through 2026-10. Binance publishes monthly archives after the month ends, so the current partial month is not included; it can be narrowed with `--start` and `--end`.
 
 ## Safety and integrity
 
