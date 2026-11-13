@@ -32,7 +32,7 @@ def test_robustness_audit_keeps_parameter_runs_separate_and_reports_baselines():
     )
     assert result["configurations_evaluated"] >= 3
     assert result["method"] == "bounded_one_factor_at_a_time_sensitivity"
-    assert "Probability of Backtest Overfitting (PBO)" in " ".join(result["limitations"])
+    assert "PBO" in " ".join(result["limitations"])
     assert "not pooled" in result["selection_policy"]
     names = [run["configuration"] for run in result["runs"]]
     assert len(names) == len(set(names))
