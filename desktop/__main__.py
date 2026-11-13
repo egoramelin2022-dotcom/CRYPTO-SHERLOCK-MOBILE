@@ -82,11 +82,12 @@ class MainWindow(QMainWindow):
         ("Overview", "01"),
         ("Market Data", "02"),
         ("Pattern Intelligence", "03"),
-        ("Multi-Timeframe", "04"),
-        ("Ensemble Engine", "05"),
-        ("Backtesting Lab", "06"),
-        ("Paper Trading", "07"),
-        ("System Monitor", "08"),
+        ("Sherlock Core", "04"),
+        ("Multi-Timeframe", "05"),
+        ("Ensemble Engine", "06"),
+        ("Backtesting Lab", "07"),
+        ("Paper Trading", "08"),
+        ("System Monitor", "09"),
     ]
 
     def __init__(self):
@@ -166,6 +167,7 @@ class MainWindow(QMainWindow):
             self.make_overview(),
             self.make_data_page(),
             self.make_research_page("Pattern Intelligence", "Historical analog search with a free mode and the preserved equal-weight five-stage formation.", "/v1/research/pattern", "pattern"),
+            self.make_research_page("Sherlock Intelligence Core", "Central research coordinator: pattern analogs, causal market regime, cost-adjusted outcomes and explicit evidence conflicts.", "/v1/research/core", "core"),
             self.make_research_page("Multi-Timeframe Scanner", "Aligned 15m lower-wick, 4h support sweep/reclaim and closed 1d bearish-context scan.", "/v1/research/multitimeframe", "mtf"),
             self.make_research_page("Ensemble Engine", "Evidence aggregation with explicit engine availability. No uncalibrated probabilities or signal averaging.", "/v1/research/ensemble", "ensemble"),
             self.make_research_page("Backtesting Lab", "Expanding-window out-of-sample validation of historical analog decisions, with embargo, costs and simple baselines.", "/v1/research/walk-forward", "walk_forward"),
