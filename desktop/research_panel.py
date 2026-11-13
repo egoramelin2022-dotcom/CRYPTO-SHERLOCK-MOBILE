@@ -111,6 +111,24 @@ class ResearchPanel(QWidget):
         self.adaptive_step.setRange(1, 500)
         self.adaptive_step.setValue(20)
         form.addRow("Adaptive length step", self.adaptive_step)
+        self.wf_folds = QSpinBox()
+        self.wf_folds.setRange(2, 100)
+        self.wf_folds.setValue(30)
+        self.wf_training = QSpinBox()
+        self.wf_training.setRange(100, 399000)
+        self.wf_training.setValue(500)
+        self.wf_budget = QSpinBox()
+        self.wf_budget.setRange(100, 5000)
+        self.wf_budget.setValue(2000)
+        if kind == "walk_forward":
+            form.addRow("Out-of-sample folds", self.wf_folds)
+            form.addRow("Minimum training history (candles)", self.wf_training)
+            form.addRow("Candidate budget per fold", self.wf_budget)
+            self.query_start.setEnabled(False)
+            self.adaptive.setEnabled(False)
+            self.adaptive_min.setEnabled(False)
+            self.adaptive_max.setEnabled(False)
+            self.adaptive_step.setEnabled(False)
         if kind == "mtf":
             self.mode.setEnabled(False)
             self.window.setEnabled(False)
@@ -189,6 +207,16 @@ class ResearchPanel(QWidget):
                 except ValueError:
                     self.status.setText("Invalid sample time · use YYYY-MM-DD HH:MM UTC")
                     return
+        elif self.kind == "walk_forward":
+            params.update({
+                "interval": self.interval.currentText(),
+                "query_window": self.window.value(),
+                "mode": self.mode.currentData(),
+                "top_k": self.top_k.value(),
+                "max_folds": self.wf_folds.value(),
+                "min_training_candles": self.wf_training.value(),
+                "candidate_budget": self.wf_budget.value(),
+            })
         elif self.kind == "ensemble":
             params.update({
                 "interval": self.interval.currentText(),
