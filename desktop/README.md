@@ -17,8 +17,8 @@ The Windows package includes a local backend executable. Open **Server Settings*
 The archive loader runs asynchronously and writes only to the staging database. The application polls job status instead of freezing the UI.
 
 - Live Binance Spot candles and 24-hour ticker; symbols BTCUSDT, ETHUSDT, BNBUSDT and SOLUSDT; 15m, 1h, 4h and 1d.
-- Historical Pattern Intelligence with free search and preserved five-stage mode. Research reads the immutable source database plus verified archive staging data as a read-only merged view; conflicting duplicate candles are rejected.
-- Multi-Timeframe scanner for aligned 15m / 4h / closed 1d data.
+- Historical Pattern Intelligence with free search and preserved five-stage mode. By default it searches up to 400,000 recent contiguous candles per market/timeframe (enough for the complete BTCUSDT 15m history currently archived). Research reads the immutable source database plus verified archive staging data as a read-only merged view; conflicting duplicate candles are rejected.
+- Multi-Timeframe scanner for aligned 15m / 4h / closed 1d data, with full available history bounds.
 - Ensemble evidence aggregation. STUMPY is an optional research dependency; the UI reports when it is unavailable. Consensus is exact-window agreement only, not a probability.
 - Backtesting Lab currently evaluates historical analog forward outcomes with configured fees and slippage. It is not yet a strategy-level walk-forward optimizer.
 - Server Settings dialog with source/analytics path validation and bundled local backend lifecycle.\n- Persistent manual Paper Trading spot ledger. Orders use public spot prices with simulated costs; no leverage, shorting or live exchange execution.
