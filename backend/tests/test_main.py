@@ -154,10 +154,13 @@ def test_ensemble_job_is_queued(monkeypatch):
     monkeypatch.setattr(
         main.research_jobs,
         "run_ensemble_job",
-        lambda job_id, symbol, interval, window, top_k, mode, include_stumpy:
+        lambda job_id, symbol, interval, window, top_k, mode, include_stumpy,
+               fee_bps_per_side, slippage_bps_per_side:
             called.update(
                 job_id=job_id, symbol=symbol, interval=interval, window=window,
                 top_k=top_k, mode=mode, include_stumpy=include_stumpy,
+                fee_bps_per_side=fee_bps_per_side,
+                slippage_bps_per_side=slippage_bps_per_side,
             ),
     )
 
@@ -166,6 +169,7 @@ def test_ensemble_job_is_queued(monkeypatch):
         params={
             "symbol": "BTCUSDT", "interval": "15m", "window": 64,
             "top_k": 5, "mode": "five_stage", "include_stumpy": "false",
+            "fee_bps_per_side": 10, "slippage_bps_per_side": 2,
         },
     )
     assert response.status_code == 202
@@ -173,4 +177,5 @@ def test_ensemble_job_is_queued(monkeypatch):
     assert called == {
         "job_id": "ensemble-job-001", "symbol": "BTCUSDT", "interval": "15m",
         "window": 64, "top_k": 5, "mode": "five_stage", "include_stumpy": False,
+        "fee_bps_per_side": 10.0, "slippage_bps_per_side": 2.0,
     }
