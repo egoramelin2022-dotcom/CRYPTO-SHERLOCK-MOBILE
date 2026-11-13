@@ -11,6 +11,7 @@ from PySide6.QtGui import QFont
 from desktop.market_panel import MarketPanel
 from desktop.research_panel import ResearchPanel
 from desktop.paper_panel import PaperPanel
+from desktop.download_panel import DownloadPanel
 
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -213,10 +214,13 @@ class MainWindow(QMainWindow):
         return page
 
     def make_data_page(self):
-        page = Page("Market Data Center", "Live public Binance Spot data routed through the local read-only Sherlock backend.")
-        self.market_panel = MarketPanel(self.api_url)
-        page.body.addWidget(self.market_panel, 1)
-        self.market_panel.refresh()
+        page = Page("Historical Data Center", "Download verified Binance Spot monthly archives into a separate staging database.")
+        panel = QFrame()
+        panel.setObjectName("panel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.addWidget(DownloadPanel(self.api_url))
+        page.body.addWidget(panel, 1)
         return page
 
     def make_paper_page(self):
