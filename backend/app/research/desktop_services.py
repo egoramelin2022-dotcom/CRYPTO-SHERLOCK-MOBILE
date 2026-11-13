@@ -113,6 +113,7 @@ def run_pattern_research(
     history_gaps = find_gaps([item.open_time for item in candles], interval)
     return {
         "symbol": symbol, "interval": interval, "mode": mode,
+        "stage_weights": result.to_dict()["stage_weights"],
         "history_candles": len(candles),
         "historical_gaps": len(history_gaps),
         "contiguous_segments": len(history_gaps) + 1,
@@ -271,6 +272,7 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
     )
     return {
         "symbol": symbol, "mode": mode, "query_window": query_window,
+        "stage_weights": pattern.to_dict()["stage_weights"],
         "data_sources": data_sources,
         "engines_available": engines_available,
         "engines_missing": engines_missing,
