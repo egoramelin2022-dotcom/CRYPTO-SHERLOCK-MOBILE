@@ -158,6 +158,11 @@ async def start_pattern_research(
     query_start_time: int | None = Query(None, ge=0),
     mode: str = Query("free", pattern=r"^(free|five_stage)$"),
     top_k: int = Query(10, ge=1, le=100),
+    adaptive_search: bool = Query(False),
+    adaptive_min_window: int = Query(20, ge=5, le=500),
+    adaptive_max_window: int = Query(100, ge=5, le=500),
+    adaptive_step: int = Query(20, ge=1, le=500),
+    adaptive_candidate_budget: int = Query(5000, ge=100, le=20000),
 ) -> dict[str, Any]:
     """Queue free or five-stage historical analog search on verified local candles."""
     if mode == "five_stage" and query_window < 5:
@@ -167,7 +172,12 @@ async def start_pattern_research(
         _run_desktop_research_job, job.job_id, desktop_services.run_pattern_research,
         {"symbol": symbol, "interval": interval, "query_window": query_window,
          "mode": mode, "top_k": top_k,
-         "query_start_time": query_start_time},
+         "query_start_time": query_start_time,
+         "adaptive_search": adaptive_search,
+         "adaptive_min_window": adaptive_min_window,
+         "adaptive_max_window": adaptive_max_window,
+         "adaptive_step": adaptive_step,
+         "adaptive_candidate_budget": adaptive_candidate_budget},
     )
     return research_jobs.get_job(job.job_id)
 
