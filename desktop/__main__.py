@@ -3,14 +3,22 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 from datetime import datetime, timezone
 
 import httpx
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QProcess, QProcessEnvironment, QSettings
 from PySide6.QtGui import QFont
+from desktop.market_panel import MarketPanel
+from desktop.research_panel import ResearchPanel
+from desktop.paper_panel import PaperPanel
+from desktop.download_panel import DownloadPanel
+from desktop.system_panel import SystemPanel
+from desktop.server_settings import ServerSettingsDialog, default_analytics_path
+
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-    QMainWindow, QPushButton, QScrollArea, QSizePolicy, QStackedWidget,
+    QMainWindow, QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QMessageBox,
     QVBoxLayout, QWidget,
 )
 
@@ -18,7 +26,7 @@ API_DEFAULT = os.getenv("SHERLOCK_API_URL", "http://127.0.0.1:8000")
 
 
 class HealthWorker(QThread):
-    finished = Signal(bool, str)
+    result_ready = Signal(bool, str)
 
     def __init__(self, base_url: str):
         super().__init__()
@@ -28,9 +36,9 @@ class HealthWorker(QThread):
         try:
             response = httpx.get(f"{self.base_url}/health", timeout=3.0)
             response.raise_for_status()
-            self.finished.emit(True, "Backend connected")
+            self.result_ready.emit(True, "Backend connected")
         except Exception as exc:
-            self.finished.emit(False, f"Backend unavailable: {type(exc).__name__}")
+            self.result_ready.emit(False, f"Backend unavailable: {type(exc).__name__}")
 
 
 class MetricCard(QFrame):
@@ -89,6 +97,12 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1120, 720)
         self.api_url = API_DEFAULT
         self.health_worker = None
+        self.settings = QSettings("CRYPTO_SHERLOCK", "Desktop")
+        self.server_process = QProcess(self)
+        self.health_timer = QTimer(self)
+        self.health_timer.timeout.connect(self.check_backend)
+        self.health_timer.start(2000)
+        self.server_process.errorOccurred.connect(self.on_server_error)
         root = QWidget()
         root.setObjectName("root")
         self.setCentralWidget(root)
@@ -122,7 +136,7 @@ class MainWindow(QMainWindow):
             side.addWidget(button)
             self.nav_buttons.append(button)
         side.addStretch(1)
-        version = QLabel("DESKTOP  •  v0.1.0\nPAPER RESEARCH ONLY")
+        version = QLabel("DESKTOP  •  v0.2.0\nPAPER RESEARCH ONLY")
         version.setObjectName("sidebarFoot")
         side.addWidget(version)
 
@@ -140,47 +154,22 @@ class MainWindow(QMainWindow):
         top.addWidget(self.breadcrumb)
         top.addStretch(1)
         top.addWidget(self.connection)
+        self.server_settings_button = QPushButton('SERVER SETTINGS')
+        self.server_settings_button.setObjectName('settingsButton')
+        self.server_settings_button.clicked.connect(self.open_server_settings)
+        top.addWidget(self.server_settings_button)
         content.addWidget(topbar)
 
         self.stack = QStackedWidget()
         self.pages = [
             self.make_overview(),
             self.make_data_page(),
-            self.make_module_page("Pattern Intelligence", "Historical analog discovery across candle shapes, movement paths and configurable formation modes.", [
-                "Free pattern search — unrestricted sequence matching",
-                "Five-stage formation — preserved as a separate selectable mode",
-                "Historical candidates must end before the query window",
-                "Forward outcomes are measured separately from similarity ranking",
-            ]),
-            self.make_module_page("Multi-Timeframe Scanner", "Find synchronized market structure across 15M, 4H and 1D without treating an observation as a trading signal.", [
-                "15M — long lower-wick event",
-                "4H — support sweep and reclaim",
-                "1D — unusually large bearish candle during a broader decline",
-                "Thresholds remain explicit research parameters",
-            ]),
-            self.make_module_page("Ensemble Engine", "Compare independent evidence sources. Module agreement is not automatically statistical confirmation.", [
-                "Pattern Intelligence evidence adapter",
-                "STUMPY motif evidence adapter",
-                "Candidate provenance and timestamp validation",
-                "No uncalibrated probability or signal averaging",
-            ]),
-            self.make_module_page("Backtesting Lab", "Chronological validation before any strategy can be considered reliable.", [
-                "Walk-forward evaluation",
-                "Purged and embargoed time splits",
-                "Fees, slippage and separate LONG / SHORT analysis",
-                "Baseline comparison and ablation tests",
-            ]),
-            self.make_module_page("Paper Trading", "Virtual execution only. Live exchange orders are deliberately not implemented.", [
-                "Paper portfolio and virtual positions",
-                "Risk limits and execution assumptions",
-                "No exchange credentials or live order endpoints",
-            ]),
-            self.make_module_page("System Monitor", "Local services, data integrity and research job health.", [
-                "Backend health endpoint",
-                "Source database and analytics database status",
-                "Historical archive integrity and gap audit",
-                "Research job progress",
-            ]),
+            self.make_research_page("Pattern Intelligence", "Historical analog search with a free mode and the preserved equal-weight five-stage formation.", "/v1/research/pattern", "pattern"),
+            self.make_research_page("Multi-Timeframe Scanner", "Aligned 15m lower-wick, 4h support sweep/reclaim and closed 1d bearish-context scan.", "/v1/research/multitimeframe", "mtf"),
+            self.make_research_page("Ensemble Engine", "Evidence aggregation with explicit engine availability. No uncalibrated probabilities or signal averaging.", "/v1/research/ensemble", "ensemble"),
+            self.make_research_page("Backtesting Lab", "Historical forward-outcome audit for analogs. Full strategy walk-forward backtesting remains a separate validation stage.", "/v1/research/pattern", "pattern"),
+            self.make_paper_page(),
+            self.make_system_page(),
         ]
         for page in self.pages:
             self.stack.addWidget(page)
@@ -190,6 +179,11 @@ class MainWindow(QMainWindow):
         main.setLayout(content)
         shell.addWidget(main, 1)
         self.show_page(0)
+        source = Path(self.settings.value("source_db", "")).expanduser()
+        if source.is_file():
+            self.start_local_backend()
+        else:
+            QTimer.singleShot(0, self.open_server_settings)
         self.check_backend()
 
     def card_row(self, cards):
@@ -233,25 +227,44 @@ class MainWindow(QMainWindow):
         return page
 
     def make_data_page(self):
-        page = Page("Market Data Center", "Manage verified Binance Spot history. The production/source database is never overwritten by staging imports.")
+        page = Page("Historical Data Center", "Download verified Binance Spot monthly archives into a separate staging database.")
         panel = QFrame()
         panel.setObjectName("panel")
         layout = QVBoxLayout(panel)
-        title = QLabel("BINANCE SPOT · BTCUSDT")
-        title.setObjectName("panelTitle")
-        detail = QLabel("Target intervals: 15m, 4h, 1d    •    Start: August 2017    •    Archive integrity: SHA256")
-        detail.setObjectName("bodyText")
-        detail.setWordWrap(True)
-        status = QLabel("DOWNLOAD WORKFLOW  •  IMPLEMENTED IN RESEARCH BRANCH — DESKTOP ACTION WIRING PENDING")
-        status.setObjectName("statusPill")
-        layout.addWidget(title)
-        layout.addWidget(detail)
-        layout.addWidget(status)
-        page.body.addWidget(panel)
-        note = QLabel("This screen is intentionally not showing invented row counts or progress. The next integration step will launch the verified archive downloader as a background task and display real progress.")
-        note.setObjectName("muted")
-        note.setWordWrap(True)
-        page.body.addWidget(note)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.addWidget(DownloadPanel(self.api_url))
+        page.body.addWidget(panel, 1)
+        return page
+
+    def make_system_page(self):
+        page = Page("System Monitor", "Backend connection, read-only source audit and derived feature pipeline.")
+        panel = QFrame()
+        panel.setObjectName("panel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.addWidget(SystemPanel(self.api_url))
+        page.body.addWidget(panel, 1)
+        return page
+
+    def make_paper_page(self):
+        page = Page("Paper Trading", "Persistent virtual spot portfolio. All actions are manually confirmed and simulated locally.")
+        panel = QFrame()
+        panel.setObjectName("panel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.addWidget(PaperPanel(self.api_url))
+        page.body.addWidget(panel, 1)
+        return page
+
+    def make_research_page(self, title, subtitle, endpoint, kind):
+        page = Page(title, subtitle)
+        panel = QFrame()
+        panel.setObjectName("panel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 16, 18, 16)
+        controls = ResearchPanel(self.api_url, endpoint, kind)
+        layout.addWidget(controls)
+        page.body.addWidget(panel, 1)
         return page
 
     def make_module_page(self, title, subtitle, items):
@@ -280,10 +293,80 @@ class MainWindow(QMainWindow):
             button.setChecked(i == index)
         self.breadcrumb.setText(f"{self.NAV_ITEMS[index][0].upper()}  /  CRYPTO SHERLOCK")
     
+    def open_server_settings(self):
+        dialog = ServerSettingsDialog(self.settings, self)
+        if dialog.exec() == ServerSettingsDialog.DialogCode.Accepted:
+            self.start_local_backend()
+
+    def start_local_backend(self):
+        source = Path(self.settings.value("source_db", "")).expanduser()
+        analytics = Path(self.settings.value("analytics_db", str(default_analytics_path()))).expanduser()
+        if not source.is_file():
+            QMessageBox.information(
+                self, "Configure source database",
+                "Select the existing sherlock_market.db in Server Settings before starting the local backend."
+            )
+            self.open_server_settings()
+            return
+        if source.resolve() == analytics.resolve():
+            QMessageBox.warning(self, "Unsafe database paths", "Source and analytics databases must be separate.")
+            return
+        app_dir = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
+        server_exe = app_dir / "Server" / "CRYPTO-SHERLOCK-Server.exe"
+        if not server_exe.is_file():
+            QMessageBox.warning(
+                self, "Local server package missing",
+                "The bundled CRYPTO-SHERLOCK-Server.exe was not found. Rebuild the complete Windows package."
+            )
+            return
+        if self.server_process.state() != QProcess.ProcessState.NotRunning:
+            self.server_process.terminate()
+            if not self.server_process.waitForFinished(3000):
+                self.server_process.kill()
+                self.server_process.waitForFinished(2000)
+        analytics.parent.mkdir(parents=True, exist_ok=True)
+        data_dir = analytics.parent
+        environment = QProcessEnvironment.systemEnvironment()
+        environment.insert("SHERLOCK_SOURCE_DB", str(source.resolve()))
+        environment.insert("SHERLOCK_ANALYTICS_DB", str(analytics.resolve()))
+        environment.insert("SHERLOCK_ARCHIVE_RAW_DIR", str(data_dir / "binance_public_raw"))
+        environment.insert("SHERLOCK_ARCHIVE_STAGING_DB", str(data_dir / "binance_archive_staging.db"))
+        environment.insert("SHERLOCK_SERVER_LOG", str(data_dir / "server.log"))
+        self.server_process.setProcessEnvironment(environment)
+        self.server_process.setWorkingDirectory(str(server_exe.parent))
+        self.server_process.setProgram(str(server_exe))
+        self.server_process.setArguments([])
+        self.connection.setText("●  STARTING LOCAL SERVER")
+        self.server_process.start()
+        QTimer.singleShot(2500, self.check_backend)
+
+    def on_server_error(self, error):
+        self.connection.setText("●  SERVER START FAILED")
+        QMessageBox.warning(self, "Local server error", f"Could not start the bundled backend: {error}")
+
+    def closeEvent(self, event):
+        self.health_timer.stop()
+        workers = self.findChildren(QThread)
+        for worker in workers:
+            if worker.isRunning():
+                worker.requestInterruption()
+        for worker in workers:
+            if worker.isRunning() and not worker.wait(4000):
+                worker.terminate()
+                worker.wait(1000)
+        if self.server_process.state() != QProcess.ProcessState.NotRunning:
+            self.server_process.terminate()
+            if not self.server_process.waitForFinished(3000):
+                self.server_process.kill()
+                self.server_process.waitForFinished(2000)
+        super().closeEvent(event)
+
     def check_backend(self):
+        if self.health_worker is not None and self.health_worker.isRunning():
+            return
         self.connection.setText("●  CONNECTING")
         self.health_worker = HealthWorker(self.api_url)
-        self.health_worker.finished.connect(self.on_health)
+        self.health_worker.result_ready.connect(self.on_health)
         self.health_worker.start()
 
     def on_health(self, ok: bool, message: str):
@@ -302,17 +385,23 @@ QWidget { color: #E7EDF2; font-family: 'Segoe UI'; font-size: 10pt; }
 #brand { color: #F2F7F8; font-size: 19pt; font-weight: 800; letter-spacing: 1px; }
 #brandSub { color: #56D6B1; font-size: 11pt; font-weight: 700; letter-spacing: 3px; }
 #eyebrow { color: #718392; font-size: 8pt; font-weight: 700; letter-spacing: 1.5px; }
-.navButton { text-align: left; color: #9EACB7; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 12px 10px; font-size: 9.5pt; }
-.navButton:hover { background: #15222B; color: #EAF4F5; }
-.navButton:checked { background: #142B2A; color: #67E0BC; border: 1px solid #24564B; font-weight: 700; }
+#navButton { text-align: left; color: #9EACB7; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 12px 10px; font-size: 9.5pt; }
+#navButton:hover { background: #15222B; color: #EAF4F5; }
+#navButton:checked { background: #142B2A; color: #67E0BC; border: 1px solid #24564B; font-weight: 700; }
 #sidebarFoot { color: #61717D; font-size: 8pt; line-height: 1.6; }
 #topbar { background: #0D141B; border-bottom: 1px solid #1C2933; }
+#settingsButton { padding: 7px 10px; font-size: 8pt; }
 #topLabel { color: #7F919F; font-size: 8pt; font-weight: 700; letter-spacing: 1px; }
 #connection { color: #E6B96B; font-size: 8pt; font-weight: 700; }
 #connection[online="true"] { color: #59D6B0; }
 #pageTitle { color: #F2F6F8; font-size: 25pt; font-weight: 700; }
 #pageSubtitle { color: #8D9CA8; font-size: 10pt; }
 #metricCard, #panel { background: #111B23; border: 1px solid #22313C; border-radius: 12px; }
+#marketPrice { color: #F0F5F6; font-size: 24pt; font-weight: 700; padding: 8px 0; }
+QTextEdit { background: #0C141B; color: #D7E1E6; border: 1px solid #263641; border-radius: 8px; padding: 10px; font-family: Consolas; font-size: 9pt; }
+QComboBox, QSpinBox, QLineEdit { background: #0C141B; color: #D7E1E6; border: 1px solid #263641; border-radius: 6px; padding: 7px; }
+QPushButton { background: #17352F; color: #70E2BF; border: 1px solid #2B6656; border-radius: 7px; padding: 9px 14px; font-weight: 700; }
+QPushButton:disabled { color: #718392; background: #17212A; border-color: #293742; }
 #metricValue { color: #F0F5F6; font-size: 18pt; font-weight: 700; padding-top: 6px; padding-bottom: 4px; }
 #metricValue[accent="mint"] { color: #62DDB8; }
 #metricValue[accent="amber"] { color: #E6B96B; }
@@ -326,6 +415,7 @@ QWidget { color: #E7EDF2; font-family: 'Segoe UI'; font-size: 10pt; }
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("CRYPTO SHERLOCK")
+    app.setOrganizationName("CRYPTO_SHERLOCK")
     app.setStyle("Fusion")
     app.setStyleSheet(STYLE)
     window = MainWindow()
