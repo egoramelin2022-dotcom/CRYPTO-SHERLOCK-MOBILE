@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import math
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -66,10 +67,12 @@ def place_virtual_order(symbol: str, side: str, quantity: float, market_price: f
     """Execute a simulated spot BUY/SELL against virtual cash and inventory."""
     if side not in ("BUY", "SELL"):
         raise ValueError("side must be BUY or SELL")
-    if not isinstance(quantity, (int, float)) or isinstance(quantity, bool) or quantity <= 0:
-        raise ValueError("quantity must be positive")
-    if not isinstance(market_price, (int, float)) or isinstance(market_price, bool) or market_price <= 0:
-        raise ValueError("market price must be positive")
+    if (not isinstance(quantity, (int, float)) or isinstance(quantity, bool)
+            or not math.isfinite(quantity) or quantity <= 0):
+        raise ValueError("quantity must be finite and positive")
+    if (not isinstance(market_price, (int, float)) or isinstance(market_price, bool)
+            or not math.isfinite(market_price) or market_price <= 0):
+        raise ValueError("market price must be finite and positive")
     if not (0 <= FEE_BPS < 10000 and 0 <= SLIPPAGE_BPS < 10000):
         raise RuntimeError("paper fee/slippage configuration is invalid")
     direction = 1 if side == "BUY" else -1
