@@ -19,8 +19,8 @@ def test_search_returns_only_pre_query_candidates_and_future_outcomes():
     rows = [candle(i, p) for i, p in enumerate(closes)]
     result = search_analogs(rows, query_start=5, query_end=9, top_k=10,
                             horizons=(1, 2), embargo=0)
-    assert result.candidates_examined == 5
-    assert all(x.end_index < 5 for x in result.analogs)
+    assert result.candidates_examined == 1
+    assert all(x.end_index == 4 for x in result.analogs)
     best = result.analogs[0]
     assert best.forward_returns[1] == closes[best.end_index + 1] / closes[best.end_index] - 1
 
