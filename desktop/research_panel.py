@@ -207,7 +207,7 @@ class ResearchPanel(QWidget):
         assumptions = result.get("execution_assumptions")
         if assumptions:
             summary.extend([
-                "\\nFORWARD-PATH ASSUMPTIONS",
+                "\nFORWARD-PATH ASSUMPTIONS",
                 f"Entry: {assumptions.get('entry')} · Exit: {assumptions.get('exit')}",
                 f"Fees: {assumptions.get('fee_bps_per_side')} bps/side · "
                 f"Slippage: {assumptions.get('slippage_bps_per_side')} bps/side · "
