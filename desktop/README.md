@@ -1,24 +1,31 @@
 # CRYPTO SHERLOCK Desktop
 
-Windows desktop research terminal built with PySide6. It connects to the existing read-only FastAPI backend at `http://127.0.0.1:8000`.
+Windows desktop research terminal built with PySide6. It connects to the local read-only FastAPI market-data backend at `http://127.0.0.1:8000`.
 
-## Run from repository root (PowerShell, first-time setup)
+## Run from repository root
 
 ```powershell
 py -3.12 -m venv .venv-desktop
-.\.venv-desktop\Scripts\python.exe -m pip install -r desktop\requirements.txt
-.\.venv-desktop\Scripts\python.exe -m desktop
+.\\.venv-desktop\\Scripts\\python.exe -m pip install -r desktop\\requirements.txt
+.\\.venv-desktop\\Scripts\\python.exe -m desktop
 ```
 
-If Python 3.12 is not installed, install it before setup. The desktop environment is separate from the backend virtual environment to avoid dependency conflicts.
+The backend must be running with `SHERLOCK_SOURCE_DB` and `SHERLOCK_ANALYTICS_DB` configured. The desktop and backend environments are separate.
 
-## Current scope
+## Connected workflows
 
-The desktop now includes live market charts, historical Pattern Intelligence search (free and five-stage modes), the multi-timeframe scan, descriptive ensemble evidence, and a persistent manual Paper Trading ledger. The Backtesting Lab currently runs historical analog forward-outcome evaluation; it is not yet a strategy-level walk-forward optimizer.
+- Live Binance Spot candles and 24-hour ticker; symbols BTCUSDT, ETHUSDT, BNBUSDT and SOLUSDT; 15m, 1h, 4h and 1d.
+- Historical Pattern Intelligence with free search and preserved five-stage mode.
+- Multi-Timeframe scanner for aligned 15m / 4h / closed 1d data.
+- Ensemble evidence aggregation. STUMPY is an optional research dependency; the UI reports when it is unavailable. Consensus is exact-window agreement only, not a probability.
+- Backtesting Lab currently evaluates historical analog forward outcomes with configured fees and slippage. It is not yet a strategy-level walk-forward optimizer.
+- Persistent manual Paper Trading spot ledger. Orders use public spot prices with simulated costs; no leverage, shorting or live exchange execution.
+- Historical Binance monthly archive downloader with SHA256 verification into a separate staging database. The source database is never overwritten.
 
-- Dark professional desktop shell and navigation.
-- Local backend health check without blocking the UI.\n- Live Binance Spot ticker and OHLC candlestick chart for BTCUSDT, ETHUSDT, BNBUSDT and SOLUSDT, with 15m / 1h / 4h / 1d intervals.\n- Candle payload validation (finite values, OHLC bounds, timestamp ordering) before rendering.\n- Market requests run in a worker thread; API failures are displayed instead of fabricating data.
-- Explicit status labels; no fabricated prices, candle counts, scan results or progress.
-- Research-only and Paper Trading only; no live order execution.
+## Safety and current limitations
 
-Pattern Intelligence, Multi-Timeframe, Ensemble, Backtesting and Paper Trading pages remain integration screens; they do not yet expose complete interactive workflows. The verified Binance archive downloader remains a separate backend command until its progress and cancellation handling are safely integrated. This build is not yet a signed installer and requires a local Windows smoke test.
+- No exchange API credentials or live order endpoints are implemented.
+- Research only uses closed local candles and a contiguous suffix; missing intervals are not interpolated.
+- The Paper Trading account is virtual and persisted in the separate analytics database. Default virtual starting cash is configurable with `SHERLOCK_PAPER_INITIAL_CASH`.
+- Archive download can consume substantial disk space and time. It requires explicit confirmation and writes only to staging.
+- This build still requires Windows smoke testing on the target PC. The generated executable is a portable folder build, not yet a signed MSI installer.
