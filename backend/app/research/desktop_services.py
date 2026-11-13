@@ -128,20 +128,73 @@ def run_pattern_research(
     }
 
 
+def _split_contiguous(candles: list[Candle]) -> list[list[Candle]]:
+    """Split verified chronological candles at missing interval boundaries."""
+    if not candles:
+        return []
+    step = interval_to_ms(candles[0].interval)
+    chunks: list[list[Candle]] = []
+    start = 0
+    for index in range(1, len(candles)):
+        if candles[index].open_time - candles[index - 1].open_time != step:
+            chunks.append(candles[start:index])
+            start = index
+    chunks.append(candles[start:])
+    return chunks
+
+
 def run_multitimeframe_research(symbol: str = "BTCUSDT") -> dict[str, Any]:
-    # These are intentionally bounded, recent contiguous windows. Daily
-    # candles are historical closed bars in the local source database.
     m15, sources_15m = _load_candles(symbol, "15m", 400000)
     h4, sources_4h = _load_candles(symbol, "4h", 25000)
     d1, sources_1d = _load_candles(symbol, "1d", 5000)
-    results = detect_multitimeframe_setups(m15, h4, d1, config=MultiTimeframeConfig())
+    chunks_15m = _split_contiguous(m15)
+    chunks_4h = _split_contiguous(h4)
+    chunks_1d = _split_contiguous(d1)
+
+    # Evaluate each overlapping triple of continuous segments independently.
+    # This preserves older valid observations without allowing any timeframe
+    # to bridge a missing candle or borrow context from a later segment.
+    results = []
+    for segment_15m in chunks_15m:
+        for segment_4h in chunks_4h:
+            overlap_start = max(segment_15m[0].open_time, segment_4h[0].open_time)
+            overlap_end = min(segment_15m[-1].close_time, segment_4h[-1].close_time)
+            if overlap_start > overlap_end:
+                continue
+            for segment_1d in chunks_1d:
+                start_time = max(overlap_start, segment_1d[0].open_time)
+                end_time = min(overlap_end, segment_1d[-1].close_time)
+                if start_time > end_time:
+                    continue
+                aligned_15m = [
+                    candle for candle in segment_15m
+                    if start_time <= candle.open_time <= end_time
+                ]
+                if not aligned_15m:
+                    continue
+                results.extend(detect_multitimeframe_setups(
+                    aligned_15m, segment_4h, segment_1d,
+                    config=MultiTimeframeConfig(),
+                ))
+
+    results.sort(key=lambda item: (item.timestamp, item.confirmed_at))
     return {
         "symbol": symbol,
         "config": asdict(MultiTimeframeConfig()),
         "rows_loaded": {"15m": len(m15), "4h": len(h4), "1d": len(d1)},
+        "contiguous_segments": {
+            "15m": len(chunks_15m), "4h": len(chunks_4h), "1d": len(chunks_1d),
+        },
+        "historical_gaps": {
+            "15m": len(chunks_15m) - 1, "4h": len(chunks_4h) - 1,
+            "1d": len(chunks_1d) - 1,
+        },
         "data_sources": {"15m": sources_15m, "4h": sources_4h, "1d": sources_1d},
         "setups": [item.to_dict() for item in results],
-        "interpretation": "Aligned historical observations only; not a forecast or trading signal. Daily bars must be closed.",
+        "interpretation": (
+            "Aligned historical observations only; each timeframe was split at missing "
+            "candles. No observation bridges a gap; daily bars must be closed."
+        ),
     }
 
 
