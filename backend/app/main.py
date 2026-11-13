@@ -227,9 +227,9 @@ async def start_robustness_research(
     query_window: int = Query(40, ge=5, le=500),
     mode: str = Query("free", pattern=r"^(free|five_stage)$"),
     top_k: int = Query(10, ge=1, le=100),
-    max_folds: int = Query(20, ge=2, le=100),
+    max_folds: int = Query(20, ge=2, le=30),
     min_training_candles: int = Query(500, ge=10, le=399000),
-    candidate_budget: int = Query(1000, ge=100, le=5000),
+    candidate_budget: int = Query(1000, ge=100, le=2000),
 ) -> dict[str, Any]:
     """Queue bounded parameter-sensitivity validation; does not optimize settings."""
     if min_training_candles < query_window + 65:
