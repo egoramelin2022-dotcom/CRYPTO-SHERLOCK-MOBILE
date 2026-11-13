@@ -62,8 +62,9 @@ jobs:
       - name: Build per-user Windows installer
         shell: pwsh
         run: |
-          $compiler = "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe"
-          & $compiler "desktop\\installer.iss"
+          $programFilesX86 = [Environment]::GetFolderPath('ProgramFilesX86')
+          $compiler = Join-Path $programFilesX86 'Inno Setup 6\ISCC.exe'
+          & $compiler 'desktop\installer.iss'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Windows installer and portable folder
         uses: actions/upload-artifact@v4
