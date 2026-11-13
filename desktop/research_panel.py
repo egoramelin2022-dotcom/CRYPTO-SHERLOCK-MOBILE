@@ -262,6 +262,23 @@ class ResearchPanel(QWidget):
                 for rank, item in enumerate(window_result["analogs"], start=1):
                     analog = item.get("analog", {})
                     summary.append(f"    #{rank} similarity {analog.get('similarity', 0):.4f} · {analog.get('start_time')} → {analog.get('end_time')}")
+        if result.get("method") == "expanding_window_historical_analog_median":
+            summary.extend([
+                "\\nWALK-FORWARD · EXPANDING TRAINING WINDOW",
+                f"Evaluated folds: {result.get('evaluated_folds', 0)} · skipped: {len(result.get('skipped_folds', []))}",
+                f"Training is strictly prior · embargo: {result.get('anti_leakage', {}).get('embargo_candles')} candles",
+                "Equal-notional fold sums · not compounded · SHORT is theoretical",
+            ])
+            for horizon, strategies in result.get("metrics_by_horizon", {}).items():
+                summary.append(f"  HORIZON +{horizon} candles")
+                for strategy, values in strategies.items():
+                    summary.append(
+                        f"    {strategy.replace('_', ' ').title()}: "
+                        f"sum {values['cumulative_return_sum']:+.2%} · "
+                        f"avg/fold {values['average_return_per_fold']:+.2%} · "
+                        f"positive {values['positive_fold_rate']:.0%} · "
+                        f"max DD {values['max_drawdown_sum_basis']:.2%}"
+                    )
         if "history_candles" in result:
             query_label = (
                 "Historical sample" if result.get("query_selection") == "historical_open_time"
