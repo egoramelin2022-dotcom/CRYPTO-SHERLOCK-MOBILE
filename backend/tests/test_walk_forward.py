@@ -43,6 +43,7 @@ def test_walk_forward_uses_strictly_prior_analogs_and_reports_baselines():
     assert result["anti_leakage"]["test_windows_and_forward_paths_non_overlapping"] is True
     for fold in result["folds"]:
         assert fold["training_candles_available"] == fold["query_start_index"]
+        assert fold["training_end_index"] == fold["query_start_index"] - 1
         for analog in fold["analogs"]:
             assert analog["end_index"] + 8 < fold["query_start_index"]
     for horizon in ("1", "4", "8"):
@@ -51,6 +52,7 @@ def test_walk_forward_uses_strictly_prior_analogs_and_reports_baselines():
         }
         model = result["metrics_by_horizon"][horizon]["model"]
         assert model["trades"] + model["flat_folds"] == model["folds"]
+        assert 0.0 <= model["positive_trade_rate"] <= 1.0
 
 
 def test_walk_forward_skips_a_gapped_test_query_and_continues():
