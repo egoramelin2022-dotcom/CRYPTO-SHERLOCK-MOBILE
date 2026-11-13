@@ -97,6 +97,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1120, 720)
         self.api_url = API_DEFAULT
         self.health_worker = None
+        self.backend_online = False
         self.settings = QSettings("CRYPTO_SHERLOCK", "Desktop")
         self.server_process = QProcess(self)
         self.health_timer = QTimer(self)
@@ -253,7 +254,8 @@ class MainWindow(QMainWindow):
         panel.setObjectName("panel")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(18, 16, 18, 16)
-        layout.addWidget(PaperPanel(self.api_url))
+        self.paper_panel = PaperPanel(self.api_url)
+        layout.addWidget(self.paper_panel)
         page.body.addWidget(panel, 1)
         return page
 
@@ -381,12 +383,19 @@ class MainWindow(QMainWindow):
         self.health_worker.start()
 
     def on_health(self, ok: bool, message: str):
+        just_connected = ok and not self.backend_online
+        self.backend_online = ok
         self.connection.setText("●  BACKEND ONLINE" if ok else "●  BACKEND OFFLINE")
         self.connection.setProperty("online", ok)
         self.connection.style().unpolish(self.connection)
         self.connection.style().polish(self.connection)
         if hasattr(self, "backend_detail"):
             self.backend_detail.setText(f"{message}  ·  {self.api_url}")
+        if just_connected:
+            if hasattr(self, "market_panel"):
+                self.market_panel.refresh()
+            if hasattr(self, "paper_panel"):
+                self.paper_panel.load_snapshot()
 
 
 STYLE = """
