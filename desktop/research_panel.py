@@ -183,7 +183,12 @@ class ResearchPanel(QWidget):
         result = job.get("result") or {}
         summary = []
         if "history_candles" in result:
+            query_label = (
+                "Historical sample" if result.get("query_selection") == "historical_open_time"
+                else "Latest closed sample"
+            )
             summary.extend([
+                f"Query: {query_label} · {result.get('query_start_time')}",
                 f"History loaded: {result.get('history_candles', 0):,} candles",
                 f"Historical gaps: {result.get('historical_gaps', 0)} · "
                 f"continuous segments: {result.get('contiguous_segments', 1)}",
@@ -237,9 +242,13 @@ class ResearchPanel(QWidget):
             self.plot.addLegend()
             query = (result.get("query_chart") or {}).get("normalized_close", [])
             if query:
+                query_label = (
+                    "Historical sample" if result.get("query_selection") == "historical_open_time"
+                    else "Latest sample"
+                )
                 self.plot.plot(
                     list(range(len(query))), query,
-                    pen=pg.mkPen("#56D6B1", width=2.6), name="Current query",
+                    pen=pg.mkPen("#56D6B1", width=2.6), name=query_label,
                 )
             palette = ["#8CA4B5", "#A7B8C4", "#6F8798", "#C0CDD5", "#718B9C"]
             for index, item in enumerate(result.get("analogs", [])[:5]):
