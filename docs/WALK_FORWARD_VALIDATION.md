@@ -42,7 +42,7 @@ Each horizon reports:
 - **Positive trade rate:** share of non-FLAT model trades with a positive realized net return. FLAT decisions are excluded.
 - **Maximum drawdown on cumulative-sum basis.**
 
-The same measures are calculated for the analog model and three simple baselines. Returns are not compounded because this research pass does not model capital allocation, sizing or concurrent positions.
+The same measures are calculated for the analog model and three simple baselines. A temporal-stability view also splits evaluated folds into chronological early, middle and recent thirds. These are time slices, not inferred market regimes. Returns are not compounded because this research pass does not model capital allocation, sizing or concurrent positions.
 
 ## Data integrity and limitations
 
