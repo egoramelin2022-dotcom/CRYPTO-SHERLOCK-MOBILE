@@ -112,8 +112,8 @@ def _outcomes(candles: Sequence[Candle], end: int,
         if end + h < len(candles) else None
         for h in horizons
     }
-    mfe = max(c.high for c in future) / entry - 1.0
-    mae = min(c.low for c in future) / entry - 1.0
+    mfe = max(0.0, max(c.high for c in future) / entry - 1.0)
+    mae = min(0.0, min(c.low for c in future) / entry - 1.0)
     return returns, mfe, mae
 
 
