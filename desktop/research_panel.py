@@ -87,6 +87,10 @@ class ResearchPanel(QWidget):
         self.top_k.setRange(1, 100)
         self.top_k.setValue(10)
         form.addRow("Top historical analogs", self.top_k)
+        if kind == "mtf":
+            self.mode.setEnabled(False)
+            self.window.setEnabled(False)
+            self.top_k.setEnabled(False)
         root.addLayout(form)
 
         actions = QHBoxLayout()
