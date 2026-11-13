@@ -41,7 +41,9 @@ class ResearchJobWorker(QThread):
                     )
                     response.raise_for_status()
                     job = response.json()
+                    progress = (job.get("result") or {}).get("progress")
                     self.status.emit(
+                        str(progress) if progress else
                         f"Research job: {job.get('status', 'unknown')} · {job_id[:8]}"
                     )
                     if job.get("status") == "completed":
