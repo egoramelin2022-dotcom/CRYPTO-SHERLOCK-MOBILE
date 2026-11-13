@@ -47,6 +47,10 @@ def test_pattern_only_run_returns_consensus_and_costed_outcomes():
     assert forward.fee_bps_per_side == 10
     assert forward.slippage_bps_per_side == 5
     assert forward.outcomes[0] is not None
+    assert result.outcome_summary
+    assert result.outcome_summary[0].horizon == 1
+    assert result.outcome_summary[0].sample_count == 1
+    assert result.to_dict()["outcome_summary_method"].startswith("Per-horizon")
 
 
 def test_stumpy_and_pattern_evidence_are_combined(monkeypatch):
