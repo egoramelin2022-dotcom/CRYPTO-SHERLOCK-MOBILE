@@ -118,7 +118,7 @@ def evaluate_forward_path(
         if candle.symbol != first.symbol or candle.interval != first.interval:
             raise ValueError("all candles must share symbol and interval")
         if previous_time is not None and candle.open_time <= previous_time:
-            raise ValueError("candle timestamps must be strictly increasing")
+            raise ValueError("candle timestamps must be strictly increasing; missing intervals or duplicates are not allowed")
         previous_time = candle.open_time
 
     # Historical data may contain gaps elsewhere. Only the candidate-to-outcome
