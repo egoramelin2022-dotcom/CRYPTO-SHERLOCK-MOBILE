@@ -18,11 +18,18 @@ jobs:
         id: detect
         shell: pwsh
         run: |
-          if (Test-Path "desktop/__main__.py") {
+          $required = @(
+            "desktop/__main__.py",
+            "desktop/requirements.txt",
+            "backend/desktop_server.py"
+          )
+          $missing = $required | Where-Object { -not (Test-Path $_) }
+          if ($missing.Count -eq 0) {
             "has_desktop=true" >> $env:GITHUB_OUTPUT
           } else {
             "has_desktop=false" >> $env:GITHUB_OUTPUT
-            Write-Host "Desktop source is not present yet; packaging is intentionally skipped."
+            Write-Host "Desktop packaging prerequisites are incomplete; skipping build."
+            Write-Host ("Missing: " + ($missing -join ", "))
           }
 
   build-windows:
