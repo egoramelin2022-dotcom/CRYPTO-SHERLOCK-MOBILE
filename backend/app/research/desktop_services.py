@@ -21,6 +21,7 @@ from app.research.ensemble import build_evidence_report
 from app.research.outcome_evaluation import evaluate_forward_path
 from app.research.stumpy_adapter import find_query_matches
 from app.research.walk_forward import run_walk_forward
+from app.research.robustness import run_robustness_audit
 
 from app.research import jobs as base_jobs
 
@@ -446,3 +447,35 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
             "forecast, or trading signal."
         ),
     }
+
+
+
+def run_robustness_research(
+    symbol: str = "BTCUSDT",
+    interval: str = "15m",
+    query_window: int = 40,
+    mode: str = "free",
+    top_k: int = 10,
+    max_folds: int = 20,
+    min_training_candles: int = 500,
+    candidate_budget: int = 1000,
+    fee_bps_per_side: float = 5.0,
+    slippage_bps_per_side: float = 2.0,
+    history_limit: int = 400000,
+) -> dict[str, Any]:
+    """Run bounded sensitivity configurations over verified local history."""
+    candles, data_sources = _load_candles(symbol, interval, history_limit)
+    result = run_robustness_audit(
+        candles, query_window=query_window, mode=mode, top_k=top_k,
+        max_folds=max_folds, min_training_candles=min_training_candles,
+        candidate_budget=candidate_budget,
+        fee_bps_per_side=fee_bps_per_side,
+        slippage_bps_per_side=slippage_bps_per_side,
+    )
+    gaps = find_gaps([item.open_time for item in candles], interval)
+    result.update({
+        "history_candles": len(candles),
+        "historical_gaps": len(gaps),
+        "data_sources": data_sources,
+    })
+    return result
