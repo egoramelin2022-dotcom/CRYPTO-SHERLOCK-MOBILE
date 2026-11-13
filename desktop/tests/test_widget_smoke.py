@@ -98,6 +98,18 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
         "updated_at": "test",
         "result": {
             "method": "expanding_window_historical_analog_median",
+            "strategy_portfolio_note": "Four causal methods on aligned folds.",
+            "strategy_portfolio_by_horizon": {"4": {
+                "aligned_folds": 4,
+                "individual_metrics": {
+                    "pattern_analogs": {"average_return_per_fold": 0.01, "volatility_per_fold": 0.02, "positive_fold_rate": 0.75},
+                    "trend_following": {"average_return_per_fold": 0.005, "volatility_per_fold": 0.01, "positive_fold_rate": 0.5},
+                    "mean_reversion": {"average_return_per_fold": -0.002, "volatility_per_fold": 0.01, "positive_fold_rate": 0.25},
+                    "range_breakout": {"average_return_per_fold": 0.003, "volatility_per_fold": 0.01, "positive_fold_rate": 0.5},
+                },
+                "pairwise_return_correlation": {"pattern_analogs|trend_following": 0.3},
+                "equal_weight_portfolio": {"average_return_per_fold": 0.004, "volatility_per_fold": 0.01, "positive_fold_rate": 0.5},
+            }},
             "regime_detection_note": "Causal trailing-window heuristic.",
             "regime_outcomes": {"TREND_UP|4": {"folds": 3, "average_model_return": 0.012, "positive_fold_rate": 0.67}},
             "evaluated_folds": 4,
@@ -136,6 +148,10 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
     assert "Always Long: sum +1.00%" in rendered
     assert "TEMPORAL STABILITY" in rendered
     assert "REGIME-CONDITIONAL OUTCOMES" in rendered
+    assert "METHOD PORTFOLIO" in rendered
+    assert "Pattern Analogs: avg/fold +1.00%" in rendered
+    assert "corr pattern_analogs|trend_following: 0.3" in rendered
+    assert "EQUAL-WEIGHT: avg/fold +0.40%" in rendered
     assert "TREND_UP · +4: 3 folds" in rendered
     assert "+4 recent: model sum +1.00%" in rendered
     panel.close()
