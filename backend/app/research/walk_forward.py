@@ -260,6 +260,7 @@ def run_walk_forward(
         "query_window": query_window,
         "top_k": top_k,
         "requested_folds": max_folds,
+        "min_training_candles": min_training_candles,
         "evaluated_folds": len(fold_rows),
         "skipped_folds": skipped,
         "candidate_budget_per_fold": candidate_budget,
