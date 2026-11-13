@@ -6,7 +6,7 @@ from app.research.strategy_portfolio import analyze_strategy_portfolio
 def test_strategy_portfolio_reports_correlation_and_equal_weight_metrics():
     result = analyze_strategy_portfolio({
         "trend": [0.01, -0.01, 0.02, -0.02],
-        "reversal": [-0.01, 0.01, -0.01, 0.01],
+        "reversal": [-0.01, 0.01, -0.02, 0.02],
     })
     assert result["aligned_folds"] == 4
     assert result["pairwise_return_correlation"]["trend|reversal"] == -1.0
