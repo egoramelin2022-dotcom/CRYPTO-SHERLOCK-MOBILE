@@ -3,20 +3,22 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 from datetime import datetime, timezone
 
 import httpx
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QProcess, QProcessEnvironment, QTimer, QSettings
 from PySide6.QtGui import QFont
 from desktop.market_panel import MarketPanel
 from desktop.research_panel import ResearchPanel
 from desktop.paper_panel import PaperPanel
 from desktop.download_panel import DownloadPanel
 from desktop.system_panel import SystemPanel
+from desktop.server_settings import ServerSettingsDialog, default_analytics_path
 
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-    QMainWindow, QPushButton, QScrollArea, QSizePolicy, QStackedWidget,
+    QMainWindow, QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QMessageBox,
     QVBoxLayout, QWidget,
 )
 
@@ -95,6 +97,9 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1120, 720)
         self.api_url = API_DEFAULT
         self.health_worker = None
+        self.settings = QSettings('CRYPTO_SHERLOCK', 'Desktop')
+        self.server_process = QProcess(self)
+        self.server_process.errorOccurred.connect(self.on_server_error)
         root = QWidget()
         root.setObjectName("root")
         self.setCentralWidget(root)
@@ -146,6 +151,10 @@ class MainWindow(QMainWindow):
         top.addWidget(self.breadcrumb)
         top.addStretch(1)
         top.addWidget(self.connection)
+        self.server_settings_button = QPushButton('SERVER SETTINGS')
+        self.server_settings_button.setObjectName('settingsButton')
+        self.server_settings_button.clicked.connect(self.open_server_settings)
+        top.addWidget(self.server_settings_button)
         content.addWidget(topbar)
 
         self.stack = QStackedWidget()
@@ -276,6 +285,62 @@ class MainWindow(QMainWindow):
             button.setChecked(i == index)
         self.breadcrumb.setText(f"{self.NAV_ITEMS[index][0].upper()}  /  CRYPTO SHERLOCK")
     
+    def open_server_settings(self):
+        dialog = ServerSettingsDialog(self.settings, self)
+        if dialog.exec() == ServerSettingsDialog.DialogCode.Accepted:
+            self.start_local_backend()
+
+    def start_local_backend(self):
+        if self.server_process.state() != QProcess.ProcessState.NotRunning:
+            self.connection.setText("●  BACKEND STARTING")
+            return
+        source = Path(self.settings.value("source_db", "")).expanduser()
+        analytics = Path(self.settings.value("analytics_db", str(default_analytics_path()))).expanduser()
+        if not source.is_file():
+            QMessageBox.information(
+                self, "Configure source database",
+                "Select the existing sherlock_market.db in Server Settings before starting the local backend."
+            )
+            self.open_server_settings()
+            return
+        if source.resolve() == analytics.resolve():
+            QMessageBox.warning(self, "Unsafe database paths", "Source and analytics databases must be separate.")
+            return
+        app_dir = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
+        server_exe = app_dir / "Server" / "CRYPTO-SHERLOCK-Server.exe"
+        if not server_exe.is_file():
+            QMessageBox.warning(
+                self, "Local server package missing",
+                "The bundled CRYPTO-SHERLOCK-Server.exe was not found. Rebuild the complete Windows package."
+            )
+            return
+        analytics.parent.mkdir(parents=True, exist_ok=True)
+        data_dir = analytics.parent
+        environment = QProcessEnvironment.systemEnvironment()
+        environment.insert("SHERLOCK_SOURCE_DB", str(source.resolve()))
+        environment.insert("SHERLOCK_ANALYTICS_DB", str(analytics.resolve()))
+        environment.insert("SHERLOCK_ARCHIVE_RAW_DIR", str(data_dir / "binance_public_raw"))
+        environment.insert("SHERLOCK_ARCHIVE_STAGING_DB", str(data_dir / "binance_archive_staging.db"))
+        self.server_process.setProcessEnvironment(environment)
+        self.server_process.setWorkingDirectory(str(server_exe.parent))
+        self.server_process.setProgram(str(server_exe))
+        self.server_process.setArguments([])
+        self.connection.setText("●  STARTING LOCAL SERVER")
+        self.server_process.start()
+        QTimer.singleShot(2500, self.check_backend)
+
+    def on_server_error(self, error):
+        self.connection.setText("●  SERVER START FAILED")
+        QMessageBox.warning(self, "Local server error", f"Could not start the bundled backend: {error}")
+
+    def closeEvent(self, event):
+        if self.server_process.state() != QProcess.ProcessState.NotRunning:
+            self.server_process.terminate()
+            if not self.server_process.waitForFinished(3000):
+                self.server_process.kill()
+                self.server_process.waitForFinished(2000)
+        super().closeEvent(event)
+
     def check_backend(self):
         self.connection.setText("●  CONNECTING")
         self.health_worker = HealthWorker(self.api_url)
@@ -303,6 +368,7 @@ QWidget { color: #E7EDF2; font-family: 'Segoe UI'; font-size: 10pt; }
 #navButton:checked { background: #142B2A; color: #67E0BC; border: 1px solid #24564B; font-weight: 700; }
 #sidebarFoot { color: #61717D; font-size: 8pt; line-height: 1.6; }
 #topbar { background: #0D141B; border-bottom: 1px solid #1C2933; }
+#settingsButton { padding: 7px 10px; font-size: 8pt; }
 #topLabel { color: #7F919F; font-size: 8pt; font-weight: 700; letter-spacing: 1px; }
 #connection { color: #E6B96B; font-size: 8pt; font-weight: 700; }
 #connection[online="true"] { color: #59D6B0; }
@@ -327,6 +393,7 @@ QPushButton:disabled { color: #718392; background: #17212A; border-color: #29374
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("CRYPTO SHERLOCK")
+    app.setOrganizationName("CRYPTO_SHERLOCK")
     app.setStyle("Fusion")
     app.setStyleSheet(STYLE)
     window = MainWindow()
