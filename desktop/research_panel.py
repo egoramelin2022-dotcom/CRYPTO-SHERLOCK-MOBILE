@@ -116,10 +116,20 @@ class ResearchPanel(QWidget):
         self.wf_folds.setValue(30)
         self.wf_training = QSpinBox()
         self.wf_training.setRange(100, 399000)
-        self.wf_training.setValue(500)
+        self.wf_training.setMinimum(self.window.value() + 65)
+        self.wf_training.setValue(max(500, self.window.value() + 65))
+        self.window.valueChanged.connect(
+            lambda value: self.wf_training.setMinimum(value + 65)
+        )
         self.wf_budget = QSpinBox()
         self.wf_budget.setRange(100, 5000)
         self.wf_budget.setValue(2000)
+        if kind != "pattern":
+            for control in (self.adaptive, self.adaptive_min, self.adaptive_max, self.adaptive_step):
+                control.hide()
+                label = form.labelForField(control)
+                if label is not None:
+                    label.hide()
         if kind == "walk_forward":
             form.addRow("Out-of-sample folds", self.wf_folds)
             form.addRow("Minimum training history (candles)", self.wf_training)
