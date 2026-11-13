@@ -22,6 +22,8 @@ class PaperWorker(QThread):
 
     def run(self):
         try:
+            if self.isInterruptionRequested():
+                return
             with httpx.Client(timeout=20.0) as client:
                 if self.operation == "snapshot":
                     response = client.get(f"{self.api_url}/v1/paper/portfolio")
