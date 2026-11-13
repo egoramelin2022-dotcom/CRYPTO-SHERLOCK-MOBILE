@@ -100,7 +100,7 @@ def test_ledger_failed_run_is_recorded_without_leaking_exception_message(tmp_pat
     record = ledger.get_run(run_id)
     assert record["result"] is None
     assert record["events"][-1]["event_type"] == "failed"
-    assert record["events"][-1]["payload"] == {"error_type": "ValueErrorprivatepathshouldnotbestored"}
+    assert record["events"][-1]["payload"] == {"error_type": "ValueError"}
     assert ledger.verify_integrity()["ok"] is True
 
 
