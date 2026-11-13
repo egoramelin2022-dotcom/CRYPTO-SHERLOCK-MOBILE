@@ -166,6 +166,7 @@ class ResearchPanel(QWidget):
             self.robustness_button.setToolTip(
                 "Run up to five independent parameter configurations. "
                 "Capped at 30 folds and 2,000 candidate windows per fold; no winner is selected."
+            self.robustness_button.clicked.connect(lambda: self.run_research("/v1/research/robustness"))
             )
             actions.addWidget(self.robustness_button)
         actions.addStretch(1)
