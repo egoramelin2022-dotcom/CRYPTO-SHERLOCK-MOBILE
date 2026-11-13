@@ -97,6 +97,8 @@ def detect_multitimeframe_setups(
         raise ValueError("wick and daily body multipliers must be positive")
     if not 0 <= config.daily_body_min_return < 1:
         raise ValueError("daily_body_min_return must be in [0, 1)")
+    if not 0 <= config.daily_decline_min_return < 1:
+        raise ValueError("daily_decline_min_return must be in [0, 1)")
     if config.support_sweep_tolerance < 0:
         raise ValueError("support_sweep_tolerance must be nonnegative")
 
