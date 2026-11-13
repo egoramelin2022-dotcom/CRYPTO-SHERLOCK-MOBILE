@@ -6,7 +6,6 @@ separate staging database and never overwrites an existing candle row.
 from __future__ import annotations
 
 import argparse
-import calendar
 from datetime import datetime, timezone, timedelta
 import csv
 import hashlib
