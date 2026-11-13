@@ -10,7 +10,13 @@ from scripts.download_binance_spot_klines import run as download_archives
 
 
 def _record_progress(job_id: str, message: str) -> None:
-    base_jobs._set_job(job_id, result={"progress": message[-500:]})
+    current = base_jobs.get_job(job_id) or {}
+    previous = (current.get("result") or {}).get("progress_log", [])
+    progress_log = [*previous, message][-200:]
+    base_jobs._set_job(
+        job_id,
+        result={"progress": message[-500:], "progress_log": progress_log},
+    )
 
 
 def run_archive_download(job_id: str, start: str, end: str) -> None:
@@ -34,7 +40,7 @@ def run_archive_download(job_id: str, start: str, end: str) -> None:
             "inserted_this_run": inserted,
             "staging_database": str(db_path),
             "raw_archive_cache": str(raw_dir),
-            "progress_log": "See per-month progress messages above.",
+            "progress_log": (base_jobs.get_job(job_id) or {}).get("result", {}).get("progress_log", []),
             "note": "Staging only. Source market database was not modified.",
         })
     except Exception as exc:
