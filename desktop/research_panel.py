@@ -122,6 +122,10 @@ class ResearchPanel(QWidget):
             self.adaptive_step.setEnabled(False)
         elif kind == "ensemble":
             self.query_start.setEnabled(False)
+            self.adaptive.setEnabled(False)
+            self.adaptive_min.setEnabled(False)
+            self.adaptive_max.setEnabled(False)
+            self.adaptive_step.setEnabled(False)
         root.addLayout(form)
 
         actions = QHBoxLayout()
@@ -217,7 +221,7 @@ class ResearchPanel(QWidget):
                 f"stale threshold: {freshness.get('stale_after_hours', 0):.1f}h",
             ])
         if result.get("adaptive_search"):
-            summary.append("\\nADAPTIVE WINDOW SEARCH · INDEPENDENT RANKINGS")
+            summary.append("\nADAPTIVE WINDOW SEARCH · INDEPENDENT RANKINGS")
             summary.append(result.get("adaptive_comparison_note", ""))
             for window_result in result.get("adaptive_results", []):
                 if window_result.get("status") != "completed":
