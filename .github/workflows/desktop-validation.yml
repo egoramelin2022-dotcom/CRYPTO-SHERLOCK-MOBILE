@@ -23,6 +23,7 @@ jobs:
       - name: Run desktop parser tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -m pytest desktop/tests -q
+        run: |
+          if [ -d desktop/tests ]; then python -m pytest desktop/tests -q; else echo 'No desktop tests in foundation branch'; fi
       - name: Compile desktop Python modules
         run: python -m compileall -q desktop
