@@ -24,18 +24,20 @@ def fixture():
 
     # 4h history: 20 prior support bars at 95; current bar sweeps to 90,
     # then closes at 96, reclaiming support.
+    # 60 daily candles contain 360 four-hour candles each.
     four_hour = [
         make("BTCUSDT", "4h", i, 97, 99, 95, 97)
-        for i in range(20)
+        for i in range(60 * 6)
     ]
-    four_hour.append(make("BTCUSDT", "4h", 20, 97, 98, 90, 96))
+    four_hour.append(make("BTCUSDT", "4h", 60 * 6, 97, 98, 90, 96))
 
     # 15m bars throughout the matching 4h interval; one long lower wick.
+    h4_index = 60 * 6
     fifteen = [
         make("BTCUSDT", "15m", i, 96, 97, 95, 96)
-        for i in range(20 * 16, 21 * 16)
+        for i in range(h4_index * 16, (h4_index + 1) * 16)
     ]
-    fifteen[3] = make("BTCUSDT", "15m", 20 * 16 + 3, 96, 97, 88, 96)
+    fifteen[3] = make("BTCUSDT", "15m", h4_index * 16 + 3, 96, 97, 88, 96)
     return fifteen, four_hour, daily
 
 
