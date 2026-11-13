@@ -163,7 +163,7 @@ def main() -> None:
         if output == Path(args.database).expanduser().resolve():
             raise ValueError("report output must not overwrite the source database")
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(rendered + "\\n", encoding="utf-8")
+        output.write_text(rendered + "\n", encoding="utf-8")
     print(rendered)
 
 
