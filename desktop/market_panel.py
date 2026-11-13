@@ -27,6 +27,8 @@ class MarketWorker(QThread):
 
     def run(self):
         try:
+            if self.isInterruptionRequested():
+                return
             with httpx.Client(timeout=12.0) as client:
                 candles_response = client.get(
                     f"{self.base_url}/v1/market/klines",
