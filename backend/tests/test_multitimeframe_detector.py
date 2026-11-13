@@ -47,6 +47,8 @@ def test_detects_simultaneous_three_timeframe_setup():
     assert len(signals) == 1
     signal = signals[0]
     assert signal.timestamp == m15[3].open_time
+    assert signal.confirmed_at == d1[-1].close_time
+    assert signal.confirmed_at > signal.timestamp
     assert signal.support_4h == 95
     assert signal.sweep_depth_4h == 5
     assert signal.daily_body_return == pytest.approx(-0.09)
