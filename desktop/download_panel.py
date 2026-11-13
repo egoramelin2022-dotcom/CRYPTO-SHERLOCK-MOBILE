@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone, timedelta
 from PySide6.QtWidgets import (
     QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
     QPushButton, QTextEdit, QVBoxLayout, QWidget,
@@ -17,7 +18,10 @@ class DownloadPanel(QWidget):
         root = QVBoxLayout(self)
         form = QFormLayout()
         self.start = QLineEdit("2017-08")
-        self.end = QLineEdit("2026-10")
+        latest_complete_month = (
+            datetime.now(timezone.utc).replace(day=1) - timedelta(days=1)
+        ).strftime("%Y-%m")
+        self.end = QLineEdit(latest_complete_month)
         form.addRow("First month (YYYY-MM)", self.start)
         form.addRow("Last month (YYYY-MM)", self.end)
         root.addLayout(form)
@@ -57,7 +61,7 @@ class DownloadPanel(QWidget):
         answer = QMessageBox.question(
             self, "Confirm archive download",
             f"Download Binance Spot BTCUSDT 15m / 4h / 1d archives from {start} through {end}?\n\n"
-            "Files and candles will be written only to the staging area. This may consume several gigabytes.",
+            "Files and candles will be written only to the staging area. This may take time and use additional disk space.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
