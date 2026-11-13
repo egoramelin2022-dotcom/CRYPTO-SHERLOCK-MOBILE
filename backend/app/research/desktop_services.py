@@ -159,8 +159,11 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
     try:
         import numpy as np
 
-        history = candles[:start]
+        embargo = 32
+        history = candles[:max(0, start - embargo)]
         query = candles[start:end + 1]
+        if len(history) < len(query):
+            raise RuntimeError("not enough pre-query history for STUMPY with the configured embargo")
         history_close = np.asarray([item.close for item in history], dtype=np.float64)
         # Include the close immediately before the query so its first return
         # is measured from the true prior candle, not replaced with zero.
