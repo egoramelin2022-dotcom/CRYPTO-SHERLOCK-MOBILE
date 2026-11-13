@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from app.market_data.candles import Candle
 from app.research.pattern_intelligence import search_analogs
 
@@ -17,12 +19,12 @@ def candle(i, close, *, high=None, low=None):
 def test_search_returns_only_pre_query_candidates_and_future_outcomes():
     closes = [100, 102, 101, 105, 103, 100, 102, 101, 105, 103, 110, 111]
     rows = [candle(i, p) for i, p in enumerate(closes)]
-    result = search_analogs(rows, query_start=5, query_end=9, top_k=10,
-                            horizons=(1, 2), embargo=0)
+    result = search_analogs(rows, query_start=7, query_end=11, top_k=10,
+                            horizons=(1, 2))
     assert result.candidates_examined == 1
     assert all(x.end_index == 4 for x in result.analogs)
     best = result.analogs[0]
-    assert best.forward_returns[1] == closes[best.end_index + 1] / closes[best.end_index] - 1
+    assert best.forward_returns[1] == rows[best.end_index + 1].close / rows[best.end_index + 1].open - 1
 
 
 def test_five_stage_requires_five_candles_and_returns_equal_stage_mode():
@@ -47,5 +49,45 @@ def test_five_stage_rejects_short_query():
         search_analogs(rows, query_start=3, query_end=5, mode="five_stage")
     except ValueError as exc:
         assert "at least five" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_rejects_embargo_shorter_than_forward_horizon():
+    rows = [candle(i, 100 + i) for i in range(20)]
+    try:
+        search_analogs(rows, query_start=10, query_end=14,
+                       horizons=(1, 4), embargo=2)
+    except ValueError as exc:
+        assert "maximum forward horizon" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_rejects_candle_gaps_before_search():
+    rows = [candle(i, 100 + i) for i in range(20)]
+    rows[5] = candle(6, 106)
+    try:
+        search_analogs(rows, query_start=10, query_end=14)
+    except ValueError as exc:
+        assert "missing" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_rejects_mixed_symbols_and_invalid_horizons():
+    rows = [candle(i, 100 + i) for i in range(20)]
+    rows[3] = replace(rows[3], symbol="ETHUSDT")
+    try:
+        search_analogs(rows, query_start=10, query_end=14)
+    except ValueError as exc:
+        assert "same symbol" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+    rows = [candle(i, 100 + i) for i in range(20)]
+    try:
+        search_analogs(rows, query_start=10, query_end=14, horizons=(True,))
+    except ValueError as exc:
+        assert "positive integers" in str(exc)
     else:
         raise AssertionError("expected ValueError")
