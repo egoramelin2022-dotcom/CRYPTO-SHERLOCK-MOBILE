@@ -41,7 +41,9 @@ def test_desktop_pattern_research_uses_local_verified_history(tmp_path, monkeypa
     assert result["symbol"] == "BTCUSDT"
     assert result["history_candles"] == 120
     assert result["query_window"] == 10
+    assert len(result["query_chart"]["normalized_close"]) == 10
     assert result["analogs"]
+    assert all(len(item["chart"]["normalized_close"]) == 10 for item in result["analogs"])
     assert all(
         item["analog"]["end_time"] < result["query_start_time"]
         for item in result["analogs"]
