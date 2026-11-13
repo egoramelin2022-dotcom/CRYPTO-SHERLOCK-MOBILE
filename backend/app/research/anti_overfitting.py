@@ -59,7 +59,7 @@ def probability_of_backtest_overfitting(
         rank = next(pos for pos, (_, idx) in enumerate(ordered, start=1) if idx == winner)
         # Mid-rank for exact ties prevents arbitrary ordering from inflating PBO.
         tied = sum(score == oos_scores[winner] for score in oos_scores)
-        rank_fraction = (rank - 0.5 * (tied - 1)) / len(names)
+        rank_fraction = (rank + 0.5 * (tied - 1)) / len(names)
         rank_fraction = min(1.0 - 1e-12, max(1e-12, rank_fraction))
         logits.append(log(rank_fraction / (1.0 - rank_fraction)))
         selected.append(names[winner])
