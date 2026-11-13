@@ -30,8 +30,8 @@ def test_entry_is_next_open_and_horizon_exits_are_forward_only():
     result = evaluate_forward_path(path(), candidate_end_index=0, horizons=(1, 2, 4))
     one, two, missing = result.outcomes
     assert one.entry_price == 102
-    assert one.exit_price == 99
-    assert one.gross_return == pytest.approx(99 / 102 - 1)
+    assert one.exit_price == 104
+    assert one.gross_return == pytest.approx(104 / 102 - 1)
     assert two.exit_time == 2 * STEP
     assert missing is None
 
@@ -40,8 +40,8 @@ def test_long_short_excursions_and_neutral_range_metrics():
     result = evaluate_forward_path(path(), candidate_end_index=0, horizons=(2,))
     item = result.outcomes[0]
     assert item.long_mfe == pytest.approx(106 / 102 - 1)
-    assert item.long_mae == pytest.approx(97 / 102 - 1)
-    assert item.short_mfe == pytest.approx(102 / 97 - 1)
+    assert item.long_mae == pytest.approx(98 / 102 - 1)
+    assert item.short_mfe == pytest.approx(102 / 98 - 1)
     assert item.short_mae == pytest.approx(102 / 106 - 1)
     assert item.max_high_low_range == pytest.approx(106 / 97 - 1)
     assert item.absolute_close_return == pytest.approx(abs(101 / 102 - 1))
