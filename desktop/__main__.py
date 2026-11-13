@@ -12,6 +12,7 @@ from desktop.market_panel import MarketPanel
 from desktop.research_panel import ResearchPanel
 from desktop.paper_panel import PaperPanel
 from desktop.download_panel import DownloadPanel
+from desktop.system_panel import SystemPanel
 
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -156,12 +157,7 @@ class MainWindow(QMainWindow):
             self.make_research_page("Ensemble Engine", "Evidence aggregation with explicit engine availability. No uncalibrated probabilities or signal averaging.", "/v1/research/ensemble", "ensemble"),
             self.make_research_page("Backtesting Lab", "Historical forward-outcome audit for analogs. Full strategy walk-forward backtesting remains a separate validation stage.", "/v1/research/pattern", "pattern"),
             self.make_paper_page(),
-            self.make_module_page("System Monitor", "Local services, data integrity and research job health.", [
-                "Backend health endpoint",
-                "Source database and analytics database status",
-                "Historical archive integrity and gap audit",
-                "Research job progress",
-            ]),
+            self.make_system_page(),
         ]
         for page in self.pages:
             self.stack.addWidget(page)
@@ -220,6 +216,16 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.addWidget(DownloadPanel(self.api_url))
+        page.body.addWidget(panel, 1)
+        return page
+
+    def make_system_page(self):
+        page = Page("System Monitor", "Backend connection, read-only source audit and derived feature pipeline.")
+        panel = QFrame()
+        panel.setObjectName("panel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.addWidget(SystemPanel(self.api_url))
         page.body.addWidget(panel, 1)
         return page
 
