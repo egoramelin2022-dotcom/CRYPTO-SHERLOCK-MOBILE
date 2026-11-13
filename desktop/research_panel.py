@@ -96,6 +96,15 @@ class ResearchPanel(QWidget):
         self.top_k.setRange(1, 100)
         self.top_k.setValue(10)
         form.addRow("Top historical analogs", self.top_k)
+        self.core_min_analogs = QSpinBox()
+        self.core_min_analogs.setRange(1, 100)
+        self.core_min_analogs.setValue(5)
+        self.core_budget = QSpinBox()
+        self.core_budget.setRange(100, 5000)
+        self.core_budget.setValue(2000)
+        if kind == "core":
+            form.addRow("Minimum analog sample", self.core_min_analogs)
+            form.addRow("Candidate search budget", self.core_budget)
         self.adaptive = QCheckBox("Automatically compare multiple pattern lengths")
         self.adaptive.setToolTip("Keeps the sample end fixed; each length is ranked independently.")
         form.addRow("Adaptive window search", self.adaptive)
@@ -236,6 +245,28 @@ class ResearchPanel(QWidget):
                 "min_training_candles": self.wf_training.value(),
                 "candidate_budget": self.wf_budget.value(),
             })
+        elif self.kind == "core":
+            if self.core_min_analogs.value() > self.top_k.value():
+                self.status.setText("Minimum analog sample cannot exceed Top historical analogs")
+                return
+            params.update({
+                "interval": self.interval.currentText(),
+                "query_window": self.window.value(),
+                "mode": self.mode.currentData(),
+                "top_k": self.top_k.value(),
+                "min_analogs": self.core_min_analogs.value(),
+                "candidate_budget": self.core_budget.value(),
+            })
+            selected_time = self.query_start.text().strip()
+            if selected_time:
+                try:
+                    parsed = datetime.fromisoformat(selected_time.replace("Z", "+00:00"))
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=timezone.utc)
+                    params["query_start_time"] = int(parsed.astimezone(timezone.utc).timestamp() * 1000)
+                except ValueError:
+                    self.status.setText("Invalid sample time · use YYYY-MM-DD HH:MM UTC")
+                    return
         elif self.kind == "ensemble":
             params.update({
                 "interval": self.interval.currentText(),
@@ -274,6 +305,33 @@ class ResearchPanel(QWidget):
                 f"Latest closed candle age: {freshness.get('age_hours', 0):.1f}h · "
                 f"stale threshold: {freshness.get('stale_after_hours', 0):.1f}h",
             ])
+        if result.get("core_version"):
+            summary.extend([
+                "\\nSHERLOCK INTELLIGENCE CORE · v" + str(result.get("core_version")),
+                "Research status: " + str(result.get("research_status")),
+                "Core always abstains · no forecast or trading signal is emitted.",
+                f"Pattern analogs: {result.get('modules', {}).get('pattern_intelligence', {}).get('analogs_returned', 0)} · "
+                f"candidates examined: {result.get('modules', {}).get('pattern_intelligence', {}).get('candidates_examined', 0):,}",
+            ])
+            regime = result.get("modules", {}).get("market_regime", {}).get("result", {})
+            summary.append("Market regime: " + str(regime.get("regime") or "UNCLASSIFIED"))
+            if regime.get("reason"):
+                summary.append("Regime note: " + str(regime.get("reason")))
+            for item in result.get("modules", {}).get("forward_outcomes", {}).get("horizons", []):
+                if item.get("status") != "evaluated":
+                    summary.append(f"  +{item.get('horizon')} candles: insufficient sample ({item.get('sample_count', 0)}/{item.get('required_sample_count')})")
+                    continue
+                summary.append(
+                    f"  +{item['horizon']} candles · historical side {item['historical_analogue_side']} · "
+                    f"median LONG {item['median_long_net_return']:+.2%} · "
+                    f"median SHORT {item['median_short_net_return']:+.2%} · "
+                    f"SIDEWAYS paths {item['sideways_path_rate']:.0%} · "
+                    f"regime {item['regime_consistency']}"
+                )
+            for conflict in result.get("conflicts", []):
+                summary.append(f"CONFLICT · +{conflict['horizon']} · {conflict['current_regime']} vs {conflict['historical_analogue_side']}")
+            summary.append("REQUIRED NEXT CHECKS")
+            summary.extend("  • " + item for item in result.get("required_next_checks", []))
         if result.get("adaptive_search"):
             summary.append("\nADAPTIVE WINDOW SEARCH · INDEPENDENT RANKINGS")
             summary.append(result.get("adaptive_comparison_note", ""))
