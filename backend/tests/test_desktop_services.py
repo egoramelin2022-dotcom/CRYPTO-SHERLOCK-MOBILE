@@ -3,6 +3,7 @@ import sqlite3
 from app.market_data.candles import Candle
 from app.market_data.repository import CandleRepository
 from app.research.desktop_services import run_pattern_research, run_ensemble_research, run_walk_forward_research, run_intelligence_core_research, _load_candles, _split_contiguous
+from app.research.experiment_ledger import ExperimentLedger
 
 
 def make_candles(count=120):
@@ -285,3 +286,51 @@ def test_intelligence_core_service_runs_on_read_only_verified_history(tmp_path, 
     assert result["decision"]["trading_signal"] is None
     assert result["decision"]["paper_trade_eligible"] is False
     assert result["provenance"]["candidate_stride"] >= 1
+
+
+
+def test_intelligence_core_service_persists_reproducible_experiment_record(tmp_path, monkeypatch):
+    configure_db(tmp_path, monkeypatch)
+    result = run_intelligence_core_research(
+        query_window=10,
+        query_start_time=90 * 900_000,
+        top_k=3,
+        min_analogs=1,
+        candidate_budget=100,
+        history_limit=120,
+    )
+    ledger = ExperimentLedger(tmp_path / "analytics.db")
+    record = ledger.get_run(result["run_id"])
+    assert result["experiment_ledger"]["status"] == "completed"
+    assert result["experiment_ledger"]["input_fingerprint"]
+    assert record["run"]["input_fingerprint"] == result["experiment_ledger"]["input_fingerprint"]
+    assert record["result"]["run_id"] == result["run_id"]
+    assert record["events"][-1]["event_type"] == "completed"
+    assert ledger.verify_integrity()["ok"] is True
+
+
+def test_intelligence_core_service_records_failed_attempt_without_result(tmp_path, monkeypatch):
+    configure_db(tmp_path, monkeypatch)
+    try:
+        run_intelligence_core_research(
+            query_window=10,
+            query_start_time=90 * 900_000,
+            mode="not-a-mode",
+            top_k=3,
+            min_analogs=1,
+            candidate_budget=100,
+            history_limit=120,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("invalid Core mode must fail")
+
+    ledger = ExperimentLedger(tmp_path / "analytics.db")
+    rows = ledger.list_runs(limit=10)
+    assert len(rows) == 1
+    record = ledger.get_run(rows[0]["run_id"])
+    assert rows[0]["status"] == "failed"
+    assert record["result"] is None
+    assert record["events"][-1]["payload"]["error_type"] == "ValueError"
+    assert ledger.verify_integrity()["ok"] is True
