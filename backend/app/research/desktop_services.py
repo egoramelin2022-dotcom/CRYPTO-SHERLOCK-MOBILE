@@ -84,11 +84,11 @@ def _load_candles(symbol: str, interval: str, limit: int) -> tuple[list[Candle],
 
 def run_pattern_research(
     symbol: str = "BTCUSDT", interval: str = "15m", query_window: int = 40,
-    mode: str = "free", top_k: int = 10, history_limit: int = 20000,
+    mode: str = "free", top_k: int = 10, history_limit: int = 400000,
     fee_bps_per_side: float = 5.0, slippage_bps_per_side: float = 2.0,
 ) -> dict[str, Any]:
-    if history_limit < query_window + 2 or history_limit > 50000:
-        raise ValueError("history_limit must be between query_window + 2 and 50000")
+    if history_limit < query_window + 2 or history_limit > 500000:
+        raise ValueError("history_limit must be between query_window + 2 and 500000")
     candles, data_sources = _load_candles(symbol, interval, history_limit)
     if len(candles) <= query_window:
         raise ValueError("Not enough local history for query window and earlier analogs")
@@ -127,9 +127,9 @@ def run_pattern_research(
 def run_multitimeframe_research(symbol: str = "BTCUSDT") -> dict[str, Any]:
     # These are intentionally bounded, recent contiguous windows. Daily
     # candles are historical closed bars in the local source database.
-    m15, sources_15m = _load_candles(symbol, "15m", 30000)
-    h4, sources_4h = _load_candles(symbol, "4h", 3000)
-    d1, sources_1d = _load_candles(symbol, "1d", 1000)
+    m15, sources_15m = _load_candles(symbol, "15m", 400000)
+    h4, sources_4h = _load_candles(symbol, "4h", 25000)
+    d1, sources_1d = _load_candles(symbol, "1d", 5000)
     results = detect_multitimeframe_setups(m15, h4, d1, config=MultiTimeframeConfig())
     return {
         "symbol": symbol,
@@ -144,7 +144,7 @@ def run_multitimeframe_research(symbol: str = "BTCUSDT") -> dict[str, Any]:
 def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
                           query_window: int = 40, mode: str = "free",
                           top_k: int = 20) -> dict[str, Any]:
-    candles, data_sources = _load_candles(symbol, interval, 20000)
+    candles, data_sources = _load_candles(symbol, interval, 400000)
     if len(candles) <= query_window:
         raise ValueError("Not enough local history for ensemble query")
     start, end = len(candles) - query_window, len(candles) - 1
