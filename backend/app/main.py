@@ -144,6 +144,7 @@ async def start_historical_pipeline(
 
 
 from app.research import desktop_services
+from app.research import paper_portfolio
 
 
 @app.post("/v1/research/pattern", status_code=202)
@@ -208,6 +209,32 @@ def _run_desktop_research_job(job_id: str, function, kwargs: dict[str, Any]) -> 
         research_jobs._set_job(job_id, status="completed", result=result)
     except Exception as exc:
         research_jobs._set_job(job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
+
+
+
+@app.get("/v1/paper/portfolio")
+async def get_paper_portfolio() -> dict[str, Any]:
+    """Read the persistent local virtual spot portfolio; never touches exchange accounts."""
+    return paper_portfolio.portfolio_snapshot()
+
+
+@app.post("/v1/paper/orders", status_code=201)
+async def place_paper_order(
+    symbol: str = Query(..., pattern=r"^[A-Z0-9]{5,20}$"),
+    side: str = Query(..., pattern=r"^(BUY|SELL)$"),
+    quantity: float = Query(..., gt=0, le=100000000),
+) -> dict[str, Any]:
+    """Simulate a spot fill using public last price plus configured costs."""
+    try:
+        ticker = await binance_get("/api/v3/ticker/price", {"symbol": symbol})
+        return paper_portfolio.place_virtual_order(
+            symbol=symbol, side=side, quantity=quantity,
+            market_price=float(ticker["price"]),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/v1/research/jobs/{job_id}")
