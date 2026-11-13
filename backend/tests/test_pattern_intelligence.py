@@ -31,6 +31,8 @@ def test_five_stage_requires_five_candles_and_returns_equal_stage_mode():
                             horizons=(1,), embargo=0)
     assert result.mode == "five_stage"
     assert result.segment_length == 5
+    assert result.to_dict()["forward_return_basis"] == "candidate_end_close_to_future_close"
+    assert result.to_dict()["excursion_basis"] == "candidate_end_close_to_future_high_low"
     assert result.to_dict()["stage_weights"] == {
         "preliminary_decline": 0.2,
         "recovery": 0.2,
@@ -134,3 +136,14 @@ def test_selected_analogs_respect_embargo_larger_than_forward_horizon():
     starts = [item.start_index for item in result.analogs]
     assert all(abs(a - b) >= 13 for i, a in enumerate(starts) for b in starts[i + 1:])
     assert all(item.end_index + 8 < result.query_start_index for item in result.analogs)
+
+
+
+def test_search_requires_at_least_one_forward_horizon():
+    rows = [candle(i, 100 + i) for i in range(12)]
+    try:
+        search_analogs(rows, query_start=8, query_end=10, horizons=())
+    except ValueError as exc:
+        assert "at least one forward horizon" in str(exc)
+    else:
+        raise AssertionError("empty horizons must be rejected")
