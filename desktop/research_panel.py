@@ -5,6 +5,7 @@ import json
 import time
 
 import httpx
+import pyqtgraph as pg
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
@@ -102,6 +103,17 @@ class ResearchPanel(QWidget):
         self.status = QLabel("No research job started")
         self.status.setObjectName("muted")
         root.addWidget(self.status)
+        self.plot = None
+        if kind == "pattern":
+            self.plot = pg.PlotWidget()
+            self.plot.setBackground("#111B23")
+            self.plot.showGrid(x=True, y=True, alpha=0.15)
+            self.plot.setLabel("left", "Normalized close (start = 100)")
+            self.plot.setLabel("bottom", "Candle offset")
+            self.plot.getAxis("left").setTextPen("#82939F")
+            self.plot.getAxis("bottom").setTextPen("#82939F")
+            self.plot.setMinimumHeight(260)
+            root.addWidget(self.plot, 1)
         self.output = QTextEdit()
         self.output.setReadOnly(True)
         self.output.setPlaceholderText("Verified research results will appear here.")
@@ -147,9 +159,31 @@ class ResearchPanel(QWidget):
         self.status.setText(
             f"Completed · {job.get('kind')} · {job.get('updated_at')}"
         )
+        result = job.get("result") or {}
         self.output.setPlainText(json.dumps(
-            job.get("result") or {}, ensure_ascii=False, indent=2
+            result, ensure_ascii=False, indent=2
         ))
+        if self.plot is not None:
+            self.plot.clear()
+            self.plot.addLegend()
+            query = (result.get("query_chart") or {}).get("normalized_close", [])
+            if query:
+                self.plot.plot(
+                    list(range(len(query))), query,
+                    pen=pg.mkPen("#56D6B1", width=2.6), name="Current query",
+                )
+            palette = ["#8CA4B5", "#A7B8C4", "#6F8798", "#C0CDD5", "#718B9C"]
+            for index, item in enumerate(result.get("analogs", [])[:5]):
+                values = (item.get("chart") or {}).get("normalized_close", [])
+                if not values:
+                    continue
+                similarity = item.get("analog", {}).get("similarity", 0.0)
+                self.plot.plot(
+                    list(range(len(values))), values,
+                    pen=pg.mkPen(palette[index % len(palette)], width=1.2),
+                    name=f"Analog {index + 1} · {similarity:.3f}",
+                )
+            self.plot.setTitle("Current pattern vs top historical analogs")
 
     def on_failed(self, message: str):
         self.status.setText("Research job failed")
