@@ -39,7 +39,7 @@ contiguous; missing intervals invalidate the run.
 
 The FastAPI gateway exposes `POST /v1/research/ensemble`. It accepts
 `symbol`, `interval`, `window`, `top_k`, `mode` (`free` or
-`five_stage`), and `include_stumpy`. The endpoint returns a queued job ID;
+`five_stage`), and `include_stumpy`, `fee_bps_per_side`, and `slippage_bps_per_side`. Fee and slippage inputs are proportional basis-point assumptions charged on both entry and exit; they are not inferred from an exchange account or fee tier. The endpoint returns a queued job ID;
 poll `GET /v1/research/jobs/{job_id}` for completion.
 
 The job reads `SHERLOCK_SOURCE_DB` in SQLite read-only mode and writes the
