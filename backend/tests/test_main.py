@@ -1,5 +1,9 @@
 from fastapi.testclient import TestClient
 from types import SimpleNamespace
+import sqlite3
+from uuid import uuid4
+
+from app.research.experiment_ledger import ExperimentLedger
 
 from app.main import app
 
@@ -333,3 +337,52 @@ def test_intelligence_core_endpoint_rejects_impossible_sample_and_costs():
         params={"fee_bps_per_side": 6000, "slippage_bps_per_side": 5000},
     )
     assert invalid_costs.status_code == 422
+
+
+
+def test_experiment_ledger_api_lists_details_and_integrity(tmp_path, monkeypatch):
+    source = tmp_path / "source.db"
+    sqlite3.connect(source).close()
+    analytics = tmp_path / "analytics.db"
+    monkeypatch.setenv("SHERLOCK_SOURCE_DB", str(source))
+    monkeypatch.setenv("SHERLOCK_ANALYTICS_DB", str(analytics))
+
+    ledger = ExperimentLedger(analytics)
+    run_id = str(uuid4())
+    ledger.start_run(
+        run_id=run_id, core_version="0.1.0", symbol="BTCUSDT",
+        interval="15m", query_start_time=100, query_end_time=200,
+        mode="free", parameters={"top_k": 5},
+        input_fingerprint="a" * 64, input_candle_count=100,
+    )
+    result = {
+        "run_id": run_id, "research_status": "REQUIRES_WALK_FORWARD_VALIDATION",
+        "decision": {"abstain": True},
+    }
+    ledger.complete_run(run_id, result)
+
+    listing = client.get("/v1/research/experiments", params={"symbol": "BTCUSDT"})
+    assert listing.status_code == 200
+    assert listing.json()["count"] == 1
+    assert listing.json()["experiments"][0]["run_id"] == run_id
+    assert listing.json()["experiments"][0]["status"] == "completed"
+
+    detail = client.get(f"/v1/research/experiments/{run_id}")
+    assert detail.status_code == 200
+    assert detail.json()["result"] == result
+    assert len(detail.json()["events"]) == 2
+
+    verification = client.get("/v1/research/experiments/verify")
+    assert verification.status_code == 200
+    assert verification.json()["ok"] is True
+    assert verification.json()["runs_checked"] == 1
+
+    missing = client.get(f"/v1/research/experiments/{uuid4()}")
+    assert missing.status_code == 404
+
+
+def test_experiment_ledger_api_requires_configured_local_databases(monkeypatch):
+    monkeypatch.delenv("SHERLOCK_SOURCE_DB", raising=False)
+    monkeypatch.delenv("SHERLOCK_ANALYTICS_DB", raising=False)
+    response = client.get("/v1/research/experiments")
+    assert response.status_code == 503
