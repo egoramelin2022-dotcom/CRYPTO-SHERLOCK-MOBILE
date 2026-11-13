@@ -351,6 +351,23 @@ class ResearchPanel(QWidget):
                     )
                     if strategy == "model":
                         summary.append(f"      Trades: {values.get('trades', 0)} · FLAT folds: {values.get('flat_folds', 0)} · positive trades: {values.get('positive_trade_rate', 0):.0%}")
+            if result.get("strategy_portfolio_by_horizon"):
+                summary.append("  REFERENCE METHODS · SAME REALIZED FOLD PATHS")
+                summary.append(result.get("strategy_portfolio_note", ""))
+                for horizon, diagnostic in result["strategy_portfolio_by_horizon"].items():
+                    summary.append(f"    +{horizon} candles")
+                    for name, values in diagnostic.get("individual_metrics", {}).items():
+                        summary.append(
+                            f"      {name.replace('_', ' ').title()}: "
+                            f"avg/fold {values['average_return_per_fold']:+.2%} · "
+                            f"positive {values['positive_fold_rate']:.0%} · "
+                            f"sum {values['cumulative_return_sum']:+.2%}"
+                        )
+                    portfolio = diagnostic.get("equal_weight_portfolio", {})
+                    summary.append(
+                        f"      Equal-weight diagnostic: avg/fold {portfolio.get('average_return_per_fold', 0):+.2%} · "
+                        f"volatility {portfolio.get('volatility_per_fold', 0):.2%}"
+                    )
             if result.get("temporal_stability_by_horizon"):
                 summary.append("  TEMPORAL STABILITY · EARLY / MIDDLE / RECENT")
                 summary.append(result.get("temporal_stability_note", ""))
