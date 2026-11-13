@@ -41,6 +41,8 @@ def test_pattern_only_run_returns_consensus_and_costed_outcomes():
     assert result.ensemble is not None
     assert result.ensemble.candidates[0].candidate_start_time == 10 * STEP
     assert len(result.forward_evaluations) == 1
+    assert result.ablations[0].removed_module == "pattern_intelligence"
+    assert result.ablations[0].full_candidates_lost == 1
     forward = result.forward_evaluations[0].forward
     assert forward.fee_bps_per_side == 10
     assert forward.slippage_bps_per_side == 5
@@ -66,6 +68,8 @@ def test_stumpy_and_pattern_evidence_are_combined(monkeypatch):
     candidate = result.ensemble.candidates[0]
     assert candidate.supporting_modules == ("pattern_intelligence", "stumpy")
     assert candidate.module_count == 2
+    assert len(result.ablations) == 2
+    assert all(item.full_candidates_lost == 1 for item in result.ablations)
 
 
 def test_short_query_skips_stumpy_and_falls_back_to_pattern():
