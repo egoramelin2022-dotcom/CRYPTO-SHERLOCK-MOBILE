@@ -170,6 +170,7 @@ class ResearchPanel(QWidget):
             ])
         if result.get("stage_weights"):
             summary.append("FIVE-STAGE WEIGHTS · 20% EACH")
+            summary.append("Stage scores compare corresponding segments; they are not probabilities.")
             summary.extend(
                 f"  {name.replace('_', ' ').title()}: {weight:.0%}"
                 for name, weight in result["stage_weights"].items()
