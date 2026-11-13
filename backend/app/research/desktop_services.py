@@ -11,7 +11,7 @@ from app.research.pattern_intelligence import search_analogs
 from app.research.multitimeframe_detector import (
     MultiTimeframeConfig, detect_multitimeframe_setups,
 )
-from app.research.evidence_adapters import pattern_search_evidence
+from app.research.evidence_adapters import pattern_search_evidence, stumpy_matches_evidence
 from app.research.ensemble import build_evidence_report
 from app.research.outcome_evaluation import evaluate_forward_path
 
@@ -123,14 +123,52 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
         top_k=top_k, horizons=(1, 4, 16, 32),
     )
     evidence = pattern_search_evidence(pattern, candles)
-    report = build_evidence_report(evidence, min_supporting_modules=1)
+    engines_available = ["pattern_intelligence"]
+    engines_missing = []
+    stumpy_error = None
+    try:
+        import numpy as np
+        import stumpy
+        from types import SimpleNamespace
+
+        history = candles[:start]
+        query = candles[start:end + 1]
+        history_close = np.asarray([item.close for item in history], dtype=np.float64)
+        query_close = np.asarray([item.close for item in query], dtype=np.float64)
+        history_values = np.diff(np.log(history_close), prepend=np.log(history_close[0]))
+        query_values = np.diff(np.log(query_close), prepend=np.log(query_close[0]))
+        raw_matches = stumpy.match(
+            query_values, history_values, max_matches=top_k,
+            max_distance=np.inf, ignore_trivial=False,
+        )
+        matches = [
+            SimpleNamespace(distance=float(item[0]), start_index=int(item[1]))
+            for item in raw_matches
+        ]
+        evidence.extend(stumpy_matches_evidence(
+            matches,
+            history_open_times=[item.open_time for item in history],
+            query_open_times=[item.open_time for item in query],
+            interval=interval,
+        ))
+        engines_available.append("stumpy")
+    except ImportError as exc:
+        engines_missing.append("stumpy")
+        stumpy_error = f"{type(exc).__name__}: optional research dependency is not installed"
+    except Exception as exc:
+        engines_missing.append("stumpy_runtime")
+        stumpy_error = f"{type(exc).__name__}: {exc}"
+
+    report = build_evidence_report(evidence, min_supporting_modules=2)
     return {
         "symbol": symbol, "mode": mode, "query_window": query_window,
-        "engines_available": ["pattern_intelligence"],
-        "engines_missing": ["stumpy_motif_adapter"],
+        "engines_available": engines_available,
+        "engines_missing": engines_missing,
+        "optional_engine_note": stumpy_error,
         "evidence_report": report.to_dict(),
         "interpretation": (
-            "Single-engine evidence report. Cross-engine consensus is unavailable "
-            "until independent STUMPY evidence is produced; no confidence score is inferred."
+            "Only exact candidate windows independently returned by multiple engines "
+            "appear in consensus. Consensus is descriptive evidence, not a probability, "
+            "forecast, or trading signal."
         ),
     }
