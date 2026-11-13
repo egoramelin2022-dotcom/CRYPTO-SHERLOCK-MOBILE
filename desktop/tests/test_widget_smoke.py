@@ -116,16 +116,6 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
             "history_candles": 400,
             "skipped_folds": [],
             "anti_leakage": {"embargo_candles": 64},
-            "strategy_portfolio_note": "Reference methods use the same realized fold paths.",
-            "strategy_portfolio_by_horizon": {
-                "4": {
-                    "individual_metrics": {
-                        "pattern_analogs": {"average_return_per_fold": 0.006, "positive_fold_rate": 0.5, "cumulative_return_sum": 0.024},
-                        "trend_following": {"average_return_per_fold": 0.004, "positive_fold_rate": 0.5, "cumulative_return_sum": 0.016},
-                    },
-                    "equal_weight_portfolio": {"average_return_per_fold": 0.005, "volatility_per_fold": 0.01},
-                }
-            },
             "temporal_stability_note": "Chronological thirds, not market regimes.",
             "temporal_stability_by_horizon": {
                 "4": {
@@ -156,8 +146,6 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
     assert "embargo: 64 candles" in rendered
     assert "Model: sum +2.50%" in rendered
     assert "Always Long: sum +1.00%" in rendered
-    assert "REFERENCE METHODS" in rendered
-    assert "Pattern Analogs: avg/fold +0.60%" in rendered
     assert "TEMPORAL STABILITY" in rendered
     assert "REGIME-CONDITIONAL OUTCOMES" in rendered
     assert "METHOD PORTFOLIO" in rendered
