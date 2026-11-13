@@ -17,7 +17,7 @@ def candle(i, close, *, high=None, low=None):
 def test_search_returns_only_pre_query_candidates_and_future_outcomes():
     closes = [100, 102, 101, 105, 103, 100, 102, 101, 105, 103, 110, 111]
     rows = [candle(i, p) for i, p in enumerate(closes)]
-    result = search_analogs(rows, query_start=5, query_end=9, top_k=10,
+    result = search_analogs(rows, query_start=7, query_end=11, top_k=10,
                             horizons=(1, 2), embargo=0)
     assert result.candidates_examined == 1
     assert all(x.end_index == 4 for x in result.analogs)
@@ -49,3 +49,16 @@ def test_five_stage_rejects_short_query():
         assert "at least five" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+
+def test_selected_analogs_do_not_overlap_their_forward_outcome_horizons():
+    rows = [candle(i, 100 + (i % 5)) for i in range(40)]
+    result = search_analogs(
+        rows, query_start=30, query_end=34, top_k=10,
+        horizons=(1, 4), embargo=0,
+    )
+    starts = [item.start_index for item in result.analogs]
+    # Five-candle analog plus four-candle forward horizon must not overlap.
+    assert all(abs(a - b) >= 9 for i, a in enumerate(starts) for b in starts[i + 1:])
+    assert all(item.end_index + 4 < result.query_start_index for item in result.analogs)
