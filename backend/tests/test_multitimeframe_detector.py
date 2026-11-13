@@ -60,7 +60,6 @@ def test_rejects_when_daily_candle_is_not_large_red():
 
 def test_rejects_gaps_and_mixed_symbols():
     m15, h4, d1 = fixture()
-    broken = list(m15)
-    broken[2] = make("BTCUSDT", "15m", 22 * 16 + 2, 96, 97, 95, 96)
+    broken = m15[:2] + m15[3:]
     with pytest.raises(ValueError, match="missing"):
         detect_multitimeframe_setups(broken, h4, d1)
