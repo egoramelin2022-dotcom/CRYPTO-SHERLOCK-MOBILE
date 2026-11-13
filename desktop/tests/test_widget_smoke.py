@@ -39,6 +39,14 @@ def test_research_panel_formats_stage_scores_and_forward_outcomes():
         "updated_at": "test",
         "result": {
             "history_candles": 100,
+            "data_freshness": {
+                "is_stale": True, "age_hours": 12.0, "stale_after_hours": 0.75,
+            },
+            "execution_assumptions": {
+                "entry": "next candle open", "exit": "horizon candle close",
+                "fee_bps_per_side": 5.0, "slippage_bps_per_side": 2.0,
+                "short_side": "theoretical price-return calculation",
+            },
             "historical_gaps": 1,
             "contiguous_segments": 2,
             "candidates_examined": 5,
@@ -63,6 +71,19 @@ def test_research_panel_formats_stage_scores_and_forward_outcomes():
     rendered = panel.output.toPlainText()
     assert "FIVE-STAGE WEIGHTS" in rendered
     assert "Preliminary Decline: 20%" in rendered
+    assert "STALE — historical search uses old local data" in rendered
+    assert "Fees: 5.0 bps/side" in rendered
+    assert "Slippage: 2.0 bps/side" in rendered
     assert "LONG net +1.00%" in rendered
+    panel.close()
+    app.processEvents()
+
+
+
+def test_download_panel_exposes_separate_archive_and_recent_sync_actions():
+    app = QApplication.instance() or QApplication([])
+    panel = DownloadPanel("http://127.0.0.1:1")
+    assert panel.run_button.text() == "DOWNLOAD ARCHIVES TO STAGING"
+    assert panel.sync_button.text() == "SYNC CURRENT MONTH"
     panel.close()
     app.processEvents()
