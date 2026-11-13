@@ -135,8 +135,8 @@ def run_pattern_research(
             raise ValueError("adaptive search controls must be integers")
         if not (5 <= adaptive_min_window <= adaptive_max_window <= 500):
             raise ValueError("adaptive window bounds must satisfy 5 <= min <= max <= 500")
-        if adaptive_step < 1 or adaptive_candidate_budget < 100:
-            raise ValueError("adaptive step must be positive and candidate budget at least 100")
+        if adaptive_step < 1 or not 100 <= adaptive_candidate_budget <= 5000:
+            raise ValueError("adaptive step must be positive and candidate budget between 100 and 5000")
         lengths = list(range(adaptive_min_window, adaptive_max_window + 1, adaptive_step))
         if len(lengths) > 10:
             raise ValueError("adaptive search supports at most 10 window lengths per run")
@@ -149,14 +149,24 @@ def run_pattern_research(
                     "reason": "query window begins before available history",
                 })
                 continue
-            eligible = max(0, window_start - 64)
+            eligible = max(0, window_start - window_length - 64)
             stride = max(1, (eligible + adaptive_candidate_budget - 1)
                          // adaptive_candidate_budget)
-            adaptive = search_analogs(
-                candles, query_start=window_start, query_end=fixed_query_end,
-                mode=mode, top_k=top_k, horizons=(1, 4, 16, 32, 64),
-                candidate_stride=stride,
-            )
+            try:
+                adaptive = search_analogs(
+                    candles, query_start=window_start, query_end=fixed_query_end,
+                    mode=mode, top_k=top_k, horizons=(1, 4, 16, 32, 64),
+                    candidate_stride=stride,
+                )
+            except ValueError as exc:
+                if "query window crosses a missing-candle gap" not in str(exc):
+                    raise
+                adaptive_results.append({
+                    "window_length": window_length,
+                    "status": "skipped",
+                    "reason": "query window crosses a missing-candle gap",
+                })
+                continue
             window_segment = candles[window_start:fixed_query_end + 1]
             window_analogs = []
             for analog in adaptive.analogs:
