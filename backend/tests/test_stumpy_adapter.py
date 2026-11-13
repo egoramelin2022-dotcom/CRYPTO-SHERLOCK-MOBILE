@@ -49,7 +49,7 @@ def test_adapter_ranks_matches_and_applies_non_overlap(monkeypatch):
         exclusion_zone=3,
     )
     assert [item.start_index for item in result] == [5, 2]
-    assert result[0].distance == pytest.approx(0.01)
+    assert abs(result[0].distance - 0.01) < 1e-12
 
 
 def test_adapter_rejects_nonfinite_values(monkeypatch):
