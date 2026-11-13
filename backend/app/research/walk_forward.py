@@ -14,6 +14,7 @@ from app.market_data.candles import Candle
 from app.research.outcome_evaluation import evaluate_forward_path
 from app.research.pattern_intelligence import search_analogs
 from app.research.regime_detection import classify_regime, summarize_regime_outcomes
+from app.research.strategy_portfolio import analyze_strategy_portfolio
 
 DEFAULT_HORIZONS = (1, 4, 16, 32, 64)
 
@@ -165,7 +166,33 @@ def run_walk_forward(
                 item.horizon: item for item in outcome.outcomes if item is not None
             })
 
+        # Transparent causal reference methods use only candles known by query close.
+        query_rows = candles[query_start:query_end + 1]
+        momentum_return = query_rows[-1].close / query_rows[0].close - 1.0
+        momentum_threshold = 0.005
+        if momentum_return > momentum_threshold:
+            trend_side = "LONG"
+        elif momentum_return < -momentum_threshold:
+            trend_side = "SHORT"
+        else:
+            trend_side = "FLAT"
+        mean_reversion_side = (
+            "SHORT" if trend_side == "LONG" else "LONG" if trend_side == "SHORT" else "FLAT"
+        )
+        breakout_reference = candles[max(0, query_start - 20):query_start]
+        if breakout_reference:
+            reference_high = max(item.high for item in breakout_reference)
+            reference_low = min(item.low for item in breakout_reference)
+            if candles[query_end].close > reference_high:
+                breakout_side = "LONG"
+            elif candles[query_end].close < reference_low:
+                breakout_side = "SHORT"
+            else:
+                breakout_side = "FLAT"
+        else:
+            breakout_side = "FLAT"
         horizon_decisions = {}
+        strategy_returns_by_horizon = {}
         for horizon in horizons:
             long_values = [
                 row[horizon].long_net_return for row in analog_outcomes if horizon in row
@@ -199,8 +226,24 @@ def run_walk_forward(
             per_horizon[horizon]["always_long"].append(realized.long_net_return)
             per_horizon[horizon]["always_short"].append(realized.short_net_return)
             per_horizon[horizon]["flat"].append(0.0)
+            def realized_for(signal_side: str) -> float:
+                if signal_side == "LONG":
+                    return realized.long_net_return
+                if signal_side == "SHORT":
+                    return realized.short_net_return
+                return 0.0
+            strategy_returns_by_horizon[str(horizon)] = {
+                "pattern_analogs": model_return,
+                "trend_following": realized_for(trend_side),
+                "mean_reversion": realized_for(mean_reversion_side),
+                "range_breakout": realized_for(breakout_side),
+            }
             horizon_decisions[str(horizon)] = {
                 "predicted_side": side,
+                "trend_following_side": trend_side,
+                "mean_reversion_side": mean_reversion_side,
+                "range_breakout_side": breakout_side,
+                "strategy_returns": strategy_returns_by_horizon[str(horizon)],
                 "median_analog_long_net": expected_long,
                 "median_analog_short_net": expected_short,
                 "realized_long_net": realized.long_net_return,
@@ -250,6 +293,7 @@ def run_walk_forward(
                 for item in search.analogs
             ],
             "horizons": horizon_decisions,
+            "strategy_returns_by_horizon": strategy_returns_by_horizon,
         })
 
     temporal_stability: dict[str, Any] = {}
@@ -294,6 +338,17 @@ def run_walk_forward(
             if trade_returns[horizon] else 0.0
         )
 
+    strategy_portfolio_by_horizon: dict[str, Any] = {}
+    for horizon in horizons:
+        returns = {}
+        for fold in fold_rows:
+            fold_returns = fold.get("strategy_returns_by_horizon", {}).get(str(horizon))
+            if fold_returns is not None:
+                for name, value in fold_returns.items():
+                    returns.setdefault(name, []).append(value)
+        if returns and len(next(iter(returns.values()))) >= 2:
+            strategy_portfolio_by_horizon[str(horizon)] = analyze_strategy_portfolio(returns)
+
     return {
         "symbol": first_candle.symbol,
         "interval": first_candle.interval,
@@ -313,6 +368,11 @@ def run_walk_forward(
         "metrics_by_horizon": metrics,
         "temporal_stability_by_horizon": temporal_stability,
         "regime_outcomes": summarize_regime_outcomes(fold_rows),
+        "strategy_portfolio_by_horizon": strategy_portfolio_by_horizon,
+        "strategy_portfolio_note": (
+            "Pattern analogs, trailing momentum, contrarian mean reversion and prior-range breakout "
+            "are evaluated on the same realized fold paths. Equal-weight returns are diagnostic only."
+        ),
         "regime_detection_note": (
             "Causal trailing-window rule labels at each query close; "
             "ACCUMULATION_CANDIDATE is heuristic, not verified accumulation."
