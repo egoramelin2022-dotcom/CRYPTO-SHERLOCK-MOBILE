@@ -55,11 +55,12 @@ def probability_of_backtest_overfitting(
         in_scores = [mean(row[index] for index in in_sample) for row in matrix]
         winner = max(range(len(names)), key=lambda idx: (in_scores[idx], -idx))
         oos_scores = [mean(row[index] for index in out_sample) for row in matrix]
-        ordered = sorted((score, idx) for idx, score in enumerate(oos_scores))
-        rank = next(pos for pos, (_, idx) in enumerate(ordered, start=1) if idx == winner)
-        # Mid-rank for exact ties prevents arbitrary ordering from inflating PBO.
-        tied = sum(score == oos_scores[winner] for score in oos_scores)
-        rank_fraction = (rank + 0.5 * (tied - 1)) / (len(names) + 1)
+        winner_score = oos_scores[winner]
+        less = sum(score < winner_score for score in oos_scores)
+        tied = sum(score == winner_score for score in oos_scores)
+        # Compute the mid-rank from the full tie group, independent of index order.
+        mid_rank = less + (tied + 1) / 2
+        rank_fraction = mid_rank / (len(names) + 1)
         rank_fraction = min(1.0 - 1e-12, max(1e-12, rank_fraction))
         logits.append(log(rank_fraction / (1.0 - rank_fraction)))
         selected.append(names[winner])
