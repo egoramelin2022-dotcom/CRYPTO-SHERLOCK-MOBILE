@@ -102,6 +102,14 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
             "history_candles": 400,
             "skipped_folds": [],
             "anti_leakage": {"embargo_candles": 64},
+            "temporal_stability_note": "Chronological thirds, not market regimes.",
+            "temporal_stability_by_horizon": {
+                "4": {
+                    "early": {"model": {"cumulative_return_sum": 0.01, "positive_fold_rate": 0.5, "trade_rate": 0.5}},
+                    "middle": {"model": {"cumulative_return_sum": 0.005, "positive_fold_rate": 0.5, "trade_rate": 1.0}},
+                    "recent": {"model": {"cumulative_return_sum": 0.01, "positive_fold_rate": 1.0, "trade_rate": 0.5}},
+                }
+            },
             "metrics_by_horizon": {
                 "4": {
                     "model": {"cumulative_return_sum": 0.025, "average_return_per_fold": 0.00625, "positive_fold_rate": 0.5, "max_drawdown_sum_basis": 0.01},
@@ -118,5 +126,7 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
     assert "embargo: 64 candles" in rendered
     assert "Model: sum +2.50%" in rendered
     assert "Always Long: sum +1.00%" in rendered
+    assert "TEMPORAL STABILITY" in rendered
+    assert "+4 recent: model sum +1.00%" in rendered
     panel.close()
     app.processEvents()
