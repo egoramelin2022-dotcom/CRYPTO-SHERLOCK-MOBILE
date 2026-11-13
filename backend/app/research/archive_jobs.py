@@ -71,6 +71,7 @@ def run_recent_sync_job(
             raise RuntimeError(
                 "Recent sync staging database must be separate from source and analytics databases"
             )
+        staging_path.parent.mkdir(parents=True, exist_ok=True)
 
         now = now or datetime.now(timezone.utc)
         if now.tzinfo is None:
