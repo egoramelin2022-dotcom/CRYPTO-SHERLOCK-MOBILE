@@ -1,0 +1,60 @@
+name: Windows desktop package
+
+on:
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "backend/**"
+      - ".github/workflows/desktop-windows-build.yml"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install desktop and backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r desktop/requirements.txt -r backend/requirements.txt pyinstaller==6.14.2
+      - name: Compile application sources
+        run: |
+          python -m compileall -q desktop
+          python -m compileall -q backend/app backend/scripts backend/desktop_server.py
+      - name: Build desktop executable
+        run: >
+          pyinstaller --noconfirm --clean --windowed
+          --name CRYPTO-SHERLOCK
+          --paths .
+          --collect-all pyqtgraph
+          --collect-all PySide6
+          --hidden-import shiboken6
+          desktop/__main__.py
+      - name: Build bundled local backend executable
+        run: >
+          pyinstaller --noconfirm --clean --console
+          --name CRYPTO-SHERLOCK-Server
+          --paths backend
+          --collect-all fastapi
+          --collect-all uvicorn
+          --collect-all httpx
+          --collect-submodules app
+          --collect-submodules scripts
+          --distpath dist/server
+          --workpath build/server
+          --specpath build/server
+          backend/desktop_server.py
+      - name: Assemble portable application folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/CRYPTO-SHERLOCK/Server | Out-Null
+          Copy-Item -Path dist/server/CRYPTO-SHERLOCK-Server/* -Destination dist/CRYPTO-SHERLOCK/Server -Recurse -Force
+      - name: Upload Windows application
+        uses: actions/upload-artifact@v4
+        with:
+          name: CRYPTO-SHERLOCK-Windows-x64
+          path: dist/CRYPTO-SHERLOCK/
+          if-no-files-found: error
+          retention-days: 14
