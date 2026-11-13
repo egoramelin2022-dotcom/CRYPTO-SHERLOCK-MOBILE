@@ -54,7 +54,7 @@ def test_recent_sync_job_targets_only_current_month_closed_candles(
 
     source = tmp_path / "source.db"
     analytics = tmp_path / "analytics.db"
-    staging = tmp_path / "staging.db"
+    staging = tmp_path / "nested" / "staging.db"
     source.touch()
     monkeypatch.setattr(jobs, "_configured_paths", lambda: (source, analytics))
     monkeypatch.setenv("SHERLOCK_ARCHIVE_STAGING_DB", str(staging))
@@ -89,6 +89,7 @@ def test_recent_sync_job_targets_only_current_month_closed_candles(
     assert calls[1]["end_ms"] == int(datetime(2026, 11, 13, 4, 0, tzinfo=timezone.utc).timestamp() * 1000)
     assert calls[2]["end_ms"] == int(datetime(2026, 11, 12, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
     assert result["result"]["intervals"]["15m"]["status"] == "COMPLETE"
+    assert staging.parent.is_dir()
     assert source.stat().st_size == 0
     assert analytics.exists() is False
 
