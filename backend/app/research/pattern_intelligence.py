@@ -149,11 +149,18 @@ def search_analogs(
         raise ValueError("embargo must be nonnegative")
 
     step = interval_to_ms(candles[0].interval)
+    # Prefix counts make continuity checks O(1), even when scanning hundreds
+    # of thousands of overlapping candidate windows.
+    gap_prefix = [0] * len(candles)
+    for index in range(1, len(candles)):
+        gap_prefix[index] = gap_prefix[index - 1] + int(
+            candles[index].open_time - candles[index - 1].open_time != step
+        )
 
     def is_contiguous(start: int, end: int) -> bool:
         if start < 0 or end >= len(candles) or start > end:
             return False
-        return candles[end].open_time - candles[start].open_time == (end - start) * step
+        return gap_prefix[end] == gap_prefix[start]
 
     if not is_contiguous(query_start, query_end):
         raise ValueError("query window crosses a missing-candle gap; choose a fully contiguous latest window")
