@@ -73,7 +73,9 @@ def test_search_skips_candidates_and_forward_paths_crossing_data_gaps():
         horizons=(1, 2), embargo=0,
     )
     assert result.analogs
-    assert all(item.start_index >= 16 for item in result.analogs)
+    # Earlier candidates are valid only if their complete forward path ends
+    # before the gap; later candidates must start after the gap.
+    assert all(item.end_index + 2 < 15 or item.start_index >= 16 for item in result.analogs)
     assert all(item.end_index + 2 < result.query_start_index for item in result.analogs)
 
 
