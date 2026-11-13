@@ -19,6 +19,9 @@ historical candidate discovery engines.
    changes the exact-window candidate set.
 8. Only after candidate discovery is frozen, evaluate forward paths using
    next-candle-open entry, configured fees and slippage.
+9. Aggregate available outcomes by horizon: cost-adjusted LONG/SHORT positive
+   rates, mean/median net returns, excursion statistics, and an explicit
+   retrospective SIDEWAYS rate.
 
 ## Output and limitations
 
