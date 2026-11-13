@@ -23,6 +23,7 @@ class Analog:
     start_time: int
     end_time: int
     similarity: float
+    stage_similarities: dict[str, float]
     forward_returns: dict[int, float | None]
     max_favorable_excursion: float | None
     max_adverse_excursion: float | None
@@ -43,6 +44,15 @@ class SearchResult:
             "query_start_index": self.query_start_index,
             "query_end_index": self.query_end_index,
             "segment_length": self.segment_length,
+            "stage_weights": (
+                {
+                    "preliminary_decline": 0.2,
+                    "recovery": 0.2,
+                    "peak": 0.2,
+                    "sharp_collapse": 0.2,
+                    "sideways_lower_wicks": 0.2,
+                } if self.mode == "five_stage" else {}
+            ),
             "candidates_examined": self.candidates_examined,
             "analogs": [asdict(item) for item in self.analogs],
         }
@@ -74,26 +84,63 @@ def _shape(candles: Sequence[Candle]) -> list[tuple[float, ...]]:
     return result
 
 
-def _distance(a: Sequence[tuple[float, ...]],
-              b: Sequence[tuple[float, ...]], mode: SearchMode) -> float:
-    n = len(a)
-    if mode == "free":
-        squared = [sum((x - y) ** 2 for x, y in zip(a[i], b[i])) / len(a[i])
-                   for i in range(n)]
-        return math.sqrt(sum(squared) / n)
+_STAGE_NAMES = (
+    "preliminary_decline",
+    "recovery",
+    "peak",
+    "sharp_collapse",
+    "sideways_lower_wicks",
+)
 
-    # Five equally weighted stages. Each stage contributes one fifth of the
-    # total distance, independent of its absolute candle count.
-    stage_errors = []
+
+def _stage_mean_squared_errors(
+    a: Sequence[tuple[float, ...]],
+    b: Sequence[tuple[float, ...]],
+) -> list[float]:
+    n = len(a)
+    errors = []
     for stage in range(5):
         lo = stage * n // 5
         hi = (stage + 1) * n // 5
         if hi <= lo:
             raise ValueError("five_stage mode requires at least five candles")
-        err = [sum((x - y) ** 2 for x, y in zip(a[i], b[i])) / len(a[i])
-               for i in range(lo, hi)]
-        stage_errors.append(sum(err) / len(err))
-    return math.sqrt(sum(stage_errors) / 5)
+        row_errors = [
+            sum((x - y) ** 2 for x, y in zip(a[i], b[i])) / len(a[i])
+            for i in range(lo, hi)
+        ]
+        errors.append(sum(row_errors) / len(row_errors))
+    return errors
+
+
+def _distance(
+    a: Sequence[tuple[float, ...]],
+    b: Sequence[tuple[float, ...]],
+    mode: SearchMode,
+) -> float:
+    n = len(a)
+    if mode == "free":
+        squared = [
+            sum((x - y) ** 2 for x, y in zip(a[i], b[i])) / len(a[i])
+            for i in range(n)
+        ]
+        return math.sqrt(sum(squared) / n)
+    # Each of the five named stages contributes exactly one fifth, regardless
+    # of the number of candles assigned to that stage.
+    return math.sqrt(sum(_stage_mean_squared_errors(a, b)) / 5)
+
+
+def _stage_similarities(
+    query: Sequence[tuple[float, ...]],
+    candidate: Sequence[tuple[float, ...]],
+    mode: SearchMode,
+) -> dict[str, float]:
+    if mode != "five_stage":
+        return {}
+    errors = _stage_mean_squared_errors(query, candidate)
+    return {
+        name: 1.0 / (1.0 + math.sqrt(error))
+        for name, error in zip(_STAGE_NAMES, errors)
+    }
 
 
 def _outcomes(candles: Sequence[Candle], end: int,
@@ -193,9 +240,12 @@ def search_analogs(
                for previous_start, previous_end in selected_ranges):
             continue
         returns, mfe, mae = _outcomes(candles, end, horizons)
+        candidate_shape = _shape(candles[start:end + 1])
         analogs.append(Analog(
             start, end, candles[start].open_time, candles[end].open_time,
-            1.0 / (1.0 + distance), returns, mfe, mae,
+            1.0 / (1.0 + distance),
+            _stage_similarities(query, candidate_shape, mode),
+            returns, mfe, mae,
         ))
         selected_ranges.append((range_start, range_end))
         if len(analogs) >= top_k:
