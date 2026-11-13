@@ -371,6 +371,23 @@ class ResearchPanel(QWidget):
                     f"avg {values['average_model_return']:+.2%} · "
                     f"positive {values['positive_fold_rate']:.0%}"
                 )
+            summary.append("  METHOD PORTFOLIO · PATTERN / MOMENTUM / MEAN REVERSION / BREAKOUT")
+            summary.append(result.get("strategy_portfolio_note", ""))
+            for horizon, diagnostic in result.get("strategy_portfolio_by_horizon", {}).items():
+                summary.append(f"    HORIZON +{horizon} · {diagnostic['aligned_folds']} aligned folds")
+                for name, values in diagnostic["individual_metrics"].items():
+                    summary.append(
+                        f"      {name.replace('_', ' ').title()}: avg/fold {values['average_return_per_fold']:+.2%} · "
+                        f"volatility {values['volatility_per_fold']:.2%} · positive {values['positive_fold_rate']:.0%}"
+                    )
+                for pair, correlation in diagnostic["pairwise_return_correlation"].items():
+                    summary.append(f"      corr {pair}: {correlation if correlation is not None else 'n/a'}")
+                portfolio = diagnostic["equal_weight_portfolio"]
+                summary.append(
+                    f"      EQUAL-WEIGHT: avg/fold {portfolio['average_return_per_fold']:+.2%} · "
+                    f"volatility {portfolio['volatility_per_fold']:.2%} · "
+                    f"positive {portfolio['positive_fold_rate']:.0%}"
+                )
         if "history_candles" in result and result.get("query_selection") is not None:
             query_label = (
                 "Historical sample" if result.get("query_selection") == "historical_open_time"
