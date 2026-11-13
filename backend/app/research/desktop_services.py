@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 from datetime import datetime, timezone
 from urllib.parse import quote
+from uuid import uuid4
 
 from app.market_data.candles import Candle, find_gaps
 from app.market_data.intervals import interval_to_ms
@@ -23,6 +24,7 @@ from app.research.stumpy_adapter import find_query_matches
 from app.research.walk_forward import run_walk_forward
 from app.research.robustness import run_robustness_audit
 from app.research.intelligence_core import run_intelligence_core
+from app.research.experiment_ledger import ExperimentLedger, fingerprint_candles
 
 from app.research import jobs as base_jobs
 
@@ -306,17 +308,66 @@ def run_intelligence_core_research(
     max_horizon = 64
     eligible_candidates = max(0, query_start - query_window - max_horizon)
     candidate_stride = max(1, (eligible_candidates + candidate_budget - 1) // candidate_budget)
-    result = run_intelligence_core(
-        candles,
-        query_start_index=query_start,
-        query_end_index=query_end,
+    source_path, analytics_path = base_jobs._configured_paths()
+    del source_path  # The source database is only read by _load_candles.
+    ledger = ExperimentLedger(analytics_path)
+    run_id = str(uuid4())
+    input_fingerprint = fingerprint_candles(candles)
+    parameters = {
+        "symbol": symbol,
+        "interval": interval,
+        "query_window": query_window,
+        "query_selection": query_selection,
+        "query_start_time": candles[query_start].open_time,
+        "query_end_time": candles[query_end].open_time,
+        "mode": mode,
+        "top_k": top_k,
+        "min_analogs": min_analogs,
+        "candidate_budget": candidate_budget,
+        "candidate_stride": candidate_stride,
+        "horizons": [1, 4, 16, 32, 64],
+        "fee_bps_per_side": fee_bps_per_side,
+        "slippage_bps_per_side": slippage_bps_per_side,
+        "history_limit": history_limit,
+    }
+    ledger.start_run(
+        run_id=run_id,
+        core_version="0.1.0",
+        symbol=symbol,
+        interval=interval,
+        query_start_time=candles[query_start].open_time,
+        query_end_time=candles[query_end].close_time,
         mode=mode,
-        top_k=top_k,
-        min_analogs=min_analogs,
-        candidate_stride=candidate_stride,
-        fee_bps_per_side=fee_bps_per_side,
-        slippage_bps_per_side=slippage_bps_per_side,
+        parameters=parameters,
+        input_fingerprint=input_fingerprint,
+        input_candle_count=len(candles),
     )
+    try:
+        result = run_intelligence_core(
+            candles,
+            query_start_index=query_start,
+            query_end_index=query_end,
+            mode=mode,
+            top_k=top_k,
+            min_analogs=min_analogs,
+            candidate_stride=candidate_stride,
+            fee_bps_per_side=fee_bps_per_side,
+            slippage_bps_per_side=slippage_bps_per_side,
+            run_id=run_id,
+        )
+        result["experiment_ledger"] = {
+            "run_id": run_id,
+            "status": "completed",
+            "input_fingerprint": input_fingerprint,
+            "append_only": True,
+            "event_hash_chain": True,
+        }
+    except Exception as exc:
+        try:
+            ledger.fail_run(run_id, type(exc).__name__)
+        except Exception:
+            pass
+        raise
     gaps = find_gaps([item.open_time for item in candles], interval)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     age_hours = max(0.0, (now_ms - candles[-1].close_time) / 3_600_000)
@@ -340,6 +391,7 @@ def run_intelligence_core_research(
             "as_of_utc": datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc).isoformat(),
         },
     })
+    ledger.complete_run(run_id, result)
     return result
 
 
