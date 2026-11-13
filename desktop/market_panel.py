@@ -123,7 +123,6 @@ class MarketPanel(QWidget):
         root.addWidget(self.status)
         self.auto_refresh = QTimer(self)
         self.auto_refresh.timeout.connect(self.refresh)
-        self.auto_refresh.start(30_000)
 
     def refresh(self):
         if self.worker is not None and self.worker.isRunning():
