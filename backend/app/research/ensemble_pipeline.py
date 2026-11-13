@@ -34,6 +34,27 @@ class CandidateForwardReport:
 
 
 @dataclass(frozen=True, slots=True)
+class ModuleAblation:
+    """Leave-one-module-out candidate-set impact, not predictive value."""
+
+    removed_module: str
+    candidate_count_without_module: int
+    full_candidates_retained: int
+    full_candidates_lost: int
+    additional_candidates: int
+
+    def to_dict(self) -> dict:
+        return {
+            "removed_module": self.removed_module,
+            "candidate_count_without_module": self.candidate_count_without_module,
+            "full_candidates_retained": self.full_candidates_retained,
+            "full_candidates_lost": self.full_candidates_lost,
+            "additional_candidates": self.additional_candidates,
+            "interpretation": "Discovery-set impact only; not evidence of predictive edge.",
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class EnsembleSearchRun:
     symbol: str
     interval: str
@@ -46,6 +67,7 @@ class EnsembleSearchRun:
     stumpy_candidate_count: int
     evidence_count: int
     ensemble: EnsembleEvidenceReport | None
+    ablations: tuple[ModuleAblation, ...]
     forward_evaluations: tuple[CandidateForwardReport, ...]
 
     def to_dict(self) -> dict:
@@ -61,6 +83,7 @@ class EnsembleSearchRun:
             "stumpy_candidate_count": self.stumpy_candidate_count,
             "evidence_count": self.evidence_count,
             "ensemble": self.ensemble.to_dict() if self.ensemble else None,
+            "ablations": [item.to_dict() for item in self.ablations],
             "forward_evaluations": [item.to_dict() for item in self.forward_evaluations],
             "interpretation": (
                 "Historical analogue agreement and forward outcomes only; "
@@ -158,6 +181,32 @@ def run_ensemble_search(
         )
         if evidence else None
     )
+    ablation_reports: list[ModuleAblation] = []
+    if report is not None:
+        full_keys = {
+            (item.candidate_start_time, item.candidate_end_time)
+            for item in report.candidates
+        }
+        for module in sorted({row.module for row in evidence}):
+            reduced_rows = [row for row in evidence if row.module != module]
+            reduced_report = (
+                build_evidence_report(
+                    reduced_rows, min_supporting_modules=min_supporting_modules,
+                )
+                if reduced_rows else None
+            )
+            reduced_keys = {
+                (item.candidate_start_time, item.candidate_end_time)
+                for item in reduced_report.candidates
+            } if reduced_report else set()
+            ablation_reports.append(ModuleAblation(
+                removed_module=module,
+                candidate_count_without_module=len(reduced_keys),
+                full_candidates_retained=len(full_keys & reduced_keys),
+                full_candidates_lost=len(full_keys - reduced_keys),
+                additional_candidates=len(reduced_keys - full_keys),
+            ))
+
     index_by_open_time = {c.open_time: i for i, c in enumerate(candles)}
     forward_reports: list[CandidateForwardReport] = []
     if report is not None:
@@ -191,5 +240,6 @@ def run_ensemble_search(
         stumpy_candidate_count=stumpy_count,
         evidence_count=len(evidence),
         ensemble=report,
+        ablations=tuple(ablation_reports),
         forward_evaluations=tuple(forward_reports),
     )
