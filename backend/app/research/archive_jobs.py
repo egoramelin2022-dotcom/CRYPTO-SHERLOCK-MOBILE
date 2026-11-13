@@ -53,7 +53,7 @@ def run_archive_download(job_id: str, start: str, end: str) -> None:
 
 
 
-def run_recent_sync_job(job_id: str, symbol: str = "BTCUSDT") -> None:
+def run_recent_sync_job(\n    job_id: str, symbol: str = "BTCUSDT", *, now: datetime | None = None\n) -> None:
     """Sync the current UTC month of closed candles into isolated staging storage."""
     base_jobs._set_job(job_id, status="running", result={
         "progress": "Preparing current-month public Binance Spot sync"
