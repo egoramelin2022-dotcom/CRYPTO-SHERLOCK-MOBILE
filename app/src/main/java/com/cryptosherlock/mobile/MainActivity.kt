@@ -43,6 +43,7 @@ class MainActivity : Activity() {
     private lateinit var replayResult: TextView
     private lateinit var forecastCard: TextView
     private lateinit var refreshButton: Button
+    private lateinit var serverButton: Button
     private lateinit var historyButton: Button
     private lateinit var patternButton: Button
     private lateinit var fiveStageButton: Button
@@ -138,6 +139,8 @@ class MainActivity : Activity() {
         market.addView(candleInfo)
         refreshButton = button("↻  ОБНОВИТЬ РЫНОК") { loadMarket(true) }
         market.addView(refreshButton, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
+        serverButton = button("⚙  ПОДКЛЮЧЕНИЕ К СЕРВЕРУ") { configureServer() }
+        market.addView(serverButton, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(6) })
 
         // 02 — SHERLOCK LAB
         val lab = makePage("ШЕРЛОК")
@@ -237,9 +240,10 @@ class MainActivity : Activity() {
         refreshButton.isEnabled = false
         marketExecutor.execute {
             try {
-                val ticker = JSONObject(readUrl("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT"))
-                val p = ticker.getString("lastPrice").toDouble()
-                val pct = ticker.getString("priceChangePercent").toDouble()
+                val base = serverBaseUrl()
+                val ticker = JSONObject(readUrl("$base/v1/market/ticker/24hr?symbol=BTCUSDT"))
+                val p = ticker.getDouble("last_price")
+                val pct = ticker.getDouble("price_change_percent")
                 val candles = fetchCandles(interval)
                 if (candles.size < 30) throw IllegalStateException("Недостаточно свечей для анализа")
                 val states = listOf("15m", "1h", "4h", "1d").map { tf ->
@@ -252,7 +256,7 @@ class MainActivity : Activity() {
                     lastSnapshot = snapshot
                     render(snapshot, signal)
                     renderForecast(forecast)
-                    status.text = "Binance Spot · обновлено " + SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(snapshot.fetchedAt)) + " · 4 таймфрейма · авто 30с"
+                    status.text = "SERVER OK · Binance Spot · обновлено " + SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(snapshot.fetchedAt)) + " · 4 таймфрейма · авто 30с"
                 }
             } catch (e: Exception) {
                 runOnUiThread {
@@ -439,11 +443,62 @@ class MainActivity : Activity() {
     }
 
     private fun fetchCandles(tf: String): List<Candle> {
-        val arr = JSONArray(readUrl("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=" + tf + "&limit=120"))
+        val base = serverBaseUrl()
+        val payload = JSONObject(readUrl("$base/v1/market/klines?symbol=BTCUSDT&interval=$tf&limit=120"))
+        val arr = payload.getJSONArray("candles")
         return (0 until arr.length()).map { i ->
-            val a = arr.getJSONArray(i)
-            Candle(a.getString(1).toFloat(), a.getString(2).toFloat(), a.getString(3).toFloat(),
-                a.getString(4).toFloat(), a.getString(5).toFloat())
+            val a = arr.getJSONObject(i)
+            Candle(a.getDouble("open").toFloat(), a.getDouble("high").toFloat(),
+                a.getDouble("low").toFloat(), a.getDouble("close").toFloat(),
+                a.getDouble("volume").toFloat())
+        }
+    }
+
+    private fun serverBaseUrl(): String {
+        val prefs = getSharedPreferences("sherlock_settings", MODE_PRIVATE)
+        return prefs.getString("server_url", "http://10.0.2.2:8000")!!.trimEnd('/')
+    }
+
+    private fun configureServer() {
+        val input = EditText(this).apply {
+            setSingleLine(true)
+            hint = "http://192.168.1.10:8000"
+            setText(serverBaseUrl())
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(TextView(this@MainActivity).apply {
+                text = "Эмулятор: http://10.0.2.2:8000\\nТелефон: http://IP-АДРЕС-ПК:8000 (одна Wi-Fi сеть)"
+                textSize = 12f
+            })
+            addView(input)
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Сервер CRYPTO SHERLOCK")
+            .setView(box)
+            .setNegativeButton("Отмена", null)
+            .setNeutralButton("Проверить") { _, _ -> checkServer(input.text.toString().trim()) }
+            .setPositiveButton("Сохранить") { _, _ ->
+                val value = input.text.toString().trim().trimEnd('/')
+                getSharedPreferences("sherlock_settings", MODE_PRIVATE).edit().putString("server_url", value).apply()
+                status.text = "Адрес сервера сохранён: $value"
+                loadMarket(true)
+            }.show()
+    }
+
+    private fun checkServer(address: String) {
+        historyExecutor.execute {
+            try {
+                val health = JSONObject(readUrl(address.trimEnd('/') + "/health"))
+                runOnUiThread {
+                    status.text = if (health.optString("status") == "ok") "СЕРВЕР ДОСТУПЕН · " + health.optString("service")
+                        else "СЕРВЕР ОТВЕТИЛ, НО СТАТУС НЕ OK"
+                }
+            } catch (e: Exception) {
+                runOnUiThread { status.text = "СЕРВЕР НЕ ДОСТУПЕН: " + (e.message ?: "ошибка сети") }
+            }
         }
     }
 
