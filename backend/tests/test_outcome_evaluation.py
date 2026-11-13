@@ -27,7 +27,7 @@ def path():
 
 
 def test_entry_is_next_open_and_horizon_exits_are_forward_only():
-    result = evaluate_forward_path(path(), candidate_end_index=0, horizons=(1, 2, 4))
+    result = evaluate_forward_path(path(), candidate_end_index=0, horizons=(1, 2, 5))
     one, two, missing = result.outcomes
     assert one.entry_price == 102
     assert one.exit_price == 104
