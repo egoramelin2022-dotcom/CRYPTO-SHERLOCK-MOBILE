@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - "desktop/**"
-      - ".github/workflows/desktop-validation.yml"
 
 jobs:
   desktop-tests:
