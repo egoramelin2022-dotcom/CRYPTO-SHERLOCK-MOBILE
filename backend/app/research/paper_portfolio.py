@@ -78,6 +78,7 @@ def place_virtual_order(symbol: str, side: str, quantity: float, market_price: f
     now = datetime.now(timezone.utc).isoformat()
     with _lock, _connect() as connection:
         _ensure(connection)
+        connection.commit()
         connection.execute("BEGIN IMMEDIATE")
         account = connection.execute(
             "SELECT * FROM paper_account WHERE account_id='default'"
