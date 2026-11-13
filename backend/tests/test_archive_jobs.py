@@ -13,12 +13,13 @@ def test_archive_job_writes_only_to_separate_staging_database(tmp_path, monkeypa
     monkeypatch.setenv("SHERLOCK_ARCHIVE_STAGING_DB", str(staging))
     monkeypatch.setenv("SHERLOCK_ARCHIVE_RAW_DIR", str(raw))
 
-    def fake_download(start, end, raw_dir, db_path):
+    def fake_download(start, end, raw_dir, db_path, progress_callback=None):
         assert start == "2017-08"
         assert end == "2017-09"
         assert raw_dir == raw
         assert db_path == staging
-        print("15m 2017-08: ok; inserted=12")
+        if progress_callback:
+            progress_callback("15m 2017-08: ok; inserted=12")
         return 12
 
     monkeypatch.setattr(archive_jobs, "download_archives", fake_download)
