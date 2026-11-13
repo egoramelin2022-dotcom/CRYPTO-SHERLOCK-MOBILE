@@ -136,9 +136,14 @@ def run_ensemble_research(symbol: str = "BTCUSDT", interval: str = "15m",
         history = candles[:start]
         query = candles[start:end + 1]
         history_close = np.asarray([item.close for item in history], dtype=np.float64)
-        query_close = np.asarray([item.close for item in query], dtype=np.float64)
+        # Include the close immediately before the query so its first return
+        # is measured from the true prior candle, not replaced with zero.
+        query_close = np.asarray(
+            [candles[start - 1].close, *[item.close for item in query]],
+            dtype=np.float64,
+        )
         history_values = np.diff(np.log(history_close), prepend=np.log(history_close[0]))
-        query_values = np.diff(np.log(query_close), prepend=np.log(query_close[0]))
+        query_values = np.diff(np.log(query_close))
         matches = find_query_matches(
             history_values, query_values, top_k=top_k,
             exclusion_zone=len(query_values),
