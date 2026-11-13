@@ -1,6 +1,6 @@
 # CRYPTO SHERLOCK Desktop
 
-Windows desktop research terminal built with PySide6. It connects to the local read-only FastAPI market-data backend at `http://127.0.0.1:8000`.
+Windows desktop research terminal built with PySide6. The portable Windows package includes a local FastAPI backend executable. The backend binds to `127.0.0.1:8000` only and is launched/stopped by the desktop application.
 
 ## Run from repository root
 
@@ -26,7 +26,7 @@ The archive loader runs asynchronously and writes only to the staging database. 
 
 ## Safety and current limitations
 
-- No exchange API credentials or live order endpoints are implemented.
+- No exchange API credentials or live order endpoints are implemented. The local backend binds to loopback only; do not expose port 8000 publicly.
 - Research only uses closed local candles and a contiguous suffix; missing intervals are not interpolated.
 - The Paper Trading account is virtual and persisted in the separate analytics database. Default virtual starting cash is configurable with `SHERLOCK_PAPER_INITIAL_CASH`.
 - Archive download can consume substantial disk space and time. It requires explicit confirmation and writes only to staging.
