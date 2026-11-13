@@ -342,6 +342,9 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "Local server error", f"Could not start the bundled backend: {error}")
 
     def closeEvent(self, event):
+        self.health_timer.stop()
+        if self.health_worker is not None and self.health_worker.isRunning():
+            self.health_worker.wait(3500)
         if self.server_process.state() != QProcess.ProcessState.NotRunning:
             self.server_process.terminate()
             if not self.server_process.waitForFinished(3000):
