@@ -1,4 +1,4 @@
-from app.scripts.download_binance_spot_klines import (
+from scripts.download_binance_spot_klines import (
     archive_url,
     months_between,
     normalize_timestamp,
