@@ -138,6 +138,7 @@ def test_research_endpoints_reject_calendar_month_interval():
     for endpoint, params in (
         ("/v1/research/pipeline", {"interval": "1M"}),
         ("/v1/research/pattern", {"interval": "1M"}),
+        ("/v1/research/core", {"interval": "1M"}),
         ("/v1/research/ensemble", {"interval": "1M"}),
     ):
         response = client.post(endpoint, params=params)
