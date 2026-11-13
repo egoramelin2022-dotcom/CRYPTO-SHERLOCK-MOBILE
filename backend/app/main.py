@@ -157,6 +157,8 @@ async def start_pattern_research(
     query_window: int = Query(40, ge=5, le=500),
     mode: str = Query("free", pattern=r"^(free|five_stage)$"),
     top_k: int = Query(10, ge=1, le=100),
+    fee_bps_per_side: float = Query(5.0, ge=0, le=1000),
+    slippage_bps_per_side: float = Query(2.0, ge=0, le=1000),
 ) -> dict[str, Any]:
     """Queue free or five-stage historical analog search on verified local candles."""
     if mode == "five_stage" and query_window < 5:
@@ -165,7 +167,9 @@ async def start_pattern_research(
     background_tasks.add_task(
         _run_desktop_research_job, job.job_id, desktop_services.run_pattern_research,
         {"symbol": symbol, "interval": interval, "query_window": query_window,
-         "mode": mode, "top_k": top_k},
+         "mode": mode, "top_k": top_k,
+         "fee_bps_per_side": fee_bps_per_side,
+         "slippage_bps_per_side": slippage_bps_per_side},
     )
     return research_jobs.get_job(job.job_id)
 
