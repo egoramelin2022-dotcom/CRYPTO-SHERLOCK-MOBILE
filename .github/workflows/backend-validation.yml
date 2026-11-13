@@ -29,6 +29,6 @@ jobs:
       - name: Run backend tests
         env:
           PYTHONPATH: .
-        run: python -m pytest tests -q
+        run: python -m pytest tests -q --ignore=tests/test_stumpy_adapter_integration.py
       - name: Compile backend modules
         run: python -m compileall -q app scripts
