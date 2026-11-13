@@ -8,7 +8,26 @@ on:
       - ".github/workflows/desktop-windows-build.yml"
 
 jobs:
+  detect-desktop:
+    runs-on: windows-latest
+    outputs:
+      has_desktop: ${{ steps.detect.outputs.has_desktop }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect desktop application entry point
+        id: detect
+        shell: pwsh
+        run: |
+          if (Test-Path "desktop/__main__.py") {
+            "has_desktop=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "has_desktop=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Desktop source is not present yet; packaging is intentionally skipped."
+          }
+
   build-windows:
+    needs: detect-desktop
+    if: needs.detect-desktop.outputs.has_desktop == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
