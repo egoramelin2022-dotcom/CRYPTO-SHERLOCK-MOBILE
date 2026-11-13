@@ -218,3 +218,11 @@ def test_walk_forward_endpoint_queues_research_job(monkeypatch):
 def test_walk_forward_endpoint_rejects_calendar_month_interval():
     response = client.post("/v1/research/walk-forward", params={"interval": "1M"})
     assert response.status_code == 422
+
+
+def test_walk_forward_endpoint_rejects_training_history_shorter_than_embargo():
+    response = client.post(
+        "/v1/research/walk-forward",
+        params={"query_window": 40, "min_training_candles": 100},
+    )
+    assert response.status_code == 422
