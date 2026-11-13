@@ -48,9 +48,10 @@ def test_walk_forward_uses_strictly_prior_analogs_and_reports_baselines():
     for horizon in ("1", "4", "8"):
         assert set(result["metrics_by_horizon"][horizon]) == {
             "model", "always_long", "always_short", "flat"
-        model = result["metrics_by_horizon"][horizon]["model"]
         assert model["trades"] + model["flat_folds"] == model["folds"]
         }
+        model = result["metrics_by_horizon"][horizon]["model"]
+        assert model["trades"] + model["flat_folds"] == model["folds"]
 
 
 def test_walk_forward_skips_a_gapped_test_query_and_continues():
