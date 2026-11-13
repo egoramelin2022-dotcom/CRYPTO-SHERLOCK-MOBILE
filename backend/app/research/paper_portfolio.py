@@ -33,6 +33,8 @@ def _connect() -> sqlite3.Connection:
 
 
 def _ensure(connection: sqlite3.Connection) -> None:
+    if not math.isfinite(DEFAULT_INITIAL_CASH) or DEFAULT_INITIAL_CASH <= 0:
+        raise RuntimeError("SHERLOCK_PAPER_INITIAL_CASH must be finite and positive")
     connection.executescript("""
         CREATE TABLE IF NOT EXISTS paper_account (
             account_id TEXT PRIMARY KEY,
