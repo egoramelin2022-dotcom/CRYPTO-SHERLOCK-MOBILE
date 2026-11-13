@@ -32,7 +32,7 @@ def test_search_returns_only_pre_query_candidates_and_future_outcomes():
 def test_five_stage_requires_five_candles_and_returns_equal_stage_mode():
     rows = [candle(i, 100 + i) for i in range(12)]
     result = search_analogs(rows, query_start=7, query_end=11, mode="five_stage",
-                            horizons=(1,), embargo=0)
+                            horizons=(1,))
     assert result.mode == "five_stage"
     assert result.segment_length == 5
     assert result.analogs
@@ -68,7 +68,7 @@ def test_rejects_embargo_shorter_than_forward_horizon():
 
 def test_rejects_candle_gaps_before_search():
     rows = [candle(i, 100 + i) for i in range(20)]
-    rows[5] = candle(6, 106)
+    rows = rows[:5] + rows[6:]
     try:
         search_analogs(rows, query_start=10, query_end=14)
     except ValueError as exc:
