@@ -33,6 +33,8 @@ def test_five_stage_requires_five_candles_and_returns_equal_stage_mode():
     assert result.segment_length == 5
     assert result.to_dict()["forward_return_basis"] == "candidate_end_close_to_future_close"
     assert result.to_dict()["excursion_basis"] == "candidate_end_close_to_future_high_low"
+    assert "positional partitions" in result.to_dict()["five_stage_method"]
+    assert "not independently verified" in result.to_dict()["five_stage_method"]
     assert result.to_dict()["stage_weights"] == {
         "preliminary_decline": 0.2,
         "recovery": 0.2,
