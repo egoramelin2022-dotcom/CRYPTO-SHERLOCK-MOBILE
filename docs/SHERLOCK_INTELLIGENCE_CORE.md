@@ -36,3 +36,8 @@ The service reads the immutable source database and verified archive staging thr
 ## Release gate
 
 Before treating Core output as a validated research conclusion, require the backend test suite, data-integrity checks on the user's local database, chronological walk-forward evaluation, baseline comparison, bounded robustness audit, and a genuinely untouched final holdout. The target Windows PC still requires a local smoke test after the branch is integrated.
+
+
+## Research memory
+
+Every desktop Core execution is now assigned a stable run ID and recorded in the append-only Research Memory & Experiment Ledger. The ledger stores the full ordered-input candle fingerprint, exact parameters, complete result digest and hash-chained lifecycle events. Failed attempts are recorded without persisting raw exception messages. The source market database remains read-only; the ledger uses the separate analytics database. See docs/EXPERIMENT_LEDGER.md for its integrity model and limitations.
