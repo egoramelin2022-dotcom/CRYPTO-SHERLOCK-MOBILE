@@ -1,9 +1,10 @@
 """Persistent virtual spot portfolio. This module never sends exchange orders."""
 from __future__ import annotations
 
-import os
 import math
+import os
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
@@ -79,83 +80,92 @@ def place_virtual_order(symbol: str, side: str, quantity: float, market_price: f
     fill = float(market_price) * (1 + direction * SLIPPAGE_BPS / 10000)
     fee = fill * float(quantity) * FEE_BPS / 10000
     now = datetime.now(timezone.utc).isoformat()
-    with _lock, _connect() as connection:
-        _ensure(connection)
-        connection.commit()
-        connection.execute("BEGIN IMMEDIATE")
-        account = connection.execute(
-            "SELECT * FROM paper_account WHERE account_id='default'"
-        ).fetchone()
-        cash = float(account["cash"])
-        position = connection.execute(
-            "SELECT * FROM paper_positions WHERE symbol=?", (symbol,)
-        ).fetchone()
-        realized = 0.0
-        if side == "BUY":
-            total_cost = fill * quantity + fee
-            if total_cost > cash:
-                raise ValueError("insufficient virtual cash")
-            old_qty = float(position["quantity"]) if position else 0.0
-            old_entry = float(position["average_entry"]) if position else 0.0
-            new_qty = old_qty + quantity
-            average = ((old_qty * old_entry) + (quantity * fill)) / new_qty
-            connection.execute(
-                """INSERT INTO paper_positions VALUES (?, ?, ?, ?)
-                   ON CONFLICT(symbol) DO UPDATE SET quantity=excluded.quantity,
-                   average_entry=excluded.average_entry, updated_at=excluded.updated_at""",
-                (symbol, new_qty, average, now),
-            )
-            cash -= total_cost
-        else:
-            if position is None or quantity > float(position["quantity"]) + 1e-12:
-                raise ValueError("sell quantity exceeds virtual position")
-            old_qty = float(position["quantity"])
-            average = float(position["average_entry"])
-            proceeds = fill * quantity - fee
-            realized = (fill - average) * quantity - fee
-            cash += proceeds
-            remaining = old_qty - quantity
-            if remaining <= 1e-12:
-                connection.execute("DELETE FROM paper_positions WHERE symbol=?", (symbol,))
-            else:
+
+    with _lock:
+        with closing(_connect()) as connection:
+            with connection:
+                _ensure(connection)
+                connection.commit()
+                connection.execute("BEGIN IMMEDIATE")
+                account = connection.execute(
+                    "SELECT * FROM paper_account WHERE account_id='default'"
+                ).fetchone()
+                cash = float(account["cash"])
+                position = connection.execute(
+                    "SELECT * FROM paper_positions WHERE symbol=?", (symbol,)
+                ).fetchone()
+                realized = 0.0
+                if side == "BUY":
+                    total_cost = fill * quantity + fee
+                    if total_cost > cash:
+                        raise ValueError("insufficient virtual cash")
+                    old_qty = float(position["quantity"]) if position else 0.0
+                    old_entry = float(position["average_entry"]) if position else 0.0
+                    new_qty = old_qty + quantity
+                    average = ((old_qty * old_entry) + (quantity * fill)) / new_qty
+                    connection.execute(
+                        """INSERT INTO paper_positions VALUES (?, ?, ?, ?)
+                           ON CONFLICT(symbol) DO UPDATE SET quantity=excluded.quantity,
+                           average_entry=excluded.average_entry, updated_at=excluded.updated_at""",
+                        (symbol, new_qty, average, now),
+                    )
+                    cash -= total_cost
+                else:
+                    if position is None or quantity > float(position["quantity"]) + 1e-12:
+                        raise ValueError("sell quantity exceeds virtual position")
+                    old_qty = float(position["quantity"])
+                    average = float(position["average_entry"])
+                    proceeds = fill * quantity - fee
+                    realized = (fill - average) * quantity - fee
+                    cash += proceeds
+                    remaining = old_qty - quantity
+                    if remaining <= 1e-12:
+                        connection.execute("DELETE FROM paper_positions WHERE symbol=?", (symbol,))
+                    else:
+                        connection.execute(
+                            "UPDATE paper_positions SET quantity=?, updated_at=? WHERE symbol=?",
+                            (remaining, now, symbol),
+                        )
                 connection.execute(
-                    "UPDATE paper_positions SET quantity=?, updated_at=? WHERE symbol=?",
-                    (remaining, now, symbol),
+                    "UPDATE paper_account SET cash=? WHERE account_id='default'", (cash,)
                 )
-        connection.execute(
-            "UPDATE paper_account SET cash=? WHERE account_id='default'", (cash,)
-        )
-        connection.execute(
-            """INSERT INTO paper_events
-               (symbol, side, quantity, fill_price, fee, realized_pnl, cash_after, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (symbol, side, quantity, fill, fee, realized, cash, now),
-        )
-        return {
-            "mode": "PAPER_ONLY", "symbol": symbol, "side": side,
-            "quantity": float(quantity), "market_price": float(market_price),
-            "fill_price": fill, "fee": fee, "realized_pnl": realized,
-            "cash_after": cash, "created_at": now,
-            "execution": "simulated locally; no exchange order was submitted",
-        }
+                connection.execute(
+                    """INSERT INTO paper_events
+                       (symbol, side, quantity, fill_price, fee, realized_pnl, cash_after, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (symbol, side, quantity, fill, fee, realized, cash, now),
+                )
+                return {
+                    "mode": "PAPER_ONLY", "symbol": symbol, "side": side,
+                    "quantity": float(quantity), "market_price": float(market_price),
+                    "fill_price": fill, "fee": fee, "realized_pnl": realized,
+                    "cash_after": cash, "created_at": now,
+                    "execution": "simulated locally; no exchange order was submitted",
+                }
 
 
 def portfolio_snapshot(marks: dict[str, float] | None = None) -> dict[str, Any]:
     marks = marks or {}
-    with _lock, _connect() as connection:
-        _ensure(connection)
-        account = connection.execute(
-            "SELECT * FROM paper_account WHERE account_id='default'"
-        ).fetchone()
-        positions = connection.execute(
-            "SELECT * FROM paper_positions ORDER BY symbol"
-        ).fetchall()
-        events = connection.execute(
-            "SELECT * FROM paper_events ORDER BY event_id DESC LIMIT 20"
-        ).fetchall()
+    with _lock:
+        with closing(_connect()) as connection:
+            _ensure(connection)
+            connection.commit()
+            account = connection.execute(
+                "SELECT * FROM paper_account WHERE account_id='default'"
+            ).fetchone()
+            positions = connection.execute(
+                "SELECT * FROM paper_positions ORDER BY symbol"
+            ).fetchall()
+            events = connection.execute(
+                "SELECT * FROM paper_events ORDER BY event_id DESC LIMIT 20"
+            ).fetchall()
+            account_data = dict(account)
+            position_rows = [dict(row) for row in positions]
+            event_rows = [dict(row) for row in events]
+
     items = []
-    equity = float(account["cash"])
-    for row in positions:
+    equity = float(account_data["cash"])
+    for row in position_rows:
         symbol = row["symbol"]
         mark = float(marks.get(symbol, row["average_entry"]))
         quantity = float(row["quantity"])
@@ -171,10 +181,10 @@ def portfolio_snapshot(marks: dict[str, float] | None = None) -> dict[str, Any]:
         })
     return {
         "mode": "PAPER_ONLY",
-        "initial_cash": float(account["initial_cash"]),
-        "cash": float(account["cash"]),
+        "initial_cash": float(account_data["initial_cash"]),
+        "cash": float(account_data["cash"]),
         "equity": equity,
         "positions": items,
-        "recent_events": [dict(row) for row in events],
+        "recent_events": event_rows,
         "disclaimer": "Virtual spot ledger only; marks default to average entry unless live public prices are supplied.",
     }
