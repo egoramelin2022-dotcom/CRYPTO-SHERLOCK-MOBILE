@@ -40,6 +40,15 @@ def test_walk_forward_uses_strictly_prior_analogs_and_reports_baselines():
     assert result["anti_leakage"]["training_is_strictly_before_test_start"] is True
     assert result["anti_leakage"]["future_candles_excluded_from_analog_search"] is True
     assert result["regime_outcomes"]
+    assert result["strategy_portfolio_by_horizon"]
+    for horizon, portfolio in result["strategy_portfolio_by_horizon"].items():
+        assert set(portfolio["strategies"]) == {
+            "pattern_analogs", "trend_following", "mean_reversion", "range_breakout"
+        }
+        assert portfolio["aligned_folds"] >= 2
+        for fold in result["folds"]:
+            if horizon in fold["horizons"]:
+                assert set(fold["horizons"][horizon]["strategy_returns"]) == set(portfolio["strategies"])
     for fold in result["folds"]:
         assert fold["regime"]["causal"] is True
         assert fold["regime"]["end_index"] == fold["query_end_index"]
