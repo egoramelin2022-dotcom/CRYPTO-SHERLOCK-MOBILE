@@ -183,18 +183,21 @@ def search_analogs(
 
     ranked.sort(key=lambda item: (item[0], item[1]))
     analogs = []
-    selected_starts: list[int] = []
-    min_start_separation = length + gap
+    selected_ranges: list[tuple[int, int]] = []
     for distance, start in ranked:
-        if any(abs(start - previous) < min_start_separation for previous in selected_starts):
-            continue
         end = start + length - 1
+        outcome_end = end + max_horizon
+        range_start = candles[start].open_time
+        range_end = candles[outcome_end].close_time if max_horizon else candles[end].close_time
+        if any(not (range_end < previous_start or previous_end < range_start)
+               for previous_start, previous_end in selected_ranges):
+            continue
         returns, mfe, mae = _outcomes(candles, end, horizons)
         analogs.append(Analog(
             start, end, candles[start].open_time, candles[end].open_time,
             1.0 / (1.0 + distance), returns, mfe, mae,
         ))
-        selected_starts.append(start)
+        selected_ranges.append((range_start, range_end))
         if len(analogs) >= top_k:
             break
     return SearchResult(mode, query_start, query_end, length, examined, tuple(analogs))
