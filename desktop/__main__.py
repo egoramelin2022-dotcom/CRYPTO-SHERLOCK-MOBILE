@@ -9,6 +9,7 @@ import httpx
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
 from desktop.market_panel import MarketPanel
+from desktop.research_panel import ResearchPanel
 
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -148,34 +149,14 @@ class MainWindow(QMainWindow):
         self.pages = [
             self.make_overview(),
             self.make_data_page(),
-            self.make_module_page("Pattern Intelligence", "Historical analog discovery across candle shapes, movement paths and configurable formation modes.", [
-                "Free pattern search — unrestricted sequence matching",
-                "Five-stage formation — preserved as a separate selectable mode",
-                "Historical candidates must end before the query window",
-                "Forward outcomes are measured separately from similarity ranking",
-            ]),
-            self.make_module_page("Multi-Timeframe Scanner", "Find synchronized market structure across 15M, 4H and 1D without treating an observation as a trading signal.", [
-                "15M — long lower-wick event",
-                "4H — support sweep and reclaim",
-                "1D — unusually large bearish candle during a broader decline",
-                "Thresholds remain explicit research parameters",
-            ]),
-            self.make_module_page("Ensemble Engine", "Compare independent evidence sources. Module agreement is not automatically statistical confirmation.", [
-                "Pattern Intelligence evidence adapter",
-                "STUMPY motif evidence adapter",
-                "Candidate provenance and timestamp validation",
-                "No uncalibrated probability or signal averaging",
-            ]),
-            self.make_module_page("Backtesting Lab", "Chronological validation before any strategy can be considered reliable.", [
-                "Walk-forward evaluation",
-                "Purged and embargoed time splits",
-                "Fees, slippage and separate LONG / SHORT analysis",
-                "Baseline comparison and ablation tests",
-            ]),
-            self.make_module_page("Paper Trading", "Virtual execution only. Live exchange orders are deliberately not implemented.", [
-                "Paper portfolio and virtual positions",
-                "Risk limits and execution assumptions",
-                "No exchange credentials or live order endpoints",
+            self.make_research_page("Pattern Intelligence", "Historical analog search with a free mode and the preserved equal-weight five-stage formation.", "/v1/research/pattern", "pattern"),
+            self.make_research_page("Multi-Timeframe Scanner", "Aligned 15m lower-wick, 4h support sweep/reclaim and closed 1d bearish-context scan.", "/v1/research/multitimeframe", "mtf"),
+            self.make_research_page("Ensemble Engine", "Evidence aggregation with explicit engine availability. No uncalibrated probabilities or signal averaging.", "/v1/research/ensemble", "ensemble"),
+            self.make_research_page("Backtesting Lab", "Historical forward-outcome audit for analogs. Full strategy walk-forward backtesting remains a separate validation stage.", "/v1/research/pattern", "pattern"),
+            self.make_module_page("Paper Trading", "Paper-only portfolio controls are being integrated separately. No live orders or exchange credentials are present.", [
+                "No live exchange execution endpoints",
+                "No leverage or automated capital allocation",
+                "Virtual portfolio persistence and risk controls are next",
             ]),
             self.make_module_page("System Monitor", "Local services, data integrity and research job health.", [
                 "Backend health endpoint",
@@ -241,6 +222,17 @@ class MainWindow(QMainWindow):
         self.market_panel.refresh()
         return page
 
+    def make_research_page(self, title, subtitle, endpoint, kind):
+        page = Page(title, subtitle)
+        panel = QFrame()
+        panel.setObjectName("panel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 16, 18, 16)
+        controls = ResearchPanel(self.api_url, endpoint, kind)
+        layout.addWidget(controls)
+        page.body.addWidget(panel, 1)
+        return page
+
     def make_module_page(self, title, subtitle, items):
         page = Page(title, subtitle)
         panel = QFrame()
@@ -300,6 +292,11 @@ QWidget { color: #E7EDF2; font-family: 'Segoe UI'; font-size: 10pt; }
 #pageTitle { color: #F2F6F8; font-size: 25pt; font-weight: 700; }
 #pageSubtitle { color: #8D9CA8; font-size: 10pt; }
 #metricCard, #panel { background: #111B23; border: 1px solid #22313C; border-radius: 12px; }
+#marketPrice { color: #F0F5F6; font-size: 24pt; font-weight: 700; padding: 8px 0; }
+QTextEdit { background: #0C141B; color: #D7E1E6; border: 1px solid #263641; border-radius: 8px; padding: 10px; font-family: Consolas; font-size: 9pt; }
+QComboBox, QSpinBox, QLineEdit { background: #0C141B; color: #D7E1E6; border: 1px solid #263641; border-radius: 6px; padding: 7px; }
+QPushButton { background: #17352F; color: #70E2BF; border: 1px solid #2B6656; border-radius: 7px; padding: 9px 14px; font-weight: 700; }
+QPushButton:disabled { color: #718392; background: #17212A; border-color: #293742; }
 #metricValue { color: #F0F5F6; font-size: 18pt; font-weight: 700; padding-top: 6px; padding-bottom: 4px; }
 #metricValue[accent="mint"] { color: #62DDB8; }
 #metricValue[accent="amber"] { color: #E6B96B; }
