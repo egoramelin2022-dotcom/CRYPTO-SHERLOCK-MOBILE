@@ -329,6 +329,7 @@ class MainWindow(QMainWindow):
         environment.insert("SHERLOCK_ANALYTICS_DB", str(analytics.resolve()))
         environment.insert("SHERLOCK_ARCHIVE_RAW_DIR", str(data_dir / "binance_public_raw"))
         environment.insert("SHERLOCK_ARCHIVE_STAGING_DB", str(data_dir / "binance_archive_staging.db"))
+        environment.insert("SHERLOCK_SERVER_LOG", str(data_dir / "server.log"))
         self.server_process.setProcessEnvironment(environment)
         if getattr(sys, "frozen", False):
             app_dir = Path(sys.executable).resolve().parent
@@ -363,7 +364,8 @@ class MainWindow(QMainWindow):
         if exit_code != 0 and self.isVisible():
             self.connection.setText("●  SERVER STOPPED")
             self.backend_detail.setText(
-                f"Local backend process exited with code {exit_code}. Check that port 8000 is free."
+                f"Local backend process exited with code {exit_code}. Check port 8000 and server log: "
+                f"{Path(self.settings.value('analytics_db')).expanduser().parent / 'server.log'}"
             )
 
     def closeEvent(self, event):
