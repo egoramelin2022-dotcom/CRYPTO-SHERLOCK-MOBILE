@@ -294,7 +294,7 @@ class ResearchPanel(QWidget):
                 f"Configurations evaluated: {result.get('configurations_evaluated', 0)} / {result.get('configurations_requested', 0)} · attempted {result.get('configurations_attempted', 0)} · with OOS folds {result.get('configurations_with_oos_folds', 0)}",
                 result.get("selection_policy", ""),
                 f"Candidate budget/fold: {result.get('candidate_budget_per_fold', '—')} · fee {result.get('fee_bps_per_side', 0)} bps/side · slippage {result.get('slippage_bps_per_side', 0)} bps/side",
-                "Not PBO/CSCV; no winning configuration is selected.",
+                "PBO/CSCV is limited to paired analog-count variants; no winning configuration is selected.",
             ])
             for horizon, stability in result.get("stability_by_horizon", {}).items():
                 summary.append(
