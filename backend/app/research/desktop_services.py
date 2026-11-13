@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 from datetime import datetime, timezone
 from urllib.parse import quote
+from uuid import uuid4
 
 from app.market_data.candles import Candle, find_gaps
 from app.market_data.intervals import interval_to_ms
@@ -22,6 +23,8 @@ from app.research.outcome_evaluation import evaluate_forward_path
 from app.research.stumpy_adapter import find_query_matches
 from app.research.walk_forward import run_walk_forward
 from app.research.robustness import run_robustness_audit
+from app.research.intelligence_core import run_intelligence_core
+from app.research.experiment_ledger import ExperimentLedger, fingerprint_candles
 
 from app.research import jobs as base_jobs
 
@@ -261,6 +264,135 @@ def _split_contiguous(candles: list[Candle]) -> list[list[Candle]]:
     chunks.append(candles[start:])
     return chunks
 
+
+
+def run_intelligence_core_research(
+    symbol: str = "BTCUSDT",
+    interval: str = "15m",
+    query_window: int = 40,
+    mode: str = "free",
+    top_k: int = 20,
+    min_analogs: int = 5,
+    candidate_budget: int = 5000,
+    query_start_time: int | None = None,
+    fee_bps_per_side: float = 5.0,
+    slippage_bps_per_side: float = 2.0,
+    history_limit: int = 400000,
+) -> dict[str, Any]:
+    """Run the Core over verified local history with a bounded search budget."""
+    if isinstance(query_window, bool) or not isinstance(query_window, int) or not 5 <= query_window <= 500:
+        raise ValueError("query_window must be an integer in [5, 500]")
+    if isinstance(candidate_budget, bool) or not isinstance(candidate_budget, int) or not 100 <= candidate_budget <= 5000:
+        raise ValueError("candidate_budget must be an integer in [100, 5000]")
+    if history_limit < query_window + 2 or history_limit > 500000:
+        raise ValueError("history_limit must be between query_window + 2 and 500000")
+
+    candles, data_sources = _load_candles(symbol, interval, history_limit)
+    if len(candles) <= query_window:
+        raise ValueError("Not enough local history for Core query and earlier analogs")
+    if query_start_time is None:
+        query_start = len(candles) - query_window
+        query_selection = "latest_closed_window"
+    else:
+        if isinstance(query_start_time, bool) or not isinstance(query_start_time, int) or query_start_time < 0:
+            raise ValueError("query_start_time must be a nonnegative UTC millisecond timestamp")
+        open_times = [item.open_time for item in candles]
+        query_start = bisect_left(open_times, query_start_time)
+        if query_start >= len(candles) or open_times[query_start] != query_start_time:
+            raise ValueError("query_start_time does not match an available closed candle open time")
+        if query_start + query_window > len(candles):
+            raise ValueError("query window extends beyond available closed history")
+        query_selection = "historical_open_time"
+
+    query_end = query_start + query_window - 1
+    max_horizon = 64
+    eligible_candidates = max(0, query_start - query_window - max_horizon)
+    candidate_stride = max(1, (eligible_candidates + candidate_budget - 1) // candidate_budget)
+    source_path, analytics_path = base_jobs._configured_paths()
+    del source_path  # The source database is only read by _load_candles.
+    ledger = ExperimentLedger(analytics_path)
+    run_id = str(uuid4())
+    input_fingerprint = fingerprint_candles(candles)
+    parameters = {
+        "symbol": symbol,
+        "interval": interval,
+        "query_window": query_window,
+        "query_selection": query_selection,
+        "query_start_time": candles[query_start].open_time,
+        "query_end_time": candles[query_end].open_time,
+        "mode": mode,
+        "top_k": top_k,
+        "min_analogs": min_analogs,
+        "candidate_budget": candidate_budget,
+        "candidate_stride": candidate_stride,
+        "horizons": [1, 4, 16, 32, 64],
+        "fee_bps_per_side": fee_bps_per_side,
+        "slippage_bps_per_side": slippage_bps_per_side,
+        "history_limit": history_limit,
+    }
+    ledger.start_run(
+        run_id=run_id,
+        core_version="0.1.0",
+        symbol=symbol,
+        interval=interval,
+        query_start_time=candles[query_start].open_time,
+        query_end_time=candles[query_end].close_time,
+        mode=mode,
+        parameters=parameters,
+        input_fingerprint=input_fingerprint,
+        input_candle_count=len(candles),
+    )
+    try:
+        result = run_intelligence_core(
+            candles,
+            query_start_index=query_start,
+            query_end_index=query_end,
+            mode=mode,
+            top_k=top_k,
+            min_analogs=min_analogs,
+            candidate_stride=candidate_stride,
+            fee_bps_per_side=fee_bps_per_side,
+            slippage_bps_per_side=slippage_bps_per_side,
+            run_id=run_id,
+        )
+        result["experiment_ledger"] = {
+            "run_id": run_id,
+            "status": "completed",
+            "input_fingerprint": input_fingerprint,
+            "append_only": True,
+            "event_hash_chain": True,
+        }
+    except Exception as exc:
+        try:
+            ledger.fail_run(run_id, type(exc).__name__)
+        except Exception:
+            pass
+        raise
+    gaps = find_gaps([item.open_time for item in candles], interval)
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    age_hours = max(0.0, (now_ms - candles[-1].close_time) / 3_600_000)
+    stale_after_hours = 3 * interval_to_ms(interval) / 3_600_000
+    result.update({
+        "query_window": query_window,
+        "query_selection": query_selection,
+        "query_start_time": candles[query_start].open_time,
+        "query_end_time": candles[query_end].open_time,
+        "candidates_examined": result["provenance"]["candidates_examined"],
+        "candidate_budget": candidate_budget,
+        "data_sources": data_sources,
+        "history_candles": len(candles),
+        "historical_gaps": len(gaps),
+        "contiguous_segments": len(gaps) + 1,
+        "data_freshness": {
+            "latest_closed_candle_time": candles[-1].close_time,
+            "age_hours": age_hours,
+            "stale_after_hours": stale_after_hours,
+            "is_stale": age_hours > stale_after_hours,
+            "as_of_utc": datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc).isoformat(),
+        },
+    })
+    ledger.complete_run(run_id, result)
+    return result
 
 
 def run_walk_forward_research(

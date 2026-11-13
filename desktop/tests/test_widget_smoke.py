@@ -8,6 +8,7 @@ from desktop.download_panel import DownloadPanel
 from desktop.market_panel import MarketPanel
 from desktop.paper_panel import PaperPanel
 from desktop.research_panel import ResearchPanel
+from desktop.experiment_ledger_panel import ExperimentLedgerPanel
 from desktop.system_panel import SystemPanel
 
 
@@ -16,6 +17,8 @@ def test_desktop_panels_construct_without_backend_or_network():
     widgets = [
         MarketPanel("http://127.0.0.1:1"),
         ResearchPanel("http://127.0.0.1:1", "/v1/research/pattern", "pattern"),
+        ResearchPanel("http://127.0.0.1:1", "/v1/research/core", "core"),
+        ExperimentLedgerPanel("http://127.0.0.1:1"),
         ResearchPanel("http://127.0.0.1:1", "/v1/research/multitimeframe", "mtf"),
         ResearchPanel("http://127.0.0.1:1", "/v1/research/ensemble", "ensemble"),
         ResearchPanel("http://127.0.0.1:1", "/v1/research/walk-forward", "walk_forward"),
@@ -23,7 +26,7 @@ def test_desktop_panels_construct_without_backend_or_network():
         DownloadPanel("http://127.0.0.1:1"),
         SystemPanel("http://127.0.0.1:1"),
     ]
-    assert len(widgets) == 8
+    assert len(widgets) == 10
     assert not widgets[0].auto_refresh.isActive()  # Market feed is idle until its page is opened.
     for widget in widgets:
         widget.close()
@@ -210,5 +213,105 @@ def test_robustness_panel_formats_parameter_stability_without_picking_winner():
     assert "STRATEGY PORTFOLIO" in rendered
     assert "corr baseline|fewer_analogs: 0.4" in rendered
     assert "reason: not enough history" in rendered
+    panel.close()
+    app.processEvents()
+
+
+
+def test_sherlock_core_panel_renders_module_consensus_and_abstention():
+    app = QApplication.instance() or QApplication([])
+    panel = ResearchPanel(
+        "http://127.0.0.1:1", "/v1/research/core", "core"
+    )
+    assert panel.core_min_analogs.value() == 5
+    assert panel.core_budget.value() == 2000
+    panel.on_completed({
+        "kind": "intelligence_core",
+        "updated_at": "test",
+        "result": {
+            "core_version": "0.1.0",
+            "research_status": "CONFLICT_REQUIRES_VALIDATION",
+            "modules": {
+                "pattern_intelligence": {
+                    "analogs_returned": 8,
+                    "candidates_examined": 12000,
+                },
+                "market_regime": {
+                    "result": {"regime": "TREND_UP"},
+                },
+                "forward_outcomes": {
+                    "horizons": [{
+                        "horizon": 4,
+                        "status": "evaluated",
+                        "historical_analogue_side": "SHORT",
+                        "median_long_net_return": -0.01,
+                        "median_short_net_return": 0.02,
+                        "sideways_path_rate": 0.25,
+                        "regime_consistency": "opposed",
+                    }],
+                },
+            },
+            "conflicts": [{
+                "horizon": 4,
+                "current_regime": "TREND_UP",
+                "historical_analogue_side": "SHORT",
+            }],
+            "required_next_checks": ["Run walk-forward validation."],
+            "decision": {
+                "trading_signal": None,
+                "paper_trade_eligible": False,
+                "abstain": True,
+            },
+        },
+    })
+    rendered = panel.output.toPlainText()
+    assert "SHERLOCK INTELLIGENCE CORE" in rendered
+    assert "CONFLICT_REQUIRES_VALIDATION" in rendered
+    assert "Market regime: TREND_UP" in rendered
+    assert "historical side SHORT" in rendered
+    assert "SIDEWAYS paths 25%" in rendered
+    assert "CONFLICT · +4 · TREND_UP vs SHORT" in rendered
+    panel.close()
+    app.processEvents()
+
+
+
+def test_experiment_ledger_panel_renders_history_and_integrity_report():
+    app = QApplication.instance() or QApplication([])
+    panel = ExperimentLedgerPanel("http://127.0.0.1:1")
+    run_id = "12345678-1234-1234-1234-123456789abc"
+    panel._completed("list", {
+        "count": 1,
+        "limit": 100,
+        "experiments": [{
+            "run_id": run_id,
+            "created_at": "2026-11-13T10:00:00+00:00",
+            "symbol": "BTCUSDT",
+            "interval": "15m",
+            "mode": "free",
+            "status": "completed",
+            "input_candle_count": 320000,
+        }],
+    })
+    assert panel.table.rowCount() == 1
+    assert panel.table.item(0, 0).text() == run_id[:8]
+    assert panel.table.item(0, 0).data(256) == run_id
+    assert "Loaded 1 experiment" in panel.status.text()
+
+    panel._completed("detail", {
+        "run": {"run_id": run_id, "parameters": {"top_k": 20}},
+        "result": {"decision": {"abstain": True}},
+        "events": [{"event_type": "started"}, {"event_type": "completed"}],
+    })
+    rendered = panel.details.toPlainText()
+    assert run_id in rendered
+    assert '"abstain": true' in rendered
+    assert '"top_k": 20' in rendered
+
+    panel._completed("verify", {
+        "ok": True, "runs_checked": 1, "events_checked": 2,
+        "results_checked": 1, "issues": [],
+    })
+    assert panel.status.text() == "LEDGER INTEGRITY: PASS"
     panel.close()
     app.processEvents()

@@ -1,6 +1,12 @@
 name: Backend validation
 
 on:
+  push:
+    branches:
+      - "sherlock-intelligence-core-v0.1.0"
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-validation.yml"
   pull_request:
     paths:
       - "backend/**"

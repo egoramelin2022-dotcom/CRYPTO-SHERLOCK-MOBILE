@@ -1,5 +1,9 @@
 from fastapi.testclient import TestClient
 from types import SimpleNamespace
+import sqlite3
+from uuid import uuid4
+
+from app.research.experiment_ledger import ExperimentLedger
 
 from app.main import app
 
@@ -138,6 +142,7 @@ def test_research_endpoints_reject_calendar_month_interval():
     for endpoint, params in (
         ("/v1/research/pipeline", {"interval": "1M"}),
         ("/v1/research/pattern", {"interval": "1M"}),
+        ("/v1/research/core", {"interval": "1M"}),
         ("/v1/research/ensemble", {"interval": "1M"}),
     ):
         response = client.post(endpoint, params=params)
@@ -276,3 +281,108 @@ def test_robustness_endpoint_rejects_training_history_shorter_than_embargo():
         params={"query_window": 40, "min_training_candles": 100},
     )
     assert response.status_code == 422
+
+
+
+def test_intelligence_core_endpoint_queues_research_job(monkeypatch):
+    import app.main as main
+
+    queued = {
+        "job_id": "intelligence-core-job",
+        "kind": "intelligence_core",
+        "status": "queued",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+        "result": None,
+        "error": None,
+    }
+    captured = {}
+    monkeypatch.setattr(
+        main.research_jobs, "_new_job",
+        lambda kind: SimpleNamespace(job_id=queued["job_id"]),
+    )
+    monkeypatch.setattr(main.research_jobs, "get_job", lambda job_id: queued)
+    monkeypatch.setattr(
+        main, "_run_desktop_research_job",
+        lambda job_id, function, kwargs: captured.update(
+            job_id=job_id, function=function, kwargs=kwargs
+        ),
+    )
+    response = client.post(
+        "/v1/research/core",
+        params={
+            "query_window": 32,
+            "mode": "five_stage",
+            "top_k": 20,
+            "min_analogs": 5,
+            "candidate_budget": 1500,
+        },
+    )
+    assert response.status_code == 202
+    assert response.json()["kind"] == "intelligence_core"
+    assert captured["function"] is main.desktop_services.run_intelligence_core_research
+    assert captured["kwargs"]["query_window"] == 32
+    assert captured["kwargs"]["mode"] == "five_stage"
+    assert captured["kwargs"]["candidate_budget"] == 1500
+
+
+def test_intelligence_core_endpoint_rejects_impossible_sample_and_costs():
+    impossible_sample = client.post(
+        "/v1/research/core", params={"top_k": 5, "min_analogs": 6}
+    )
+    assert impossible_sample.status_code == 422
+
+    invalid_costs = client.post(
+        "/v1/research/core",
+        params={"fee_bps_per_side": 6000, "slippage_bps_per_side": 5000},
+    )
+    assert invalid_costs.status_code == 422
+
+
+
+def test_experiment_ledger_api_lists_details_and_integrity(tmp_path, monkeypatch):
+    source = tmp_path / "source.db"
+    sqlite3.connect(source).close()
+    analytics = tmp_path / "analytics.db"
+    monkeypatch.setenv("SHERLOCK_SOURCE_DB", str(source))
+    monkeypatch.setenv("SHERLOCK_ANALYTICS_DB", str(analytics))
+
+    ledger = ExperimentLedger(analytics)
+    run_id = str(uuid4())
+    ledger.start_run(
+        run_id=run_id, core_version="0.1.0", symbol="BTCUSDT",
+        interval="15m", query_start_time=100, query_end_time=200,
+        mode="free", parameters={"top_k": 5},
+        input_fingerprint="a" * 64, input_candle_count=100,
+    )
+    result = {
+        "run_id": run_id, "research_status": "REQUIRES_WALK_FORWARD_VALIDATION",
+        "decision": {"abstain": True},
+    }
+    ledger.complete_run(run_id, result)
+
+    listing = client.get("/v1/research/experiments", params={"symbol": "BTCUSDT"})
+    assert listing.status_code == 200
+    assert listing.json()["count"] == 1
+    assert listing.json()["experiments"][0]["run_id"] == run_id
+    assert listing.json()["experiments"][0]["status"] == "completed"
+
+    detail = client.get(f"/v1/research/experiments/{run_id}")
+    assert detail.status_code == 200
+    assert detail.json()["result"] == result
+    assert len(detail.json()["events"]) == 2
+
+    verification = client.get("/v1/research/experiments/verify")
+    assert verification.status_code == 200
+    assert verification.json()["ok"] is True
+    assert verification.json()["runs_checked"] == 1
+
+    missing = client.get(f"/v1/research/experiments/{uuid4()}")
+    assert missing.status_code == 404
+
+
+def test_experiment_ledger_api_requires_configured_local_databases(monkeypatch):
+    monkeypatch.delenv("SHERLOCK_SOURCE_DB", raising=False)
+    monkeypatch.delenv("SHERLOCK_ANALYTICS_DB", raising=False)
+    response = client.get("/v1/research/experiments")
+    assert response.status_code == 503
