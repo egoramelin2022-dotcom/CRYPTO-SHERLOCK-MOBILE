@@ -113,6 +113,7 @@ def run_walk_forward(
         for horizon in horizons
     }
     trade_returns = {horizon: [] for horizon in horizons}
+    decision_sides = {horizon: [] for horizon in horizons}
     decision_counts = {
         horizon: {"LONG": 0, "SHORT": 0, "FLAT": 0} for horizon in horizons
     }
@@ -190,6 +191,7 @@ def run_walk_forward(
                 model_return = 0.0
 
             decision_counts[horizon][side] += 1
+            decision_sides[horizon].append(side)
             if side != "FLAT":
                 trade_returns[horizon].append(model_return)
             per_horizon[horizon]["model"].append(model_return)
@@ -235,6 +237,31 @@ def run_walk_forward(
             "horizons": horizon_decisions,
         })
 
+    temporal_stability: dict[str, Any] = {}
+    for horizon, rows in per_horizon.items():
+        count = len(rows["model"])
+        boundaries = (
+            ("early", 0, round(count / 3)),
+            ("middle", round(count / 3), round(2 * count / 3)),
+            ("recent", round(2 * count / 3), count),
+        )
+        temporal_stability[str(horizon)] = {}
+        for period, start, end in boundaries:
+            period_metrics = {
+                name: _summary(values[start:end]) for name, values in rows.items()
+            }
+            period_sides = decision_sides[horizon][start:end]
+            period_returns = rows["model"][start:end]
+            traded = [value for value, side in zip(period_returns, period_sides) if side != "FLAT"]
+            model_period = period_metrics["model"]
+            model_period["trades"] = len(traded)
+            model_period["flat_folds"] = sum(side == "FLAT" for side in period_sides)
+            model_period["trade_rate"] = len(traded) / len(period_sides) if period_sides else 0.0
+            model_period["positive_trade_rate"] = (
+                sum(value > 0 for value in traded) / len(traded) if traded else 0.0
+            )
+            temporal_stability[str(horizon)][period] = period_metrics
+
     metrics = {}
     for horizon, rows in per_horizon.items():
         metrics[str(horizon)] = {
@@ -269,6 +296,8 @@ def run_walk_forward(
         "horizons": list(horizons),
         "folds": fold_rows,
         "metrics_by_horizon": metrics,
+        "temporal_stability_by_horizon": temporal_stability,
+        "temporal_stability_note": "Early, middle and recent are chronological thirds of evaluated folds, not inferred market regimes.",
         "baselines": ["always_long", "always_short_theoretical", "flat"],
         "return_accounting": "equal_notional_per_fold_sum; not compounded",
         "anti_leakage": {
