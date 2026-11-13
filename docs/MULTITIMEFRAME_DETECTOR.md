@@ -9,7 +9,7 @@ Detects the conjunction previously specified for BTC:
 
 ## Definitions
 
-All thresholds are explicit parameters in `MultiTimeframeConfig`. Initial defaults are research starting points, not fitted or validated trading thresholds. The 15m wick is measured as a fraction of total candle range and relative to body size. The 4h support is the minimum low of the preceding 20 completed 4h bars, excluding the current bar. Daily body size is compared with the median absolute body return over the preceding 60 daily bars. Broader decline is measured over 20 daily bars.
+All thresholds are explicit parameters in `MultiTimeframeConfig`. Initial defaults are research starting points, not fitted or validated trading thresholds. The 15m wick is measured as a fraction of total candle range and relative to body size. The 4h support is the minimum low of the preceding 20 completed 4h bars, excluding the current bar. Daily body size must exceed both the median absolute body return over the preceding 60 daily bars multiplied by `daily_body_multiple_of_median` and the absolute floor `daily_body_min_return` (default 2%). The floor prevents a zero or near-zero historical median from allowing an ordinary red candle to pass as unusually large. Broader decline is measured over 20 daily bars.
 
 A 15m candle is associated with the 4h and daily candles whose open/close interval contains its timestamp. Inputs must be complete, validated, chronologically contiguous candles on all three timeframes, and the same symbol. No resampling, gap filling, data download, or use of unfinished candles occurs here.
 
