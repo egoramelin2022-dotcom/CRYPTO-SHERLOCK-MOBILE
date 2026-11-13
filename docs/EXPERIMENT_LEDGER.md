@@ -18,7 +18,7 @@ The input fingerprint covers symbol, interval, timestamps, OHLCV, quote volume, 
 
 ## Storage and integrity
 
-Records are stored in the separate SHERLOCK_ANALYTICS_DB. The source market database remains read-only. Three SQLite tables hold run metadata, result JSON and lifecycle events. Update/delete triggers prevent ordinary application mutations. Each event includes the previous event hash and its own SHA-256 digest, forming a per-run chain.
+Records are stored in the separate SHERLOCK_ANALYTICS_DB. The source market database remains read-only. Three SQLite tables hold run metadata, result JSON and lifecycle events. Update/delete triggers prevent ordinary application mutations. On an existing ledger, a missing trigger is reported rather than silently recreated, so opening the app cannot hide evidence that an integrity guard was removed. Each event includes the previous event hash and its own SHA-256 digest, forming a per-run chain.
 
 GET /v1/research/experiments lists runs. GET /v1/research/experiments/{run_id} returns one full record. GET /v1/research/experiments/verify checks event chains and result digests.
 
