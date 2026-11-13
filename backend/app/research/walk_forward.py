@@ -15,6 +15,7 @@ from app.research.outcome_evaluation import evaluate_forward_path
 from app.research.pattern_intelligence import search_analogs
 from app.research.regime_detection import classify_regime, summarize_regime_outcomes
 from app.research.strategy_portfolio import analyze_strategy_portfolio
+from app.research.prediction_scorecard import build_prediction_scorecard
 
 DEFAULT_HORIZONS = (1, 4, 16, 32, 64)
 
@@ -120,6 +121,7 @@ def run_walk_forward(
         horizon: {"LONG": 0, "SHORT": 0, "FLAT": 0} for horizon in horizons
     }
     skipped: list[dict[str, Any]] = []
+    prediction_rows: dict[int, list[dict[str, Any]]] = {horizon: [] for horizon in horizons}
 
     for fold_number, query_start in enumerate(fold_starts, start=1):
         query_end = query_start + query_window - 1
@@ -222,6 +224,11 @@ def run_walk_forward(
 
             decision_counts[horizon][side] += 1
             decision_sides[horizon].append(side)
+            prediction_rows[horizon].append({
+                "predicted_side": side,
+                "realized_long_net": realized.long_net_return,
+                "realized_short_net": realized.short_net_return,
+            })
             if side != "FLAT":
                 trade_returns[horizon].append(model_return)
             per_horizon[horizon]["model"].append(model_return)
@@ -298,6 +305,11 @@ def run_walk_forward(
             "strategy_returns_by_horizon": strategy_returns_by_horizon,
         })
 
+    prediction_scorecards = {
+        str(horizon): build_prediction_scorecard(rows)
+        for horizon, rows in prediction_rows.items()
+    }
+
     temporal_stability: dict[str, Any] = {}
     for horizon, rows in per_horizon.items():
         count = len(rows["model"])
@@ -368,6 +380,7 @@ def run_walk_forward(
         "horizons": list(horizons),
         "folds": fold_rows,
         "metrics_by_horizon": metrics,
+        "prediction_scorecard_by_horizon": prediction_scorecards,
         "temporal_stability_by_horizon": temporal_stability,
         "regime_outcomes": summarize_regime_outcomes(fold_rows),
         "strategy_portfolio_by_horizon": strategy_portfolio_by_horizon,
