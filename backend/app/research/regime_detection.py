@@ -1,11 +1,11 @@
 """Causal, rule-based market regime descriptors from trailing closed candles."""
 from __future__ import annotations
 
+from math import isfinite
 from statistics import pstdev
 from typing import Sequence, Any
 
 from app.market_data.candles import Candle, find_gaps
-from math import isfinite
 
 
 def classify_regime(
