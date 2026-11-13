@@ -33,7 +33,7 @@ class _ProgressWriter(io.StringIO):
 def run_archive_download(job_id: str, start: str, end: str) -> None:
     base_jobs._set_job(job_id, status="running", result={"progress": "Preparing staging download"})
     try:
-        root = Path(__file__).resolve().parents[2]
+        root = Path(__file__).resolve().parents[3]
         raw_dir = Path(os.getenv(
             "SHERLOCK_ARCHIVE_RAW_DIR", str(root / "data" / "binance_public_raw")
         )).expanduser().resolve()
