@@ -102,7 +102,7 @@ def place_virtual_order(symbol: str, side: str, quantity: float, market_price: f
                     old_qty = float(position["quantity"]) if position else 0.0
                     old_entry = float(position["average_entry"]) if position else 0.0
                     new_qty = old_qty + quantity
-                    average = ((old_qty * old_entry) + (quantity * fill)) / new_qty
+                    average = ((old_qty * old_entry) + (quantity * fill + fee)) / new_qty
                     connection.execute(
                         """INSERT INTO paper_positions VALUES (?, ?, ?, ?)
                            ON CONFLICT(symbol) DO UPDATE SET quantity=excluded.quantity,
