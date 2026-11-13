@@ -187,6 +187,45 @@ async def start_pattern_research(
     return research_jobs.get_job(job.job_id)
 
 
+@app.post("/v1/research/core", status_code=202)
+async def start_intelligence_core(
+    background_tasks: BackgroundTasks,
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w)$"),
+    query_window: int = Query(40, ge=5, le=500),
+    query_start_time: int | None = Query(None, ge=0),
+    mode: str = Query("free", pattern=r"^(free|five_stage)$"),
+    top_k: int = Query(20, ge=1, le=100),
+    min_analogs: int = Query(5, ge=1, le=100),
+    candidate_budget: int = Query(5000, ge=100, le=5000),
+    fee_bps_per_side: float = Query(5.0, ge=0, lt=10000),
+    slippage_bps_per_side: float = Query(2.0, ge=0, lt=10000),
+) -> dict[str, Any]:
+    """Queue the Sherlock Core coordinator over verified local market history."""
+    if min_analogs > top_k:
+        raise HTTPException(status_code=422, detail="min_analogs must not exceed top_k")
+    if fee_bps_per_side + slippage_bps_per_side >= 10000:
+        raise HTTPException(status_code=422, detail="combined per-side costs must be below 10000 bps")
+    job = research_jobs._new_job("intelligence_core")
+    background_tasks.add_task(
+        _run_desktop_research_job, job.job_id,
+        desktop_services.run_intelligence_core_research,
+        {
+            "symbol": symbol,
+            "interval": interval,
+            "query_window": query_window,
+            "query_start_time": query_start_time,
+            "mode": mode,
+            "top_k": top_k,
+            "min_analogs": min_analogs,
+            "candidate_budget": candidate_budget,
+            "fee_bps_per_side": fee_bps_per_side,
+            "slippage_bps_per_side": slippage_bps_per_side,
+        },
+    )
+    return research_jobs.get_job(job.job_id)
+
+
 @app.post("/v1/research/walk-forward", status_code=202)
 async def start_walk_forward_research(
     background_tasks: BackgroundTasks,
