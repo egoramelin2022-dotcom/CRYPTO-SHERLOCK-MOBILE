@@ -52,3 +52,14 @@ the same module for the same candidate are rejected.
    data and remains robust across folds.
 
 This module is an evidence plumbing primitive, not proof of an edge.
+
+
+## Pattern Intelligence timing hardening
+
+Pattern Intelligence validates a single-symbol, single-timeframe, contiguous
+candle series before searching. The embargo must be at least the maximum
+forward horizon so a candidate's measured future path cannot overlap the
+query window. Forward returns enter at the next candle open and exit at the
+close of candidate-end plus horizon, matching the separate outcome evaluator.
+MFE is clamped to nonnegative and MAE to nonpositive values. These descriptive
+outcomes are not used to rank or select analogs.
