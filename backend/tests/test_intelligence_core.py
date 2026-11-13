@@ -71,9 +71,9 @@ def test_core_abstains_when_analog_sample_is_below_minimum():
         rows,
         query_start_index=120,
         query_end_index=129,
-        top_k=2,
+        top_k=5,
         min_analogs=2,
-        horizons=(1, 4),
+        horizons=(64,),
     )
     assert result["research_status"] == "INSUFFICIENT_ANALOGS"
     assert result["decision"]["abstain"] is True
