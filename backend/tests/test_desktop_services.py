@@ -2,7 +2,7 @@ import sqlite3
 
 from app.market_data.candles import Candle
 from app.market_data.repository import CandleRepository
-from app.research.desktop_services import run_pattern_research, run_ensemble_research
+from app.research.desktop_services import run_pattern_research, run_ensemble_research, _load_candles
 
 
 def make_candles(count=120):
@@ -55,3 +55,27 @@ def test_ensemble_reports_optional_engine_availability(tmp_path, monkeypatch):
     assert "pattern_intelligence" in result["engines_available"]
     assert "evidence_report" in result
     assert "not a probability" in result["interpretation"]
+
+
+
+def test_verified_archive_staging_is_merged_with_source_without_duplicates(tmp_path, monkeypatch):
+    rows = make_candles(120)
+    source = tmp_path / "source.db"
+    staging = tmp_path / "staging.db"
+    analytics = tmp_path / "analytics.db"
+
+    for path, selected in ((source, rows[60:]), (staging, rows[:80])):
+        connection = sqlite3.connect(path)
+        repository = CandleRepository(connection)
+        repository.ensure_schema()
+        repository.insert_many(selected)
+        connection.close()
+
+    monkeypatch.setenv("SHERLOCK_SOURCE_DB", str(source))
+    monkeypatch.setenv("SHERLOCK_ANALYTICS_DB", str(analytics))
+    monkeypatch.setenv("SHERLOCK_ARCHIVE_STAGING_DB", str(staging))
+
+    candles, sources = _load_candles("BTCUSDT", "15m", 200)
+    assert len(candles) == 120
+    assert [item.open_time for item in candles] == [item.open_time for item in rows]
+    assert sources == ["source", "archive_staging"]
