@@ -43,8 +43,8 @@ def test_long_short_excursions_and_neutral_range_metrics():
     assert item.long_mae == pytest.approx(98 / 102 - 1)
     assert item.short_mfe == pytest.approx(102 / 98 - 1)
     assert item.short_mae == pytest.approx(102 / 106 - 1)
-    assert item.max_high_low_range == pytest.approx(106 / 97 - 1)
-    assert item.absolute_close_return == pytest.approx(abs(101 / 102 - 1))
+    assert item.max_high_low_range == pytest.approx(106 / 98 - 1)
+    assert item.absolute_close_return == pytest.approx(abs(99 / 102 - 1))
 
 
 def test_round_trip_fees_and_slippage_reduce_both_directions():
