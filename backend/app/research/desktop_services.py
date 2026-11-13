@@ -5,6 +5,8 @@ import sqlite3
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+from datetime import datetime, timezone
+from urllib.parse import quote
 
 from app.market_data.candles import Candle, find_gaps
 from app.research.pattern_intelligence import search_analogs
@@ -20,17 +22,18 @@ from app.research import jobs as base_jobs
 
 def _load_candles(symbol: str, interval: str, limit: int) -> list[Candle]:
     source, _ = base_jobs._configured_paths()
-    uri = f"file:{source.as_posix()}?mode=ro"
+    uri = f"file:{quote(source.as_posix(), safe='/:')}?mode=ro"
     connection = sqlite3.connect(uri, uri=True)
     connection.row_factory = sqlite3.Row
     try:
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         rows = connection.execute(
             """SELECT symbol, interval, open_time, open, high, low, close,
                       volume, close_time, quote_volume, trade_count,
                       taker_buy_base, taker_buy_quote
-               FROM candles WHERE symbol=? AND interval=?
+               FROM candles WHERE symbol=? AND interval=? AND close_time < ?
                ORDER BY open_time DESC LIMIT ?""",
-            (symbol, interval, limit),
+            (symbol, interval, now_ms, limit),
         ).fetchall()
     finally:
         connection.close()
