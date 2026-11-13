@@ -248,7 +248,10 @@ def search_analogs(
         end = start + length - 1
         outcome_end = end + max_horizon
         range_start = candles[start].open_time
-        range_end = candles[outcome_end].close_time if max_horizon else candles[end].close_time
+        range_end = (
+            candles[outcome_end].close_time + (gap - max_horizon) * step
+            if max_horizon else candles[end].close_time + gap * step
+        )
         if any(not (range_end < previous_start or previous_end < range_start)
                for previous_start, previous_end in selected_ranges):
             continue
