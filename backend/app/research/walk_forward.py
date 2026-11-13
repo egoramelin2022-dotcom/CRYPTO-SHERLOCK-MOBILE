@@ -120,9 +120,12 @@ def run_walk_forward(
         query_end = query_start + query_window - 1
         eligible_candidates = max(0, query_start - query_window - max_horizon + 1)
         stride = max(1, (eligible_candidates + candidate_budget - 1) // candidate_budget)
+        # The matcher and historical analog outcomes receive only data available
+        # through the final candle of this query sample; future test candles are excluded.
+        known_at_query_close = candles[:query_end + 1]
         try:
             search = search_analogs(
-                candles, query_start=query_start, query_end=query_end,
+                known_at_query_close, query_start=query_start, query_end=query_end,
                 mode=mode, top_k=top_k, horizons=horizons,
                 candidate_stride=stride,
             )
@@ -150,7 +153,7 @@ def run_walk_forward(
         analog_outcomes = []
         for analog in search.analogs:
             outcome = evaluate_forward_path(
-                candles, candidate_end_index=analog.end_index, horizons=horizons,
+                known_at_query_close, candidate_end_index=analog.end_index, horizons=horizons,
                 fee_bps_per_side=fee_bps_per_side,
                 slippage_bps_per_side=slippage_bps_per_side,
             )
@@ -208,6 +211,8 @@ def run_walk_forward(
             "query_start_time": candles[query_start].open_time,
             "query_end_time": candles[query_end].open_time,
             "training_candles_available": query_start,
+            "known_data_end_index": query_end,
+            "known_data_end_time": candles[query_end].open_time,
             "candidates_examined": search.candidates_examined,
             "candidate_stride": search.candidate_stride,
             "analog_count": len(search.analogs),
@@ -257,6 +262,7 @@ def run_walk_forward(
         "return_accounting": "equal_notional_per_fold_sum; not compounded",
         "anti_leakage": {
             "training_is_strictly_before_test_start": True,
+            "future_candles_excluded_from_analog_search": True,
             "candidate_forward_outcomes_end_before_test_start": True,
             "embargo_candles": max_horizon,
             "test_windows_and_forward_paths_non_overlapping": True,
