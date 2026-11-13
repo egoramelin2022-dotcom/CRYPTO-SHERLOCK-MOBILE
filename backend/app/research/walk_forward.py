@@ -10,7 +10,7 @@ from __future__ import annotations
 from statistics import median
 from typing import Any, Sequence
 
-from app.market_data.candles import Candle
+from app.market_data.candles import Candle, find_gaps
 from app.research.outcome_evaluation import evaluate_forward_path
 from app.research.pattern_intelligence import search_analogs
 from app.research.regime_detection import classify_regime, summarize_regime_outcomes
@@ -180,7 +180,9 @@ def run_walk_forward(
             "SHORT" if trend_side == "LONG" else "LONG" if trend_side == "SHORT" else "FLAT"
         )
         breakout_reference = candles[max(0, query_start - 20):query_start]
-        if breakout_reference:
+        if (len(breakout_reference) >= 2 and not find_gaps(
+            [item.open_time for item in breakout_reference], breakout_reference[0].interval
+        )):
             reference_high = max(item.high for item in breakout_reference)
             reference_low = min(item.low for item in breakout_reference)
             if candles[query_end].close > reference_high:
