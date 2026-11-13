@@ -158,9 +158,12 @@ def test_ledger_detects_tampered_event_hash(tmp_path):
     )
     connection.commit()
     connection.close()
-    audit = ledger.verify_integrity()
+    # Reopening the ledger must not silently recreate a missing guard and hide tampering.
+    reopened = ExperimentLedger(path)
+    audit = reopened.verify_integrity()
     assert audit["ok"] is False
     assert any("event hash mismatch" in issue for issue in audit["issues"])
+    assert any("Missing append-only trigger" in issue for issue in audit["issues"])
 
 
 def test_ledger_rejects_invalid_fingerprint_and_non_uuid(tmp_path):
