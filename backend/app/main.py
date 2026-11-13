@@ -132,7 +132,7 @@ async def start_data_audit(background_tasks: BackgroundTasks) -> dict[str, Any]:
 async def start_historical_pipeline(
     background_tasks: BackgroundTasks,
     symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
-    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1M)$"),
+    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w)$"),
     window: int = Query(20, ge=2, le=500),
 ) -> dict[str, Any]:
     """Queue point-in-time feature and regime extraction from local history."""
@@ -153,7 +153,7 @@ from app.research import archive_jobs
 async def start_pattern_research(
     background_tasks: BackgroundTasks,
     symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
-    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1M)$"),
+    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w)$"),
     query_window: int = Query(40, ge=5, le=500),
     mode: str = Query("free", pattern=r"^(free|five_stage)$"),
     top_k: int = Query(10, ge=1, le=100),
@@ -188,7 +188,7 @@ async def start_multitimeframe_research(
 async def start_ensemble_research(
     background_tasks: BackgroundTasks,
     symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
-    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1M)$"),
+    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w)$"),
     query_window: int = Query(40, ge=5, le=500),
     mode: str = Query("free", pattern=r"^(free|five_stage)$"),
     top_k: int = Query(20, ge=1, le=100),
