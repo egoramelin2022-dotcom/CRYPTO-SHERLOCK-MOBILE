@@ -32,6 +32,25 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "service": "sherlock-data-gateway", "version": "0.1.0"}
 
 
+@app.get("/v1/market/ticker/24hr")
+async def ticker_24hr(
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+) -> dict[str, Any]:
+    """24-hour rolling ticker from public Binance Spot data."""
+    raw = await binance_get("/api/v3/ticker/24hr", {"symbol": symbol})
+    return {
+        "symbol": symbol,
+        "last_price": float(raw["lastPrice"]),
+        "price_change": float(raw["priceChange"]),
+        "price_change_percent": float(raw["priceChangePercent"]),
+        "high_price": float(raw["highPrice"]),
+        "low_price": float(raw["lowPrice"]),
+        "volume": float(raw["volume"]),
+        "quote_volume": float(raw["quoteVolume"]),
+        "trade_count": int(raw["count"]),
+    }
+
+
 @app.get("/v1/market/klines")
 async def klines(
     symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
