@@ -22,8 +22,27 @@ Open `http://127.0.0.1:8000/docs` for the interactive API reference.
 - `GET /v1/market/klines?symbol=BTCUSDT&interval=15m&limit=500`
 - `GET /v1/market/orderbook?symbol=BTCUSDT&limit=100`
 - `GET /v1/market/agg-trades?symbol=BTCUSDT&limit=500`
+- `POST /v1/research/audit` — queues a read-only audit of the configured local SQLite source.
+- `POST /v1/research/pipeline?symbol=BTCUSDT&interval=15m&window=20` — queues historical feature/regime extraction into a separate analytics DB.
+- `GET /v1/research/jobs/{job_id}` — checks job status and returns its result.
 
 The kline response preserves Binance timestamps and includes taker-buy volume fields. Order-book endpoint returns a snapshot only: a true live order-flow feed requires a WebSocket stream plus snapshot/delta sequencing, which is the next implementation step. Historical footprint/order-book depth cannot be reconstructed from OHLCV candles.
+
+## Local research database configuration
+
+Before using the research endpoints, configure two paths on the PC running the server:
+
+- `SHERLOCK_SOURCE_DB` — existing market SQLite database (opened read-only).
+- `SHERLOCK_ANALYTICS_DB` — separate output SQLite database (created/updated by the pipeline).
+
+PowerShell example (adjust paths to your actual files):
+
+```powershell
+$env:SHERLOCK_SOURCE_DB = "C:\\CRYPTO_SHERLOCK\\data\\sherlock_market.db"
+$env:SHERLOCK_ANALYTICS_DB = "C:\\CRYPTO_SHERLOCK\\data\\sherlock_analytics.db"
+```
+
+Research job status is currently held in server memory and is lost if the server restarts. Completed feature/regime outputs and pipeline run metadata are stored in the analytics database. These endpoints do not accept arbitrary filesystem paths from the phone.
 
 ## Docker
 
