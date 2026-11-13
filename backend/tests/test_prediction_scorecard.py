@@ -46,3 +46,14 @@ def test_scorecard_rejects_invalid_prediction_side():
             "realized_long_net": 0.01,
             "realized_short_net": -0.01,
         }])
+
+
+def test_balanced_metrics_are_unavailable_when_a_realized_class_is_absent():
+    result = build_prediction_scorecard([
+        {"predicted_side": "LONG", "realized_long_net": 0.01, "realized_short_net": -0.01},
+        {"predicted_side": "SHORT", "realized_long_net": -0.01, "realized_short_net": 0.01},
+    ])
+    assert result["accuracy_percent"] == 100.0
+    assert result["balanced_accuracy"] is None
+    assert result["macro_f1"] is None
+    assert result["class_metrics"]["FLAT"]["support"] == 0
