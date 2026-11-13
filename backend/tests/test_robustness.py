@@ -45,6 +45,27 @@ def test_robustness_audit_keeps_parameter_runs_separate_and_reports_baselines():
         assert 0 <= horizon["positive_excess_vs_best_baseline_share"] <= 1
 
 
+def test_robustness_audit_reports_pbo_and_aligned_portfolio_diagnostics():
+    result = run_robustness_audit(
+        make_candles(900), query_window=10, top_k=4, max_folds=4,
+        min_training_candles=100, candidate_budget=100,
+    )
+    assert result["paired_diagnostic_configurations"] == [
+        "baseline", "fewer_analogs", "more_analogs"
+    ]
+    assert result["pbo_by_horizon"]
+    assert result["strategy_portfolio_by_horizon"]
+    for diagnostic in result["pbo_by_horizon"].values():
+        if diagnostic["status"] == "completed":
+            assert 0 <= diagnostic["pbo"] <= 1
+            assert diagnostic["aligned_folds"] >= 4
+            assert diagnostic["partitions_evaluated"] > 0
+    for diagnostic in result["strategy_portfolio_by_horizon"].values():
+        if diagnostic["status"] == "completed":
+            assert diagnostic["aligned_folds"] >= 4
+            assert "pairwise_return_correlation" in diagnostic
+
+
 def test_robustness_audit_rejects_invalid_parameters():
     with pytest.raises(ValueError, match="query_window"):
         run_robustness_audit(make_candles(), query_window=2)
