@@ -55,3 +55,11 @@ def test_ensemble_reports_optional_engine_availability(tmp_path, monkeypatch):
     assert "pattern_intelligence" in result["engines_available"]
     assert "evidence_report" in result
     assert "not a probability" in result["interpretation"]
+
+
+def test_ensemble_uses_stumpy_when_research_extra_is_installed(tmp_path, monkeypatch):
+    import pytest
+    pytest.importorskip("stumpy")
+    configure_db(tmp_path, monkeypatch)
+    result = run_ensemble_research(query_window=10, top_k=3)
+    assert "stumpy" in result["engines_available"]
