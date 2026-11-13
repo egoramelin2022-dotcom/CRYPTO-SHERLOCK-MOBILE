@@ -36,6 +36,9 @@ class ResearchJobWorker(QThread):
                 deadline = time.monotonic() + 14400
                 while time.monotonic() < deadline:
                     time.sleep(1.0)
+                    if self.isInterruptionRequested():
+                        self.failed.emit("Research polling stopped during application shutdown")
+                        return
                     response = client.get(
                         f"{self.api_url}/v1/research/jobs/{job_id}"
                     )
