@@ -204,6 +204,16 @@ class ResearchPanel(QWidget):
                 f"  {name.replace('_', ' ').title()}: {weight:.0%}"
                 for name, weight in result["stage_weights"].items()
             )
+        assumptions = result.get("execution_assumptions")
+        if assumptions:
+            summary.extend([
+                "\\nFORWARD-PATH ASSUMPTIONS",
+                f"Entry: {assumptions.get('entry')} · Exit: {assumptions.get('exit')}",
+                f"Fees: {assumptions.get('fee_bps_per_side')} bps/side · "
+                f"Slippage: {assumptions.get('slippage_bps_per_side')} bps/side · "
+                "charged on entry and exit",
+                assumptions.get("short_side", ""),
+            ])
         analogs = result.get("analogs", [])
         if analogs:
             summary.append(f"\nTOP HISTORICAL ANALOGS · {len(analogs)}")
