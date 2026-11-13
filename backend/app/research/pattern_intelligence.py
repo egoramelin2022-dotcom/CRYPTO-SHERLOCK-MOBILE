@@ -46,6 +46,11 @@ class SearchResult:
             "segment_length": self.segment_length,
             "forward_return_basis": "candidate_end_close_to_future_close",
             "excursion_basis": "candidate_end_close_to_future_high_low",
+            "five_stage_method": (
+                "five equal-length positional partitions; corresponding segments are "
+                "compared with equal 20% weight; stage names are descriptive labels, "
+                "not independently verified semantic classifications"
+            ) if self.mode == "five_stage" else None,
             "stage_weights": (
                 {
                     "preliminary_decline": 0.2,
