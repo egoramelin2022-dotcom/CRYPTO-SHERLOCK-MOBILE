@@ -219,6 +219,38 @@ async def start_walk_forward_research(
     return research_jobs.get_job(job.job_id)
 
 
+@app.post("/v1/research/robustness", status_code=202)
+async def start_robustness_research(
+    background_tasks: BackgroundTasks,
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w)$"),
+    query_window: int = Query(40, ge=5, le=500),
+    mode: str = Query("free", pattern=r"^(free|five_stage)$"),
+    top_k: int = Query(10, ge=1, le=100),
+    max_folds: int = Query(20, ge=2, le=100),
+    min_training_candles: int = Query(500, ge=10, le=399000),
+    candidate_budget: int = Query(1000, ge=100, le=5000),
+) -> dict[str, Any]:
+    """Queue bounded parameter-sensitivity validation; does not optimize settings."""
+    if min_training_candles < query_window + 65:
+        raise HTTPException(
+            status_code=422,
+            detail="min_training_candles must be at least query_window + 65",
+        )
+    job = research_jobs._new_job("robustness_research")
+    background_tasks.add_task(
+        _run_desktop_research_job, job.job_id,
+        desktop_services.run_robustness_research,
+        {
+            "symbol": symbol, "interval": interval, "query_window": query_window,
+            "mode": mode, "top_k": top_k, "max_folds": max_folds,
+            "min_training_candles": min_training_candles,
+            "candidate_budget": candidate_budget,
+        },
+    )
+    return research_jobs.get_job(job.job_id)
+
+
 @app.post("/v1/research/multitimeframe", status_code=202)
 async def start_multitimeframe_research(
     background_tasks: BackgroundTasks,
