@@ -169,7 +169,6 @@ class ResearchPanel(QWidget):
             )
             self.robustness_button.clicked.connect(lambda: self.run_research("/v1/research/robustness"))
             actions.addWidget(self.robustness_button)
-            actions.addWidget(self.robustness_button)
         actions.addStretch(1)
         root.addLayout(actions)
         self.status = QLabel("No research job started")
