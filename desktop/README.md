@@ -14,6 +14,8 @@ The Windows package includes a local backend executable. Open **Server Settings*
 
 ## Connected workflows
 
+The packaged desktop launches its local API service on loopback only after database paths are configured.
+
 The archive loader runs asynchronously and writes only to the staging database. The application polls job status instead of freezing the UI.
 
 - Live Binance Spot candles and 24-hour ticker; symbols BTCUSDT, ETHUSDT, BNBUSDT and SOLUSDT; 15m, 1h, 4h and 1d.
