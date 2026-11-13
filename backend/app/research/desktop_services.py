@@ -20,6 +20,7 @@ from app.research.evidence_adapters import pattern_search_evidence, stumpy_match
 from app.research.ensemble import build_evidence_report
 from app.research.outcome_evaluation import evaluate_forward_path
 from app.research.stumpy_adapter import find_query_matches
+from app.research.walk_forward import run_walk_forward
 
 from app.research import jobs as base_jobs
 
@@ -258,6 +259,51 @@ def _split_contiguous(candles: list[Candle]) -> list[list[Candle]]:
             start = index
     chunks.append(candles[start:])
     return chunks
+
+
+
+def run_walk_forward_research(
+    symbol: str = "BTCUSDT",
+    interval: str = "15m",
+    query_window: int = 40,
+    mode: str = "free",
+    top_k: int = 10,
+    max_folds: int = 30,
+    min_training_candles: int = 500,
+    candidate_budget: int = 2000,
+    fee_bps_per_side: float = 5.0,
+    slippage_bps_per_side: float = 2.0,
+    history_limit: int = 400000,
+) -> dict[str, Any]:
+    """Run fixed-method expanding-window validation over verified local candles."""
+    candles, data_sources = _load_candles(symbol, interval, history_limit)
+    result = run_walk_forward(
+        candles, query_window=query_window, mode=mode, top_k=top_k,
+        max_folds=max_folds, min_training_candles=min_training_candles,
+        candidate_budget=candidate_budget,
+        fee_bps_per_side=fee_bps_per_side,
+        slippage_bps_per_side=slippage_bps_per_side,
+    )
+    gaps = find_gaps([item.open_time for item in candles], interval)
+    result.update({
+        "history_candles": len(candles),
+        "historical_gaps": len(gaps),
+        "data_sources": data_sources,
+        "data_freshness": {
+            "latest_closed_candle_time": candles[-1].close_time,
+            "age_hours": max(
+                0.0,
+                (datetime.now(timezone.utc).timestamp() * 1000 - candles[-1].close_time)
+                / 3_600_000,
+            ),
+            "stale_after_hours": 3 * interval_to_ms(interval) / 3_600_000,
+        },
+    })
+    age = result["data_freshness"]["age_hours"]
+    result["data_freshness"]["is_stale"] = (
+        age > result["data_freshness"]["stale_after_hours"]
+    )
+    return result
 
 
 def run_multitimeframe_research(symbol: str = "BTCUSDT") -> dict[str, Any]:
