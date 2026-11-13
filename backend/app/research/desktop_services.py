@@ -123,8 +123,18 @@ def run_pattern_research(
             ).to_dict(),
         })
     history_gaps = find_gaps([item.open_time for item in candles], interval)
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    latest_age_hours = max(0.0, (now_ms - candles[-1].close_time) / 3_600_000)
+    freshness_limit_hours = 3 * interval_to_ms(interval) / 3_600_000
     return {
         "symbol": symbol, "interval": interval, "mode": mode,
+        "data_freshness": {
+            "latest_closed_candle_time": candles[-1].close_time,
+            "age_hours": latest_age_hours,
+            "stale_after_hours": freshness_limit_hours,
+            "is_stale": latest_age_hours > freshness_limit_hours,
+            "as_of_utc": datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc).isoformat(),
+        },
         "stage_weights": result.to_dict()["stage_weights"],
         "forward_return_basis": result.to_dict()["forward_return_basis"],
         "excursion_basis": result.to_dict()["excursion_basis"],
