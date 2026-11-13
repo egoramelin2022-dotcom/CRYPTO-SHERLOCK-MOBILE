@@ -78,3 +78,15 @@ def test_rejects_invalid_costs_horizons_and_candidate_index():
         evaluate_forward_path(rows, candidate_end_index=0, fee_bps_per_side=-1)
     with pytest.raises(ValueError, match="candidate_end_index"):
         evaluate_forward_path(rows, candidate_end_index=99)
+
+
+
+def test_unrelated_older_gap_does_not_block_contiguous_forward_path():
+    rows = [candle(0, 100, 101, 99, 100),
+            candle(1, 100, 101, 99, 100),
+            candle(3, 100, 102, 99, 101),
+            candle(4, 101, 104, 100, 103)]
+    result = evaluate_forward_path(rows, candidate_end_index=2, horizons=(1,))
+    assert result.outcomes[0] is not None
+    assert result.outcomes[0].entry_price == 101
+    assert result.outcomes[0].exit_price == 103
