@@ -303,7 +303,7 @@ class ResearchPanel(QWidget):
                 )
             for run in result.get("runs", []):
                 summary.append(
-                    f"  {run['configuration']}: window {run['query_window']} · top_k {run['top_k']} · "
+                    f"  {run['configuration']}: {run.get('status', 'completed')} · window {run['query_window']} · top_k {run['top_k']} · "
                     f"folds {run['evaluated_folds']} · skipped {run['skipped_fold_count']}"
                 )
         if result.get("method") == "expanding_window_historical_analog_median":
