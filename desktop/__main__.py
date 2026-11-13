@@ -103,6 +103,7 @@ class MainWindow(QMainWindow):
         self.health_timer.timeout.connect(self.check_backend)
         self.health_timer.start(2000)
         self.server_process.errorOccurred.connect(self.on_server_error)
+        self.server_process.finished.connect(self.on_server_finished)
         root = QWidget()
         root.setObjectName("root")
         self.setCentralWidget(root)
@@ -296,6 +297,11 @@ class MainWindow(QMainWindow):
     def open_server_settings(self):
         dialog = ServerSettingsDialog(self.settings, self)
         if dialog.exec() == ServerSettingsDialog.DialogCode.Accepted:
+            if self.server_process.state() != QProcess.ProcessState.NotRunning:
+                self.server_process.terminate()
+                if not self.server_process.waitForFinished(3000):
+                    self.server_process.kill()
+                    self.server_process.waitForFinished(2000)
             self.start_local_backend()
 
     def start_local_backend(self):
@@ -350,6 +356,13 @@ class MainWindow(QMainWindow):
     def on_server_error(self, error):
         self.connection.setText("●  SERVER START FAILED")
         QMessageBox.warning(self, "Local server error", f"Could not start the bundled backend: {error}")
+
+    def on_server_finished(self, exit_code, exit_status):
+        if exit_code != 0 and self.isVisible():
+            self.connection.setText("●  SERVER STOPPED")
+            self.backend_detail.setText(
+                f"Local backend process exited with code {exit_code}. Check that port 8000 is free."
+            )
 
     def closeEvent(self, event):
         if self.server_process.state() != QProcess.ProcessState.NotRunning:
