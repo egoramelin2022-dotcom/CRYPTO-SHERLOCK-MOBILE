@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import quote
 from typing import Any
 
-from app.market_data.candles import find_gaps
+from app.market_data.candles import find_gaps\nfrom app.market_data.intervals import interval_to_ms
 
 _REQUIRED_COLUMNS = {
     "symbol", "interval", "open_time", "open", "high", "low", "close",
@@ -103,7 +103,7 @@ def audit_sqlite_dataset(
                         "volume", "quote_volume", "taker_buy_base", "taker_buy_quote"
                     ))
                     valid = valid and int(row["trade_count"]) >= 0
-                    valid = valid and int(row["close_time"]) > int(row["open_time"])
+                    step_ms = interval_to_ms(interval)\n                    valid = valid and int(row["open_time"]) % step_ms == 0\n                    valid = valid and int(row["close_time"]) == int(row["open_time"]) + step_ms - 1
                 except (TypeError, ValueError, OverflowError):
                     valid = False
                 if not valid:
