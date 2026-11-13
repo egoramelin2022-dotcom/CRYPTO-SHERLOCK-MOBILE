@@ -251,7 +251,8 @@ class ExperimentLedger:
                 "event_hash": event_hash}
 
     def fail_run(self, run_id: str, error_type: str) -> dict[str, Any]:
-        safe_type = re.sub(r"[^A-Za-z0-9_.-]", "", str(error_type))[:80] or "ResearchError"
+        candidate = str(error_type).split(":", 1)[0].strip()
+        safe_type = candidate if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,79}", candidate) else "ResearchError"
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             event_hash = self._append_event(
