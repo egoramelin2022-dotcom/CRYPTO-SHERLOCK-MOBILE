@@ -107,6 +107,9 @@ def evaluate_forward_path(
                 or not math.isfinite(value) or value < 0 or value >= 10_000):
             raise ValueError(f"{label} must be finite and in [0, 10000)")
 
+    if fee_bps_per_side + slippage_bps_per_side >= 10_000:
+        raise ValueError("combined per-side costs must be below 10000 bps")
+
     first = candles[0]
     interval_to_ms(first.interval)
     for candle in candles:
@@ -117,7 +120,9 @@ def evaluate_forward_path(
     available_end = min(len(candles) - 1,
                         candidate_end_index + max(normalized_horizons))
     relevant = candles[:available_end + 1]
-    find_gaps([c.open_time for c in relevant], first.interval)
+    gaps = find_gaps([c.open_time for c in relevant], first.interval)
+    if gaps:
+        raise ValueError("candle sequence contains missing intervals")
 
     entry_index = candidate_end_index + 1
     if entry_index >= len(candles):
