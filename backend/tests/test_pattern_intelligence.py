@@ -122,3 +122,15 @@ def test_search_rejects_non_integer_controls_and_duplicate_timestamps():
         assert "strictly increasing" in str(exc)
     else:
         raise AssertionError("duplicate candle timestamps must be rejected")
+
+
+
+def test_selected_analogs_respect_embargo_larger_than_forward_horizon():
+    rows = [candle(i, 100 + (i % 9)) for i in range(60)]
+    result = search_analogs(
+        rows, query_start=50, query_end=54, top_k=10,
+        horizons=(1,), embargo=8,
+    )
+    starts = [item.start_index for item in result.analogs]
+    assert all(abs(a - b) >= 13 for i, a in enumerate(starts) for b in starts[i + 1:])
+    assert all(item.end_index + 8 < result.query_start_index for item in result.analogs)
