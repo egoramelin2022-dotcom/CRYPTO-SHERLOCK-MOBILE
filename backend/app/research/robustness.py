@@ -11,6 +11,8 @@ from typing import Any, Sequence
 
 from app.market_data.candles import Candle
 from app.research.walk_forward import run_walk_forward
+from app.research.anti_overfitting import probability_of_backtest_overfitting
+from app.research.strategy_portfolio import analyze_strategy_portfolio
 
 
 def run_robustness_audit(
@@ -51,6 +53,7 @@ def run_robustness_audit(
             seen.add(key)
 
     runs: list[dict[str, Any]] = []
+    aligned_fold_returns: dict[str, dict[str, dict[int, float]]] = {}
     for name, window, analog_count in unique:
         training = max(min_training_candles, window + 65)
         try:
@@ -84,6 +87,18 @@ def run_robustness_audit(
             })
             continue
 
+        # Pair only analog-count variants that share the exact query timestamps.
+        if name in ("baseline", "fewer_analogs", "more_analogs"):
+            by_horizon: dict[str, dict[int, float]] = {}
+            for horizon in result["horizons"]:
+                by_time = {}
+                for fold in result["folds"]:
+                    outcome = fold.get("horizons", {}).get(str(horizon))
+                    if outcome is not None:
+                        by_time[fold["query_start_time"]] = float(outcome["model_return"])
+                by_horizon[str(horizon)] = by_time
+            aligned_fold_returns[name] = by_horizon
+
         horizons: dict[str, Any] = {}
         for horizon, metrics in result["metrics_by_horizon"].items():
             model = metrics["model"]
@@ -114,6 +129,27 @@ def run_robustness_audit(
             "skipped_fold_count": len(result["skipped_folds"]),
             "metrics_by_horizon": horizons,
         })
+
+    pbo_by_horizon: dict[str, Any] = {}
+    portfolio_by_horizon: dict[str, Any] = {}
+    paired_names = [name for name in ("baseline", "fewer_analogs", "more_analogs")
+                    if name in aligned_fold_returns]
+    for horizon in sorted(
+        {key for name in paired_names for key in aligned_fold_returns[name]},
+        key=lambda value: int(value),
+    ):
+        available = [aligned_fold_returns[name].get(horizon, {}) for name in paired_names]
+        common_times = sorted(set.intersection(*(set(row) for row in available))) if available else []
+        if len(common_times) < 4 or len(common_times) % 2:
+            pbo_by_horizon[horizon] = {"status": "insufficient_aligned_folds", "aligned_folds": len(common_times), "minimum_even_folds": 4}
+            portfolio_by_horizon[horizon] = {"status": "insufficient_aligned_folds", "aligned_folds": len(common_times)}
+            continue
+        matrix = {
+            name: [aligned_fold_returns[name][horizon][timestamp] for timestamp in common_times]
+            for name in paired_names
+        }
+        pbo_by_horizon[horizon] = {"status": "completed", **probability_of_backtest_overfitting(matrix)}
+        portfolio_by_horizon[horizon] = {"status": "completed", **analyze_strategy_portfolio(matrix)}
 
     horizon_keys = sorted(
         {key for run in runs for key in run["metrics_by_horizon"]},
@@ -163,13 +199,17 @@ def run_robustness_audit(
         "configurations_with_oos_folds": sum(run["evaluated_folds"] > 0 for run in runs),
         "runs": runs,
         "stability_by_horizon": stability,
+        "pbo_by_horizon": pbo_by_horizon,
+        "strategy_portfolio_by_horizon": portfolio_by_horizon,
+        "paired_diagnostic_configurations": paired_names,
         "selection_policy": (
             "No best configuration is selected. Each parameterization is reported "
             "independently; results are not pooled and are not used to retune the model."
         ),
         "limitations": [
             "This is a small local sensitivity neighborhood, not an exhaustive parameter search.",
-            "It is not Probability of Backtest Overfitting (PBO), CSCV, or a statistical significance test.",
+            "PBO is estimated only across baseline/fewer/more analog-count variants on identical fold timestamps; it is conditional on this small candidate set, not a probability of future loss.",
+            "The equal-weight strategy portfolio is a paired diagnostic of analog-count variants, not a capital allocation or executable portfolio model.",
             "All configurations share the same historical dataset, so this audit does not create an independent final holdout.",
             "The best simple baseline is selected retrospectively on the same evaluation run and is an optimistic reference hurdle.",
             "Query-window changes can shift exact fold boundaries; configurations are independent diagnostics, not a paired experiment.",
