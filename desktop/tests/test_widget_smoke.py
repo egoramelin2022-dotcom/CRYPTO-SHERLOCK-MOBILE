@@ -132,3 +132,40 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
     assert "+4 recent: model sum +1.00%" in rendered
     panel.close()
     app.processEvents()
+
+def test_robustness_panel_formats_parameter_stability_without_picking_winner():
+    app = QApplication.instance() or QApplication([])
+    panel = ResearchPanel(
+        "http://127.0.0.1:1", "/v1/research/walk-forward", "walk_forward"
+    )
+    panel.on_completed({
+        "kind": "robustness_research",
+        "updated_at": "test",
+        "result": {
+            "method": "bounded_one_factor_at_a_time_sensitivity",
+            "configurations_requested": 5,
+            "configurations_evaluated": 4,
+            "selection_policy": "Each configuration remains independent; no winner selected.",
+            "stability_by_horizon": {
+                "4": {
+                    "positive_average_return_share": 0.5,
+                    "positive_excess_vs_best_baseline_share": 0.25,
+                    "median_average_return_per_fold": 0.001,
+                }
+            },
+            "runs": [{
+                "configuration": "baseline",
+                "query_window": 40,
+                "top_k": 10,
+                "evaluated_folds": 8,
+                "skipped_fold_count": 1,
+            }],
+        },
+    })
+    rendered = panel.output.toPlainText()
+    assert "ROBUSTNESS AUDIT" in rendered
+    assert "Configurations evaluated: 4 / 5" in rendered
+    assert "positive configurations 50%" in rendered
+    assert "no winner selected" in rendered
+    panel.close()
+    app.processEvents()
