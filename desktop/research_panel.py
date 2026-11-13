@@ -275,7 +275,7 @@ class ResearchPanel(QWidget):
         if result.get("method") == "expanding_window_historical_analog_median":
             summary.extend([
                 "\nWALK-FORWARD · EXPANDING TRAINING WINDOW",
-                f"Evaluated folds: {result.get('evaluated_folds', 0)} · skipped: {len(result.get('skipped_folds', []))}",
+                f"History: {result.get('history_candles', 0):,} candles · evaluated folds: {result.get('evaluated_folds', 0)} · skipped: {len(result.get('skipped_folds', []))}",
                 f"Training is strictly prior · embargo: {result.get('anti_leakage', {}).get('embargo_candles')} candles",
                 "Equal-notional fold sums · not compounded · SHORT is theoretical",
             ])
@@ -289,7 +289,7 @@ class ResearchPanel(QWidget):
                         f"positive {values['positive_fold_rate']:.0%} · "
                         f"max DD {values['max_drawdown_sum_basis']:.2%}"
                     )
-        if "history_candles" in result:
+        if "history_candles" in result and result.get("query_selection") is not None:
             query_label = (
                 "Historical sample" if result.get("query_selection") == "historical_open_time"
                 else "Latest closed sample"
