@@ -56,6 +56,24 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist/CRYPTO-SHERLOCK/Server | Out-Null
           Copy-Item -Path dist/server/CRYPTO-SHERLOCK-Server/* -Destination dist/CRYPTO-SHERLOCK/Server -Recurse -Force
+      - name: Smoke test bundled desktop GUI startup
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $app = (Resolve-Path 'dist/CRYPTO-SHERLOCK/CRYPTO-SHERLOCK.exe').Path
+          $process = Start-Process -FilePath $app -PassThru -WindowStyle Hidden
+          try {
+            Start-Sleep -Seconds 8
+            if ($process.HasExited) {
+              throw "Desktop application exited during startup with code $($process.ExitCode)"
+            }
+            Write-Host 'Desktop GUI process remained alive through startup smoke test.'
+          } finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+            Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
+          }
       - name: Smoke test bundled local backend
         shell: pwsh
         run: |
@@ -111,12 +129,20 @@ jobs:
           $compiler = Join-Path $programFilesX86 'Inno Setup 6\ISCC.exe'
           & $compiler 'desktop\installer.iss'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload Windows installer and portable folder
+          $installer = Get-ChildItem 'dist/installer/*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Windows installer was not produced.' }
+          Write-Host "Installer: $($installer.FullName) · $([math]::Round($installer.Length / 1MB)) MB"
+      - name: Upload Windows installer only
         uses: actions/upload-artifact@v4
         with:
-          name: CRYPTO-SHERLOCK-Windows-x64
-          path: |
-            dist/installer/*.exe
-            dist/CRYPTO-SHERLOCK/
+          name: CRYPTO-SHERLOCK-Installer-Windows-x64
+          path: dist/installer/*.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload portable application separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: CRYPTO-SHERLOCK-Portable-Windows-x64
+          path: dist/CRYPTO-SHERLOCK/
           if-no-files-found: error
           retention-days: 14
