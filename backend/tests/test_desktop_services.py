@@ -2,7 +2,7 @@ import sqlite3
 
 from app.market_data.candles import Candle
 from app.market_data.repository import CandleRepository
-from app.research.desktop_services import run_pattern_research, run_ensemble_research, _load_candles, _split_contiguous
+from app.research.desktop_services import run_pattern_research, run_ensemble_research, run_walk_forward_research, _load_candles, _split_contiguous
 
 
 def make_candles(count=120):
@@ -215,3 +215,25 @@ def test_adaptive_search_skips_only_window_that_crosses_gap(tmp_path, monkeypatc
     assert result["adaptive_results"][0]["window_length"] == 20
     assert result["adaptive_results"][1]["status"] == "skipped"
     assert "missing-candle gap" in result["adaptive_results"][1]["reason"]
+
+
+def test_walk_forward_desktop_service_uses_verified_local_history(tmp_path, monkeypatch):
+    source = tmp_path / "source.db"
+    analytics = tmp_path / "analytics.db"
+    connection = sqlite3.connect(source)
+    repository = CandleRepository(connection)
+    repository.ensure_schema()
+    repository.insert_many(make_candles(400))
+    connection.close()
+    monkeypatch.setenv("SHERLOCK_SOURCE_DB", str(source))
+    monkeypatch.setenv("SHERLOCK_ANALYTICS_DB", str(analytics))
+
+    result = run_walk_forward_research(
+        query_window=10, top_k=3, max_folds=3,
+        min_training_candles=100, candidate_budget=100,
+        history_limit=400,
+    )
+    assert result["history_candles"] == 400
+    assert result["evaluated_folds"] >= 2
+    assert result["data_sources"] == ["source"]
+    assert result["anti_leakage"]["candidate_forward_outcomes_end_before_test_start"]
