@@ -27,10 +27,12 @@ def run_robustness_audit(
 ) -> dict[str, Any]:
     """Compare a small, predeclared neighborhood around the requested settings."""
     if not 5 <= query_window <= 500:
-        raise ValueError("query_window must be in [5, 500]")
-    if not 1 <= top_k <= 100:
-        raise ValueError("top_k must be in [1, 100]")
-
+    if isinstance(query_window, bool) or not isinstance(query_window, int) or not 5 <= query_window <= 500:
+        raise ValueError("query_window must be an integer in [5, 500]")
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
+        raise ValueError("top_k must be an integer in [1, 100]")
+    if mode not in ("free", "five_stage"):
+        raise ValueError("mode must be free or five_stage")
     shorter = max(5, round(query_window * 0.8))
     longer = min(500, round(query_window * 1.2))
     configs = [
@@ -51,17 +53,29 @@ def run_robustness_audit(
     runs: list[dict[str, Any]] = []
     for name, window, analog_count in unique:
         training = max(min_training_candles, window + 65)
-        result = run_walk_forward(
-            candles,
-            query_window=window,
-            mode=mode,
-            top_k=analog_count,
-            max_folds=max_folds,
-            min_training_candles=training,
-            candidate_budget=candidate_budget,
-            fee_bps_per_side=fee_bps_per_side,
-            slippage_bps_per_side=slippage_bps_per_side,
-        )
+        try:
+            result = run_walk_forward(
+                candles,
+                query_window=window,
+                mode=mode,
+                top_k=analog_count,
+                max_folds=max_folds,
+                min_training_candles=training,
+                candidate_budget=candidate_budget,
+                fee_bps_per_side=fee_bps_per_side,
+                slippage_bps_per_side=slippage_bps_per_side,
+            )
+        except ValueError as exc:
+            if "not enough history" not in str(exc) and "not enough independent test folds" not in str(exc):
+                raise
+            runs.append({
+                "configuration": name, "query_window": window, "top_k": analog_count,
+            "status": "completed",
+                "min_training_candles": training, "status": "skipped",
+                "reason": str(exc), "evaluated_folds": 0, "skipped_fold_count": 0,
+                "metrics_by_horizon": {},
+            })
+            continue
         horizons: dict[str, Any] = {}
         for horizon, metrics in result["metrics_by_horizon"].items():
             model = metrics["model"]
@@ -127,6 +141,9 @@ def run_robustness_audit(
         "interval": candles[0].interval if candles else None,
         "method": "bounded_one_factor_at_a_time_sensitivity",
         "configurations_requested": len(configs),
+        "configurations_attempted": len(runs),
+        "configurations_evaluated": sum(run.get("status") == "completed" for run in runs),
+        "configurations_with_oos_folds": sum(run.get("evaluated_folds", 0) > 0 for run in runs),
         "configurations_evaluated": len(runs),
         "runs": runs,
         "stability_by_horizon": stability,
