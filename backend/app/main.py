@@ -238,6 +238,19 @@ async def start_archive_download(
     return research_jobs.get_job(job.job_id)
 
 
+@app.post("/v1/data/sync-current-month", status_code=202)
+async def start_current_month_sync(
+    background_tasks: BackgroundTasks,
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+) -> dict[str, Any]:
+    """Sync current-month closed Binance Spot candles into isolated staging storage."""
+    job = research_jobs._new_job("binance_recent_sync")
+    background_tasks.add_task(
+        archive_jobs.run_recent_sync_job, job.job_id, symbol
+    )
+    return research_jobs.get_job(job.job_id)
+
+
 @app.get("/v1/paper/portfolio")
 async def get_paper_portfolio() -> dict[str, Any]:
     """Read the persistent local virtual spot portfolio; never touches exchange accounts."""
