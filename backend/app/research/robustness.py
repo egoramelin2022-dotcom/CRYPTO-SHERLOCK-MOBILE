@@ -6,8 +6,8 @@ engine; scores are never pooled across different parameterizations.
 """
 from __future__ import annotations
 
-from typing import Any, Sequence
 from statistics import median
+from typing import Any, Sequence
 
 from app.market_data.candles import Candle
 from app.research.walk_forward import run_walk_forward
@@ -26,13 +26,13 @@ def run_robustness_audit(
     slippage_bps_per_side: float = 2.0,
 ) -> dict[str, Any]:
     """Compare a small, predeclared neighborhood around the requested settings."""
-    if not 5 <= query_window <= 500:
     if isinstance(query_window, bool) or not isinstance(query_window, int) or not 5 <= query_window <= 500:
         raise ValueError("query_window must be an integer in [5, 500]")
     if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
         raise ValueError("top_k must be an integer in [1, 100]")
     if mode not in ("free", "five_stage"):
         raise ValueError("mode must be free or five_stage")
+
     shorter = max(5, round(query_window * 0.8))
     longer = min(500, round(query_window * 1.2))
     configs = [
@@ -66,16 +66,22 @@ def run_robustness_audit(
                 slippage_bps_per_side=slippage_bps_per_side,
             )
         except ValueError as exc:
-            if "not enough history" not in str(exc) and "not enough independent test folds" not in str(exc):
+            if ("not enough history" not in str(exc)
+                    and "not enough independent test folds" not in str(exc)):
                 raise
             runs.append({
-                "configuration": name, "query_window": window, "top_k": analog_count,
-            "status": "completed",
-                "min_training_candles": training, "status": "skipped",
-                "reason": str(exc), "evaluated_folds": 0, "skipped_fold_count": 0,
+                "configuration": name,
+                "query_window": window,
+                "top_k": analog_count,
+                "min_training_candles": training,
+                "status": "skipped",
+                "reason": str(exc),
+                "evaluated_folds": 0,
+                "skipped_fold_count": 0,
                 "metrics_by_horizon": {},
             })
             continue
+
         horizons: dict[str, Any] = {}
         for horizon, metrics in result["metrics_by_horizon"].items():
             model = metrics["model"]
@@ -83,6 +89,7 @@ def run_robustness_audit(
                 metrics[key]["average_return_per_fold"]
                 for key in ("always_long", "always_short", "flat")
             ]
+            best_baseline = max(baseline_means)
             horizons[horizon] = {
                 "evaluated_folds": model["folds"],
                 "trades": model["trades"],
@@ -90,16 +97,15 @@ def run_robustness_audit(
                 "average_return_per_fold": model["average_return_per_fold"],
                 "positive_fold_rate": model["positive_fold_rate"],
                 "positive_trade_rate": model["positive_trade_rate"],
-                "best_baseline_average_return": max(baseline_means),
-                "excess_vs_best_baseline": (
-                    model["average_return_per_fold"] - max(baseline_means)
-                ),
+                "best_baseline_average_return": best_baseline,
+                "excess_vs_best_baseline": model["average_return_per_fold"] - best_baseline,
             }
         runs.append({
             "configuration": name,
             "query_window": window,
             "top_k": analog_count,
             "min_training_candles": training,
+            "status": "completed",
             "evaluated_folds": result["evaluated_folds"],
             "skipped_fold_count": len(result["skipped_folds"]),
             "metrics_by_horizon": horizons,
@@ -113,7 +119,9 @@ def run_robustness_audit(
     for horizon in horizon_keys:
         rows = [
             run["metrics_by_horizon"][horizon]
-            for run in runs if horizon in run["metrics_by_horizon"]
+            for run in runs
+            if run["status"] == "completed"
+            and horizon in run["metrics_by_horizon"]
             and run["metrics_by_horizon"][horizon]["evaluated_folds"] > 0
         ]
         stability[horizon] = {
@@ -127,12 +135,10 @@ def run_robustness_audit(
                 if rows else 0.0
             ),
             "median_average_return_per_fold": (
-                median(row["average_return_per_fold"] for row in rows)
-                if rows else 0.0
+                median(row["average_return_per_fold"] for row in rows) if rows else 0.0
             ),
             "median_excess_vs_best_baseline": (
-                median(row["excess_vs_best_baseline"] for row in rows)
-                if rows else 0.0
+                median(row["excess_vs_best_baseline"] for row in rows) if rows else 0.0
             ),
         }
 
@@ -142,9 +148,8 @@ def run_robustness_audit(
         "method": "bounded_one_factor_at_a_time_sensitivity",
         "configurations_requested": len(configs),
         "configurations_attempted": len(runs),
-        "configurations_evaluated": sum(run.get("status") == "completed" for run in runs),
-        "configurations_with_oos_folds": sum(run.get("evaluated_folds", 0) > 0 for run in runs),
-        "configurations_evaluated": len(runs),
+        "configurations_evaluated": sum(run["status"] == "completed" for run in runs),
+        "configurations_with_oos_folds": sum(run["evaluated_folds"] > 0 for run in runs),
         "runs": runs,
         "stability_by_horizon": stability,
         "selection_policy": (
@@ -155,6 +160,8 @@ def run_robustness_audit(
             "This is a small local sensitivity neighborhood, not an exhaustive parameter search.",
             "It is not Probability of Backtest Overfitting (PBO), CSCV, or a statistical significance test.",
             "All configurations share the same historical dataset, so this audit does not create an independent final holdout.",
+            "The best simple baseline is selected retrospectively on the same evaluation run and is an optimistic reference hurdle.",
+            "Query-window changes can shift exact fold boundaries; configurations are independent diagnostics, not a paired experiment.",
             "Positive historical stability does not establish future profitability or executable performance.",
         ],
     }
