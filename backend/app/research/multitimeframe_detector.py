@@ -10,6 +10,7 @@ from __future__ import annotations
 from bisect import bisect_right
 from dataclasses import asdict, dataclass
 import statistics
+import math
 from typing import Sequence
 
 from app.market_data.candles import Candle, find_gaps
@@ -98,8 +99,11 @@ def detect_multitimeframe_setups(
         raise ValueError("lower_wick_min_range_fraction must be in (0, 1]")
     if config.lower_wick_to_body_min < 0 or config.daily_body_multiple_of_median <= 0:
         raise ValueError("wick and daily body multipliers must be positive")
-    if config.support_sweep_tolerance < 0:
-        raise ValueError("support_sweep_tolerance must be nonnegative")
+    if not 0 <= config.support_sweep_tolerance < 1:
+        raise ValueError("support_sweep_tolerance must be in [0, 1)")
+    if (not math.isfinite(config.daily_decline_min_return)
+            or not 0 <= config.daily_decline_min_return < 1):
+        raise ValueError("daily_decline_min_return must be finite and in [0, 1)")
 
     _validate_series(candles_15m, "15m", "15m")
     _validate_series(candles_4h, "4h", "4h")
@@ -161,7 +165,7 @@ def detect_multitimeframe_setups(
             continue
         if abs(daily_body_return) < median_body * config.daily_body_multiple_of_median:
             continue
-        if decline_return > -config.daily_decline_min_return:
+        if decline_return >= -config.daily_decline_min_return:
             continue
 
         results.append(MultiTimeframeSignal(
