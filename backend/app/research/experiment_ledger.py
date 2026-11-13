@@ -335,6 +335,25 @@ class ExperimentLedger:
         issues: list[str] = []
         checked_events = checked_results = 0
         with self._connect() as connection:
+            quick_check = connection.execute("PRAGMA quick_check").fetchone()[0]
+            if quick_check != "ok":
+                issues.append(f"SQLite quick_check failed: {quick_check}")
+            foreign_key_issues = connection.execute("PRAGMA foreign_key_check").fetchall()
+            if foreign_key_issues:
+                issues.append(f"SQLite foreign_key_check found {len(foreign_key_issues)} issue(s)")
+            required_triggers = {
+                "experiment_runs_no_update", "experiment_runs_no_delete",
+                "experiment_results_no_update", "experiment_results_no_delete",
+                "experiment_events_no_update", "experiment_events_no_delete",
+            }
+            existing_triggers = {
+                row["name"] for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='trigger'"
+                ).fetchall()
+            }
+            missing_triggers = sorted(required_triggers - existing_triggers)
+            if missing_triggers:
+                issues.append("Missing append-only trigger(s): " + ", ".join(missing_triggers))
             runs = connection.execute(
                 "SELECT run_id FROM experiment_runs ORDER BY created_at, run_id"
             ).fetchall()
