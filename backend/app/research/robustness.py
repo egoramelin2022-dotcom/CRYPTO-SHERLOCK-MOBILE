@@ -7,6 +7,7 @@ engine; scores are never pooled across different parameterizations.
 from __future__ import annotations
 
 from typing import Any, Sequence
+from statistics import median
 
 from app.market_data.candles import Candle
 from app.research.walk_forward import run_walk_forward
@@ -112,11 +113,11 @@ def run_robustness_audit(
                 if rows else 0.0
             ),
             "median_average_return_per_fold": (
-                sorted(row["average_return_per_fold"] for row in rows)[len(rows) // 2]
+                median(row["average_return_per_fold"] for row in rows)
                 if rows else 0.0
             ),
             "median_excess_vs_best_baseline": (
-                sorted(row["excess_vs_best_baseline"] for row in rows)[len(rows) // 2]
+                median(row["excess_vs_best_baseline"] for row in rows)
                 if rows else 0.0
             ),
         }
