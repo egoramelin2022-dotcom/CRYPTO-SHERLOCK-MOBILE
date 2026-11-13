@@ -165,8 +165,9 @@ def portfolio_snapshot(marks: dict[str, float] | None = None) -> dict[str, Any]:
         items.append({
             "symbol": symbol, "quantity": quantity,
             "average_entry": float(row["average_entry"]),
-            "mark_price": mark, "market_value": value,
-            "unrealized_pnl": unrealized,
+            "mark_price": mark,
+            "mark_source": "public_spot" if symbol in marks else "average_entry_fallback",
+            "market_value": value, "unrealized_pnl": unrealized,
         })
     return {
         "mode": "PAPER_ONLY",
