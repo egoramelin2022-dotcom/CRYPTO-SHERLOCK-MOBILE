@@ -142,6 +142,74 @@ async def start_historical_pipeline(
     return job
 
 
+
+from app.research import desktop_services
+
+
+@app.post("/v1/research/pattern", status_code=202)
+async def start_pattern_research(
+    background_tasks: BackgroundTasks,
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1M)$"),
+    query_window: int = Query(40, ge=5, le=500),
+    mode: str = Query("free", pattern=r"^(free|five_stage)$"),
+    top_k: int = Query(10, ge=1, le=100),
+) -> dict[str, Any]:
+    """Queue free or five-stage historical analog search on verified local candles."""
+    if mode == "five_stage" and query_window < 5:
+        raise HTTPException(status_code=422, detail="five_stage requires at least five candles")
+    job = research_jobs._new_job("pattern_research")
+    background_tasks.add_task(
+        _run_desktop_research_job, job.job_id, desktop_services.run_pattern_research,
+        {"symbol": symbol, "interval": interval, "query_window": query_window,
+         "mode": mode, "top_k": top_k},
+    )
+    return research_jobs.get_job(job.job_id)
+
+
+@app.post("/v1/research/multitimeframe", status_code=202)
+async def start_multitimeframe_research(
+    background_tasks: BackgroundTasks,
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+) -> dict[str, Any]:
+    """Queue aligned 15m/4h/1d historical structure scan."""
+    job = research_jobs._new_job("multitimeframe_research")
+    background_tasks.add_task(
+        _run_desktop_research_job, job.job_id,
+        desktop_services.run_multitimeframe_research, {"symbol": symbol},
+    )
+    return research_jobs.get_job(job.job_id)
+
+
+@app.post("/v1/research/ensemble", status_code=202)
+async def start_ensemble_research(
+    background_tasks: BackgroundTasks,
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+    interval: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1M)$"),
+    query_window: int = Query(40, ge=5, le=500),
+    mode: str = Query("free", pattern=r"^(free|five_stage)$"),
+    top_k: int = Query(20, ge=1, le=100),
+) -> dict[str, Any]:
+    """Queue current ensemble evidence aggregation from available engines."""
+    job = research_jobs._new_job("ensemble_research")
+    background_tasks.add_task(
+        _run_desktop_research_job, job.job_id,
+        desktop_services.run_ensemble_research,
+        {"symbol": symbol, "interval": interval, "query_window": query_window,
+         "mode": mode, "top_k": top_k},
+    )
+    return research_jobs.get_job(job.job_id)
+
+
+def _run_desktop_research_job(job_id: str, function, kwargs: dict[str, Any]) -> None:
+    research_jobs._set_job(job_id, status="running")
+    try:
+        result = function(**kwargs)
+        research_jobs._set_job(job_id, status="completed", result=result)
+    except Exception as exc:
+        research_jobs._set_job(job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
+
+
 @app.get("/v1/research/jobs/{job_id}")
 async def research_job_status(job_id: str) -> dict[str, Any]:
     """Return the current state and result of a research job."""
