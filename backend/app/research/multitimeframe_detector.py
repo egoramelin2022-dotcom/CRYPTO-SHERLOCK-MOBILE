@@ -80,8 +80,8 @@ def detect_multitimeframe_setups(
     low to pierce that level and the same 4h candle to close back above it.
 
     A large bearish daily candle has a body return below zero whose absolute
-    size is at least the configured multiple of the median absolute body
-    return over prior daily bars. The broader decline is measured from the
+    size is at least both the configured multiple of the median absolute body
+    return over prior daily bars and the configured absolute minimum. The broader decline is measured from the
     close N daily bars earlier to the current daily close.
 
     Only complete historical candles should be supplied. No unfinished
@@ -154,7 +154,11 @@ def detect_multitimeframe_setups(
         )
         if daily_body_return >= 0:
             continue
-        if abs(daily_body_return) < median_body * config.daily_body_multiple_of_median:
+        required_daily_body = max(
+            median_body * config.daily_body_multiple_of_median,
+            config.daily_body_min_return,
+        )
+        if abs(daily_body_return) < required_daily_body:
             continue
         if decline_return > -config.daily_decline_min_return:
             continue
