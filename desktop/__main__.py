@@ -299,9 +299,6 @@ class MainWindow(QMainWindow):
             self.start_local_backend()
 
     def start_local_backend(self):
-        if self.server_process.state() != QProcess.ProcessState.NotRunning:
-            self.connection.setText("●  BACKEND STARTING")
-            return
         source = Path(self.settings.value("source_db", "")).expanduser()
         analytics = Path(self.settings.value("analytics_db", str(default_analytics_path()))).expanduser()
         if not source.is_file():
@@ -322,6 +319,11 @@ class MainWindow(QMainWindow):
                 "The bundled CRYPTO-SHERLOCK-Server.exe was not found. Rebuild the complete Windows package."
             )
             return
+        if self.server_process.state() != QProcess.ProcessState.NotRunning:
+            self.server_process.terminate()
+            if not self.server_process.waitForFinished(3000):
+                self.server_process.kill()
+                self.server_process.waitForFinished(2000)
         analytics.parent.mkdir(parents=True, exist_ok=True)
         data_dir = analytics.parent
         environment = QProcessEnvironment.systemEnvironment()
