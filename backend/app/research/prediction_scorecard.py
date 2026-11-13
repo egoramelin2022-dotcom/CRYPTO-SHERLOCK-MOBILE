@@ -70,8 +70,17 @@ def build_prediction_scorecard(
             "recall": recall,
             "f1": f1,
         }
+    all_classes_present = all(item["support"] > 0 for item in recalls.values())
     available_recalls = [item["recall"] for item in recalls.values()
                          if item["recall"] is not None]
+    balanced_accuracy = (
+        sum(available_recalls) / len(SIDES)
+        if all_classes_present else None
+    )
+    macro_f1 = (
+        sum(f1_values) / len(SIDES)
+        if all_classes_present and len(f1_values) == len(SIDES) else None
+    )
     return {
         "status": "evaluated" if total else "insufficient_sample",
         "definition": (
