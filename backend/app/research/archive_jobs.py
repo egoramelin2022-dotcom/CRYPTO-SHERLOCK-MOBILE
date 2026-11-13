@@ -79,7 +79,6 @@ def run_recent_sync_job(job_id: str, symbol: str = "BTCUSDT") -> None:
         try:
             with HistoricalSyncEngine(connection) as engine:
                 for interval in ("15m", "4h", "1d"):
-                    step = interval_to_ms(interval)
                     start_ms = floor_to_interval(month_start_ms, interval)
                     end_ms = floor_to_interval(now_ms, interval) - step
                     if end_ms < start_ms:
