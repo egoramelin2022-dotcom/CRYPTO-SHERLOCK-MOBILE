@@ -36,6 +36,7 @@ class SearchResult:
     query_end_index: int
     segment_length: int
     candidates_examined: int
+    candidate_stride: int
     analogs: tuple[Analog, ...]
 
     def to_dict(self) -> dict:
@@ -61,6 +62,8 @@ class SearchResult:
                 } if self.mode == "five_stage" else {}
             ),
             "candidates_examined": self.candidates_examined,
+            "candidate_stride": self.candidate_stride,
+            "candidate_sampling": "uniform_index_stride" if self.candidate_stride > 1 else "exhaustive",
             "analogs": [asdict(item) for item in self.analogs],
         }
 
@@ -178,6 +181,7 @@ def search_analogs(
     top_k: int = 10,
     horizons: Sequence[int] = (1, 4, 16),
     embargo: int | None = None,
+    candidate_stride: int = 1,
 ) -> SearchResult:
     """Find earlier same-length windows and score their subsequent outcomes.
 
@@ -196,6 +200,9 @@ def search_analogs(
         raise ValueError("mode must be 'free' or 'five_stage'")
     if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 1:
         raise ValueError("top_k must be a positive integer")
+    if (isinstance(candidate_stride, bool) or not isinstance(candidate_stride, int)
+            or candidate_stride < 1):
+        raise ValueError("candidate_stride must be a positive integer")
     if (isinstance(query_start, bool) or not isinstance(query_start, int)
             or isinstance(query_end, bool) or not isinstance(query_end, int)
             or not candles or query_start < 0 or query_end >= len(candles)
@@ -244,7 +251,7 @@ def search_analogs(
     last_candidate_end = query_start - gap - 1
     examined = 0
     ranked: list[tuple[float, int]] = []
-    for end in range(length - 1, last_candidate_end + 1):
+    for end in range(length - 1, last_candidate_end + 1, candidate_stride):
         start = end - length + 1
         # Both the candidate shape and its maximum forward outcome must be continuous.
         if not is_contiguous(start, end):
@@ -281,4 +288,5 @@ def search_analogs(
         selected_ranges.append((range_start, range_end))
         if len(analogs) >= top_k:
             break
-    return SearchResult(mode, query_start, query_end, length, examined, tuple(analogs))
+    return SearchResult(mode, query_start, query_end, length, examined,
+                        candidate_stride, tuple(analogs))
