@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 import httpx
@@ -223,6 +224,12 @@ async def start_archive_download(
     """Download official monthly Binance Spot archives into a separate staging DB."""
     if tuple(map(int, start.split("-"))) > tuple(map(int, end.split("-"))):
         raise HTTPException(status_code=422, detail="start month must not be after end month")
+    latest_complete_month = (datetime.now(timezone.utc).replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    if start < "2017-08" or end > latest_complete_month:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Available monthly archive range starts at 2017-08 and ends at {latest_complete_month}",
+        )
     job = research_jobs._new_job("binance_archive_download")
     background_tasks.add_task(archive_jobs.run_archive_download, job.job_id, start, end)
     return research_jobs.get_job(job.job_id)
