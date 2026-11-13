@@ -9,7 +9,7 @@ import httpx
 import pyqtgraph as pg
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+    QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QSpinBox, QTextEdit, QVBoxLayout, QWidget,
 )
 
@@ -96,11 +96,30 @@ class ResearchPanel(QWidget):
         self.top_k.setRange(1, 100)
         self.top_k.setValue(10)
         form.addRow("Top historical analogs", self.top_k)
+        self.adaptive = QCheckBox("Automatically compare multiple pattern lengths")
+        self.adaptive.setToolTip("Keeps the sample end fixed; each length is ranked independently.")
+        form.addRow("Adaptive window search", self.adaptive)
+        self.adaptive_min = QSpinBox()
+        self.adaptive_min.setRange(5, 500)
+        self.adaptive_min.setValue(20)
+        form.addRow("Adaptive minimum length", self.adaptive_min)
+        self.adaptive_max = QSpinBox()
+        self.adaptive_max.setRange(5, 500)
+        self.adaptive_max.setValue(100)
+        form.addRow("Adaptive maximum length", self.adaptive_max)
+        self.adaptive_step = QSpinBox()
+        self.adaptive_step.setRange(1, 500)
+        self.adaptive_step.setValue(20)
+        form.addRow("Adaptive length step", self.adaptive_step)
         if kind == "mtf":
             self.mode.setEnabled(False)
             self.window.setEnabled(False)
             self.query_start.setEnabled(False)
             self.top_k.setEnabled(False)
+            self.adaptive.setEnabled(False)
+            self.adaptive_min.setEnabled(False)
+            self.adaptive_max.setEnabled(False)
+            self.adaptive_step.setEnabled(False)
         elif kind == "ensemble":
             self.query_start.setEnabled(False)
         root.addLayout(form)
@@ -148,7 +167,14 @@ class ResearchPanel(QWidget):
                 "query_window": self.window.value(),
                 "mode": self.mode.currentData(),
                 "top_k": self.top_k.value(),
+                "adaptive_search": self.adaptive.isChecked(),
+                "adaptive_min_window": self.adaptive_min.value(),
+                "adaptive_max_window": self.adaptive_max.value(),
+                "adaptive_step": self.adaptive_step.value(),
             })
+            if self.adaptive_min.value() > self.adaptive_max.value():
+                self.status.setText("Adaptive minimum length cannot exceed maximum length")
+                return
             selected_time = self.query_start.text().strip()
             if selected_time:
                 try:
