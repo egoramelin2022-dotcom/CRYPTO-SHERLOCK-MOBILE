@@ -165,3 +165,17 @@ def test_current_month_sync_rejects_invalid_symbol():
         "/v1/data/sync-current-month", params={"symbol": "BTC/USDT"}
     )
     assert response.status_code == 422
+
+
+def test_adaptive_pattern_endpoint_rejects_invalid_bounds_and_too_many_windows():
+    reversed_bounds = client.post(
+        "/v1/research/pattern",
+        params={"adaptive_search": "true", "adaptive_min_window": 100, "adaptive_max_window": 20},
+    )
+    assert reversed_bounds.status_code == 422
+
+    too_many = client.post(
+        "/v1/research/pattern",
+        params={"adaptive_search": "true", "adaptive_min_window": 5, "adaptive_max_window": 100, "adaptive_step": 5},
+    )
+    assert too_many.status_code == 422
