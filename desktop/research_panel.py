@@ -160,9 +160,56 @@ class ResearchPanel(QWidget):
             f"Completed · {job.get('kind')} · {job.get('updated_at')}"
         )
         result = job.get("result") or {}
-        self.output.setPlainText(json.dumps(
+        summary = []
+        if "history_candles" in result:
+            summary.extend([
+                f"History loaded: {result.get('history_candles', 0):,} candles",
+                f"Historical gaps: {result.get('historical_gaps', 0)} · "
+                f"continuous segments: {result.get('contiguous_segments', 1)}",
+                f"Candidates examined: {result.get('candidates_examined', '—'):,}",
+            ])
+        if result.get("stage_weights"):
+            summary.append("FIVE-STAGE WEIGHTS · 20% EACH")
+            summary.extend(
+                f"  {name.replace('_', ' ').title()}: {weight:.0%}"
+                for name, weight in result["stage_weights"].items()
+            )
+        analogs = result.get("analogs", [])
+        if analogs:
+            summary.append(f"\nTOP HISTORICAL ANALOGS · {len(analogs)}")
+            for index, item in enumerate(analogs, start=1):
+                analog = item.get("analog", {})
+                summary.append(
+                    f"\n#{index} · similarity {analog.get('similarity', 0):.4f} · "
+                    f"{analog.get('start_time')} → {analog.get('end_time')}"
+                )
+                for name, score in analog.get("stage_similarities", {}).items():
+                    summary.append(f"  {name.replace('_', ' ').title()}: {score:.4f}")
+                outcomes = (item.get("forward_path") or {}).get("outcomes", [])
+                for outcome in outcomes:
+                    if outcome:
+                        summary.append(
+                            f"  +{outcome['horizon']} candles · "
+                            f"LONG net {outcome['long_net_return']:+.2%} · "
+                            f"SHORT net {outcome['short_net_return']:+.2%}"
+                        )
+        if "setups" in result:
+            summary.append(f"\nMULTI-TIMEFRAME SETUPS · {len(result['setups'])}")
+        if "evidence_report" in result:
+            report = result["evidence_report"]
+            summary.append(
+                f"\nENSEMBLE EVIDENCE · {report.get('evidence_count', 0)} observations · "
+                f"{report.get('module_count', 0)} supporting modules"
+            )
+            summary.append(
+                "Engines: " + ", ".join(result.get("engines_available", []))
+            )
+            if result.get("engines_missing"):
+                summary.append("Unavailable: " + ", ".join(result["engines_missing"]))
+        summary.extend(["\nFULL RESEARCH DATA", json.dumps(
             result, ensure_ascii=False, indent=2
-        ))
+        )])
+        self.output.setPlainText("\n".join(summary))
         if self.plot is not None:
             self.plot.clear()
             self.plot.addLegend()
