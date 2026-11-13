@@ -181,21 +181,34 @@ def search_analogs(
     """
     if mode not in ("free", "five_stage"):
         raise ValueError("mode must be 'free' or 'five_stage'")
-    if isinstance(top_k, bool) or top_k < 1:
-        raise ValueError("top_k must be >= 1")
-    if not candles or query_start < 0 or query_end >= len(candles) or query_start > query_end:
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 1:
+        raise ValueError("top_k must be a positive integer")
+    if (isinstance(query_start, bool) or not isinstance(query_start, int)
+            or isinstance(query_end, bool) or not isinstance(query_end, int)
+            or not candles or query_start < 0 or query_end >= len(candles)
+            or query_start > query_end):
         raise ValueError("invalid query bounds")
     length = query_end - query_start + 1
     if mode == "five_stage" and length < 5:
         raise ValueError("five_stage mode requires at least five candles")
-    if any(h < 1 for h in horizons):
-        raise ValueError("horizons must be positive")
+    if any(isinstance(h, bool) or not isinstance(h, int) or h < 1 for h in horizons):
+        raise ValueError("horizons must be positive integers")
+    if embargo is not None and (
+        isinstance(embargo, bool) or not isinstance(embargo, int) or embargo < 0
+    ):
+        raise ValueError("embargo must be a nonnegative integer")
+
+    first = candles[0]
+    step = interval_to_ms(first.interval)
+    previous_time = None
+    for candle in candles:
+        if candle.symbol != first.symbol or candle.interval != first.interval:
+            raise ValueError("all candles must share one symbol and interval")
+        if previous_time is not None and candle.open_time <= previous_time:
+            raise ValueError("candle timestamps must be strictly increasing")
+        previous_time = candle.open_time
     max_horizon = max(horizons, default=0)
     gap = max_horizon if embargo is None else max(embargo, max_horizon)
-    if gap < 0:
-        raise ValueError("embargo must be nonnegative")
-
-    step = interval_to_ms(candles[0].interval)
     # Prefix counts make continuity checks O(1), even when scanning hundreds
     # of thousands of overlapping candidate windows.
     gap_prefix = [0] * len(candles)
