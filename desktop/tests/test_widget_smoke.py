@@ -99,6 +99,7 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
         "result": {
             "method": "expanding_window_historical_analog_median",
             "evaluated_folds": 4,
+            "history_candles": 400,
             "skipped_folds": [],
             "anti_leakage": {"embargo_candles": 64},
             "metrics_by_horizon": {
@@ -113,7 +114,7 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
     })
     rendered = panel.output.toPlainText()
     assert "WALK-FORWARD" in rendered
-    assert "Evaluated folds: 4" in rendered
+    assert "evaluated folds: 4" in rendered
     assert "embargo: 64 candles" in rendered
     assert "Model: sum +2.50%" in rendered
     assert "Always Long: sum +1.00%" in rendered
