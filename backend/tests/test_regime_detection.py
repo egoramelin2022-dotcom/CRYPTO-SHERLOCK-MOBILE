@@ -1,4 +1,5 @@
 import math
+from dataclasses import replace
 
 import pytest
 
@@ -51,3 +52,23 @@ def test_regime_outcome_summary_groups_by_label_and_horizon():
     }])
     assert result["TREND_UP|4"]["folds"] == 1
     assert result["TREND_UP|4"]["average_model_return"] == 0.02
+
+
+def test_regime_classifier_rejects_invalid_thresholds_and_gap_windows():
+    rows = candles()
+    with pytest.raises(ValueError, match="high_volatility_threshold"):
+        classify_regime(rows, high_volatility_threshold=float("nan"))
+    gapped = [
+        replace(row, open_time=row.open_time + STEP, close_time=row.close_time + STEP)
+        if index >= 60 else row
+        for index, row in enumerate(rows)
+    ]
+    with pytest.raises(ValueError, match="missing-candle gap"):
+        classify_regime(gapped, end_index=80, lookback=60)
+
+
+def test_regime_classifier_reports_thresholds_and_source_interval():
+    result = classify_regime(candles(), end_index=80, lookback=60)
+    assert result["symbol"] == "BTCUSDT"
+    assert result["interval"] == "15m"
+    assert result["thresholds"]["high_volatility_per_candle"] == 0.006
