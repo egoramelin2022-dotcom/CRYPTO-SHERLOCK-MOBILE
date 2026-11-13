@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QTimer, QProcess, QProcessEnviro
 from PySide6.QtGui import QFont
 from desktop.market_panel import MarketPanel
 from desktop.research_panel import ResearchPanel
+from desktop.experiment_ledger_panel import ExperimentLedgerPanel
 from desktop.paper_panel import PaperPanel
 from desktop.download_panel import DownloadPanel
 from desktop.system_panel import SystemPanel
@@ -83,11 +84,12 @@ class MainWindow(QMainWindow):
         ("Market Data", "02"),
         ("Pattern Intelligence", "03"),
         ("Sherlock Core", "04"),
-        ("Multi-Timeframe", "05"),
-        ("Ensemble Engine", "06"),
-        ("Backtesting Lab", "07"),
-        ("Paper Trading", "08"),
-        ("System Monitor", "09"),
+        ("Experiment Ledger", "05"),
+        ("Multi-Timeframe", "06"),
+        ("Ensemble Engine", "07"),
+        ("Backtesting Lab", "08"),
+        ("Paper Trading", "09"),
+        ("System Monitor", "10"),
     ]
 
     def __init__(self):
@@ -168,6 +170,7 @@ class MainWindow(QMainWindow):
             self.make_data_page(),
             self.make_research_page("Pattern Intelligence", "Historical analog search with a free mode and the preserved equal-weight five-stage formation.", "/v1/research/pattern", "pattern"),
             self.make_research_page("Sherlock Intelligence Core", "Central research coordinator: pattern analogs, causal market regime, cost-adjusted outcomes and explicit evidence conflicts.", "/v1/research/core", "core"),
+            self.make_ledger_page(),
             self.make_research_page("Multi-Timeframe Scanner", "Aligned 15m lower-wick, 4h support sweep/reclaim and closed 1d bearish-context scan.", "/v1/research/multitimeframe", "mtf"),
             self.make_research_page("Ensemble Engine", "Evidence aggregation with explicit engine availability. No uncalibrated probabilities or signal averaging.", "/v1/research/ensemble", "ensemble"),
             self.make_research_page("Backtesting Lab", "Expanding-window out-of-sample validation of historical analog decisions, with embargo, costs and simple baselines.", "/v1/research/walk-forward", "walk_forward"),
@@ -247,6 +250,17 @@ class MainWindow(QMainWindow):
         page.body.addWidget(archive_panel, 1)
         return page
 
+    def make_ledger_page(self):
+        page = Page("Research Memory & Experiment Ledger", "Append-only history of Sherlock experiments, input fingerprints, immutable results and tamper-evident event chains.")
+        panel = QFrame()
+        panel.setObjectName("panel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 16, 18, 16)
+        self.ledger_panel = ExperimentLedgerPanel(self.api_url)
+        layout.addWidget(self.ledger_panel)
+        page.body.addWidget(panel, 1)
+        return page
+
     def make_system_page(self):
         page = Page("System Monitor", "Backend connection, read-only source audit and derived feature pipeline.")
         panel = QFrame()
@@ -304,6 +318,8 @@ class MainWindow(QMainWindow):
         for i, button in enumerate(self.nav_buttons):
             button.setChecked(i == index)
         self.breadcrumb.setText(f"{self.NAV_ITEMS[index][0].upper()}  /  CRYPTO SHERLOCK")
+        if hasattr(self, "ledger_panel") and index == 4 and self.backend_online:
+            self.ledger_panel.refresh()
         if hasattr(self, "market_panel"):
             if index == 1 and self.backend_online:
                 self.market_panel.auto_refresh.start(30_000)
