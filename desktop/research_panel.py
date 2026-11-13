@@ -264,7 +264,7 @@ class ResearchPanel(QWidget):
                     summary.append(f"    #{rank} similarity {analog.get('similarity', 0):.4f} · {analog.get('start_time')} → {analog.get('end_time')}")
         if result.get("method") == "expanding_window_historical_analog_median":
             summary.extend([
-                "\\nWALK-FORWARD · EXPANDING TRAINING WINDOW",
+                "\nWALK-FORWARD · EXPANDING TRAINING WINDOW",
                 f"Evaluated folds: {result.get('evaluated_folds', 0)} · skipped: {len(result.get('skipped_folds', []))}",
                 f"Training is strictly prior · embargo: {result.get('anti_leakage', {}).get('embargo_candles')} candles",
                 "Equal-notional fold sums · not compounded · SHORT is theoretical",
