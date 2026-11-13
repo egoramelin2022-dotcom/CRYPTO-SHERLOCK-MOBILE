@@ -1,8 +1,8 @@
 """Bounded parameter-sensitivity audit for walk-forward research.
 
-This is a robustness diagnostic, not PBO/CSCV and not an optimizer. Each
-configuration is evaluated independently with the leakage-aware walk-forward
-engine; scores are never pooled across different parameterizations.
+This includes a small-sample PBO-style CSCV diagnostic and a paired variant
+portfolio diagnostic, not an optimizer or proof of future performance. Only
+the aligned analog-count subset is eligible for paired CSCV calculations.
 """
 from __future__ import annotations
 
