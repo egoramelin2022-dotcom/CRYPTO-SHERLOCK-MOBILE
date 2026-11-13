@@ -145,6 +145,7 @@ async def start_historical_pipeline(
 
 
 from app.research import desktop_services
+from app.research.experiment_ledger import ExperimentLedger
 from app.research import paper_portfolio
 from app.research import archive_jobs
 
@@ -404,6 +405,43 @@ async def place_paper_order(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _configured_experiment_ledger() -> ExperimentLedger:
+    try:
+        _, analytics_path = research_jobs._configured_paths()
+    except (RuntimeError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=503, detail="Local research databases are not configured") from exc
+    return ExperimentLedger(analytics_path)
+
+
+@app.get("/v1/research/experiments")
+async def list_experiment_runs(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    symbol: str | None = Query(None, pattern=r"^[A-Z0-9]{5,20}$"),
+    interval: str | None = Query(None, pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w)$"),
+) -> dict[str, Any]:
+    """List immutable Core experiment records from the analytics ledger."""
+    rows = _configured_experiment_ledger().list_runs(
+        limit=limit, offset=offset, symbol=symbol, interval=interval
+    )
+    return {"count": len(rows), "limit": limit, "offset": offset, "experiments": rows}
+
+
+@app.get("/v1/research/experiments/verify")
+async def verify_experiment_ledger() -> dict[str, Any]:
+    """Verify result hashes and append-only event hash chains."""
+    return _configured_experiment_ledger().verify_integrity()
+
+
+@app.get("/v1/research/experiments/{run_id}")
+async def get_experiment_run(run_id: str) -> dict[str, Any]:
+    """Retrieve one immutable experiment record and its full Core result."""
+    record = _configured_experiment_ledger().get_run(run_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Experiment run not found")
+    return record
 
 
 @app.get("/v1/research/jobs/{job_id}")
