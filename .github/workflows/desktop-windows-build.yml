@@ -56,6 +56,39 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist/CRYPTO-SHERLOCK/Server | Out-Null
           Copy-Item -Path dist/server/CRYPTO-SHERLOCK-Server/* -Destination dist/CRYPTO-SHERLOCK/Server -Recurse -Force
+      - name: Smoke test bundled local backend
+        shell: pwsh
+        run: |
+          $server = (Resolve-Path 'dist/CRYPTO-SHERLOCK/Server/CRYPTO-SHERLOCK-Server.exe').Path
+          $env:SHERLOCK_SERVER_LOG = Join-Path $env:RUNNER_TEMP 'sherlock-server-smoke.log'
+          $process = Start-Process -FilePath $server -PassThru -WindowStyle Hidden
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              Start-Sleep -Seconds 1
+              if ($process.HasExited) {
+                throw "Bundled backend exited early with code $($process.ExitCode)"
+              }
+              try {
+                $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 2
+                if ($health.status -eq 'ok' -and $health.service -eq 'sherlock-data-gateway') {
+                  $ready = $true
+                  break
+                }
+              } catch {}
+            }
+            if (-not $ready) {
+              if (Test-Path $env:SHERLOCK_SERVER_LOG) {
+                Get-Content $env:SHERLOCK_SERVER_LOG -Tail 100
+              }
+              throw 'Bundled backend did not become healthy on 127.0.0.1:8000'
+            }
+            Write-Host 'Bundled backend health check passed.'
+          } finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+            }
+          }
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
