@@ -17,13 +17,12 @@ class EmbeddedBackend(QThread):
 
     def run(self):
         try:
-            if getattr(sys, "frozen", False):
-                backend_root = Path(sys._MEIPASS) / "backend"
-            else:
+            if not getattr(sys, "frozen", False):
                 backend_root = Path(__file__).resolve().parents[1] / "backend"
-            if not backend_root.is_dir():
-                raise FileNotFoundError(f"Backend folder not found: {backend_root}")
-            sys.path.insert(0, str(backend_root))
+                if not backend_root.is_dir():
+                    raise FileNotFoundError(f"Backend folder not found: {backend_root}")
+                sys.path.insert(0, str(backend_root))
+            # Frozen builds include app.main and scripts.* in the import table.
             data_dir = self.analytics_db.parent
             os.environ["SHERLOCK_SOURCE_DB"] = str(self.source_db)
             os.environ["SHERLOCK_ANALYTICS_DB"] = str(self.analytics_db)
