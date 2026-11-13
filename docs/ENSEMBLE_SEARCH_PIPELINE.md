@@ -30,3 +30,17 @@ Candidate forward paths are guaranteed not to overlap the query window when
 the configured maximum horizon is respected by the Pattern Intelligence
 embargo. The full candle series must contain only closed candles and must be
 contiguous; missing intervals invalidate the run.
+
+## Local API job
+
+The FastAPI gateway exposes `POST /v1/research/ensemble`. It accepts
+`symbol`, `interval`, `window`, `top_k`, `mode` (`free` or
+`five_stage`), and `include_stumpy`. The endpoint returns a queued job ID;
+poll `GET /v1/research/jobs/{job_id}` for completion.
+
+The job reads `SHERLOCK_SOURCE_DB` in SQLite read-only mode and writes the
+serialized result to the separate `SHERLOCK_ANALYTICS_DB` table
+`research_ensemble_runs`. It filters unfinished candles and searches only
+the latest contiguous segment. Earlier segments separated by gaps are
+reported as excluded; they are never silently concatenated or gap-filled.
+STUMPY remains opt-in because it is an optional research dependency.
