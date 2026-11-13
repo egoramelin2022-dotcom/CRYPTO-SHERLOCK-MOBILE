@@ -37,7 +37,7 @@ jobs:
           desktop/__main__.py
       - name: Build bundled local backend executable
         run: >
-          pyinstaller --noconfirm --clean --console
+          pyinstaller --noconfirm --clean --windowed
           --name CRYPTO-SHERLOCK-Server
           --paths backend
           --collect-all fastapi
