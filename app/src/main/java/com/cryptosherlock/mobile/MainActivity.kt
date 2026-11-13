@@ -461,7 +461,7 @@ class MainActivity : Activity() {
                 val queued = JSONObject(postUrl(base + path))
                 val jobId = queued.getString("job_id")
                 var finished: JSONObject? = null
-                repeat(400) {
+                for (attempt in 0 until 400) {
                     Thread.sleep(1500L)
                     val current = JSONObject(readUrl("$base/v1/research/jobs/$jobId"))
                     val state = current.optString("status")
@@ -470,7 +470,7 @@ class MainActivity : Activity() {
                     }
                     if (state == "completed" || state == "failed") {
                         finished = current
-                        return@repeat
+                        break
                     }
                 }
                 val finalJob = finished ?: throw IllegalStateException("Задание выполняется дольше 10 минут; проверь статус позже: $jobId")
@@ -487,16 +487,16 @@ class MainActivity : Activity() {
                             " · пропусков " + d.optLong("missing_candles") +
                             " · повреждённых " + d.optLong("malformed_rows")
                     }
-                    "SERVER DATA AUDIT\\nIntegrity: " + result.optJSONArray("integrity_check") +
-                        "\\nНаборов: " + datasets.length() + "\\n" + lines.joinToString("\\n")
+                    "SERVER DATA AUDIT\nIntegrity: " + result.optJSONArray("integrity_check") +
+                        "\nНаборов: " + datasets.length() + "\n" + lines.joinToString("\n")
                 } else {
-                    "HISTORICAL PIPELINE\\nИнструмент: " + result.optString("symbol") +
+                    "HISTORICAL PIPELINE\nИнструмент: " + result.optString("symbol") +
                         " · таймфрейм: " + result.optString("interval") +
-                        "\\nСвечей прочитано: " + result.optInt("candles_read") +
-                        "\\nПризнаков рассчитано: " + result.optInt("features_written") +
-                        "\\nРежимов рассчитано: " + result.optInt("regimes_written") +
-                        "\\nНепрерывных сегментов: " + result.optInt("segments") +
-                        "\\nИсходная БД открыта только для чтения. Результаты записаны в отдельную analytics DB."
+                        "\nСвечей прочитано: " + result.optInt("candles_read") +
+                        "\nПризнаков рассчитано: " + result.optInt("features_written") +
+                        "\nРежимов рассчитано: " + result.optInt("regimes_written") +
+                        "\nНепрерывных сегментов: " + result.optInt("segments") +
+                        "\nИсходная БД открыта только для чтения. Результаты записаны в отдельную analytics DB."
                 }
                 runOnUiThread {
                     researchResult.text = report
@@ -555,7 +555,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
             addView(TextView(this@MainActivity).apply {
-                text = "Эмулятор: http://10.0.2.2:8000\\nТелефон: http://IP-АДРЕС-ПК:8000 (одна Wi-Fi сеть)"
+                text = "Эмулятор: http://10.0.2.2:8000\nТелефон: http://IP-АДРЕС-ПК:8000 (одна Wi-Fi сеть)"
                 textSize = 12f
             })
             addView(input)
