@@ -30,6 +30,7 @@ class MultiTimeframeConfig:
 @dataclass(frozen=True, slots=True)
 class MultiTimeframeSignal:
     timestamp: int
+    confirmed_at: int
     price: float
     wick_15m_fraction: float
     wick_15m_to_body: float
@@ -83,8 +84,11 @@ def detect_multitimeframe_setups(
     return over prior daily bars. The broader decline is measured from the
     close N daily bars earlier to the current daily close.
 
-    Only complete historical candles should be supplied. No unfinished
-    current candles are inferred or fetched here.
+    Only complete historical candles should be supplied. The 15m wick may
+    occur before its containing 4h / 1d bars close; therefore confirmed_at
+    records the latest close time among all three bars. The observation must
+    not be treated as available before that timestamp. No unfinished current
+    candles are inferred or fetched here.
     """
     if config.support_lookback_4h < 2:
         raise ValueError("support_lookback_4h must be >= 2")
@@ -145,6 +149,10 @@ def detect_multitimeframe_setups(
             ]
         ]
         median_body = statistics.median(prior_bodies)
+        if median_body <= 0:
+            # A zero baseline makes every bearish candle appear infinitely large.
+            # Without a measurable prior body distribution, this condition is unknown.
+            continue
         decline_return = (
             bar_1d.close /
             candles_1d[index_1d - config.daily_decline_lookback].close - 1.0
@@ -158,6 +166,7 @@ def detect_multitimeframe_setups(
 
         results.append(MultiTimeframeSignal(
             timestamp=candle_15m.open_time,
+            confirmed_at=max(candle_15m.close_time, bar_4h.close_time, bar_1d.close_time),
             price=candle_15m.close,
             wick_15m_fraction=lower_wick / span,
             wick_15m_to_body=wick_to_body,
