@@ -46,6 +46,14 @@ def test_walk_forward_uses_strictly_prior_analogs_and_reports_baselines():
         assert 0.0 <= scorecard["accuracy"] <= 1.0
         assert 0.0 <= scorecard["coverage"] <= 1.0
         assert "confusion_matrix" in scorecard
+    baseline_scores = result["baseline_prediction_scorecards_by_horizon"]
+    assert set(baseline_scores) == {"trend_following", "mean_reversion", "range_breakout"}
+    for horizon_scores in baseline_scores.values():
+        assert set(horizon_scores) == {"1", "4", "8"}
+        for scorecard in horizon_scores.values():
+            assert scorecard["samples"] >= 2
+            assert 0.0 <= scorecard["accuracy"] <= 1.0
+            assert 0.0 <= scorecard["coverage"] <= 1.0
     assert result["strategy_portfolio_by_horizon"]
     for horizon, portfolio in result["strategy_portfolio_by_horizon"].items():
         assert set(portfolio["strategies"]) == {
