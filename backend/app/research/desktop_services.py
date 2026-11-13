@@ -150,7 +150,7 @@ def run_pattern_research(
                     "reason": "query window begins before available history",
                 })
                 continue
-            eligible = max(0, window_start - window_length - 64)
+            eligible = max(0, window_start - window_length - 63)
             stride = max(1, (eligible + adaptive_candidate_budget - 1)
                          // adaptive_candidate_budget)
             try:
