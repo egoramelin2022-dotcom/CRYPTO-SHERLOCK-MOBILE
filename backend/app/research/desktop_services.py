@@ -41,10 +41,16 @@ def _load_candles(symbol: str, interval: str, limit: int) -> list[Candle]:
         candle.validate()
     gaps = find_gaps([c.open_time for c in candles], interval)
     if gaps:
-        raise ValueError(
-            f"Local {symbol} {interval} history has {len(gaps)} gaps; "
-            "repair or select a verified contiguous range before research"
+        # Keep only the most recent contiguous suffix. Never interpolate,
+        # synthesize, or let a candidate window cross a missing candle.
+        last_gap = gaps[-1]
+        first_after_gap = next(
+            i for i, candle in enumerate(candles)
+            if candle.open_time == last_gap.next_open_time
         )
+        candles = candles[first_after_gap:]
+    if not candles:
+        raise ValueError(f"No contiguous local candles for {symbol} {interval}")
     return candles
 
 
