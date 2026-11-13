@@ -231,3 +231,48 @@ def test_walk_forward_endpoint_rejects_training_history_shorter_than_embargo():
         params={"query_window": 40, "min_training_candles": 100},
     )
     assert response.status_code == 422
+
+
+def test_robustness_endpoint_queues_sensitivity_job(monkeypatch):
+    import app.main as main
+
+    queued = {
+        "job_id": "robustness-job",
+        "kind": "robustness_research",
+        "status": "queued",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+        "result": None,
+        "error": None,
+    }
+    captured = {}
+    monkeypatch.setattr(
+        main.research_jobs, "_new_job",
+        lambda kind: SimpleNamespace(job_id=queued["job_id"]),
+    )
+    monkeypatch.setattr(main.research_jobs, "get_job", lambda job_id: queued)
+    monkeypatch.setattr(
+        main, "_run_desktop_research_job",
+        lambda job_id, function, kwargs: captured.update(
+            job_id=job_id, function=function, kwargs=kwargs
+        ),
+    )
+    response = client.post(
+        "/v1/research/robustness",
+        params={
+            "query_window": 30, "max_folds": 8,
+            "min_training_candles": 200, "candidate_budget": 500,
+        },
+    )
+    assert response.status_code == 202
+    assert response.json()["job_id"] == "robustness-job"
+    assert captured["function"] is main.desktop_services.run_robustness_research
+    assert captured["kwargs"]["query_window"] == 30
+
+
+def test_robustness_endpoint_rejects_training_history_shorter_than_embargo():
+    response = client.post(
+        "/v1/research/robustness",
+        params={"query_window": 40, "min_training_candles": 100},
+    )
+    assert response.status_code == 422
