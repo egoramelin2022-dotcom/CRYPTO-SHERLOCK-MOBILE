@@ -7,6 +7,7 @@ cross-module tension, and explicitly abstains from claiming a forecast.
 from __future__ import annotations
 
 from statistics import mean, median
+import math
 from typing import Any, Sequence
 from uuid import uuid4
 
@@ -59,6 +60,20 @@ def run_intelligence_core(
     _validate_positive_integer("min_analogs", min_analogs)
     _validate_positive_integer("top_k", top_k)
     _validate_positive_integer("candidate_stride", candidate_stride)
+    if min_analogs > top_k:
+        raise ValueError("min_analogs must not exceed top_k")
+    if isinstance(regime_lookback, bool) or not isinstance(regime_lookback, int) or not 20 <= regime_lookback <= 2000:
+        raise ValueError("regime_lookback must be an integer in [20, 2000]")
+    for name, value in (("fee_bps_per_side", fee_bps_per_side),
+                        ("slippage_bps_per_side", slippage_bps_per_side)):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value < 10_000:
+            raise ValueError(f"{name} must be finite and in [0, 10000)")
+    if fee_bps_per_side + slippage_bps_per_side >= 10_000:
+        raise ValueError("combined per-side costs must be below 10000 bps")
+    if not candles:
+        raise ValueError("candles must not be empty")
+    for candle in candles:
+        candle.validate()
     if not horizons:
         raise ValueError("at least one forward horizon is required")
     normalized_horizons: list[int] = []
@@ -248,7 +263,7 @@ def run_intelligence_core(
             "pattern_intelligence": {
                 "status": "completed",
                 "mode": pattern.mode,
-                "candidate_count": pattern.candidates_examined,
+                "candidates_examined": pattern.candidates_examined,
                 "analogs_returned": len(pattern.analogs),
                 "analogs": [
                     {
