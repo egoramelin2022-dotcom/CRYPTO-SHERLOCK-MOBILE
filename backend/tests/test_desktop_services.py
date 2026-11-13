@@ -112,3 +112,20 @@ def test_contiguous_segment_split_preserves_each_side_of_gap():
     assert [len(chunk) for chunk in chunks] == [6, 5]
     assert chunks[0][-1].open_time < chunks[1][0].open_time
     assert chunks[0][-1].open_time + 900_000 < chunks[1][0].open_time
+
+
+
+def test_desktop_pattern_report_exposes_equal_weight_five_stage_evidence(tmp_path, monkeypatch):
+    configure_db(tmp_path, monkeypatch)
+    result = run_pattern_research(
+        query_window=10, top_k=2, history_limit=120, mode="five_stage"
+    )
+    assert result["stage_weights"] == {
+        "preliminary_decline": 0.2,
+        "recovery": 0.2,
+        "peak": 0.2,
+        "sharp_collapse": 0.2,
+        "sideways_lower_wicks": 0.2,
+    }
+    assert result["analogs"]
+    assert result["analogs"][0]["analog"]["stage_similarities"]
