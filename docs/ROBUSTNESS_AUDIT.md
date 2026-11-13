@@ -44,6 +44,8 @@ The desktop endpoint caps the robustness audit at 30 folds and 2,000 candidate w
 - The sensitivity neighborhood is small and predeclared, not exhaustive.
 - Query-window changes can shift the exact fold boundaries; configuration summaries are independent diagnostics, not a paired statistical experiment on identical timestamps.
 - All configurations use the same historical dataset. This does not create a final independent holdout.
-- The audit is not Probability of Backtest Overfitting (PBO), Combinatorially Symmetric Cross-Validation (CSCV), a multiple-testing correction, or a statistical significance test.
+- A small-sample PBO-style CSCV diagnostic is additionally calculated only across baseline / fewer-analogs / more-analogs variants paired on identical query timestamps. It is conditional on those three correlated variants, not a comprehensive multiple-testing correction, statistical significance test, or probability of future loss.
+- The same aligned analog-count variants receive pairwise return-correlation and equal-weight fold-return diagnostics. This is not a deployable portfolio or capital-allocation simulation.
+- Query-window sensitivity configurations may use slightly different fold timestamps; they are not included in the paired PBO/portfolio diagnostics.
 - No winning configuration is selected and the audit does not retune the model.
 - Positive sensitivity results do not establish future profitability, execution quality or portfolio-level performance.
