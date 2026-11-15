@@ -331,8 +331,6 @@ def run_intelligence_core_research(
         "min_analogs": min_analogs,
         "candidate_budget": candidate_budget,
         "candidate_stride": candidate_stride,
-        "adaptive_window_sweep": adaptive_window_sweep,
-        "sweep_window_lengths": list(sweep_window_lengths) if adaptive_window_sweep else [],
         "horizons": [1, 4, 16, 32, 64],
         "fee_bps_per_side": fee_bps_per_side,
         "slippage_bps_per_side": slippage_bps_per_side,
@@ -472,7 +470,7 @@ def run_multitimeframe_pattern_research(
     if not isinstance(adaptive_window_sweep, bool):
         raise ValueError("adaptive_window_sweep must be a boolean")
 
-    series: dict[str, list[Candle]] = {};
+    series: dict[str, list[Candle]] = {}
     data_sources: dict[str, list[str]] = {}
     limits = {"15m": 400000, "1h": 100000, "4h": 30000, "1d": 10000}
     for interval, limit in limits.items():
@@ -535,6 +533,8 @@ def run_multitimeframe_pattern_research(
         "top_k": top_k,
         "candidate_budget": candidate_budget,
         "candidate_stride": candidate_stride,
+        "adaptive_window_sweep": adaptive_window_sweep,
+        "sweep_window_lengths": list(sweep_window_lengths) if adaptive_window_sweep else [],
         "horizons_15m": list(horizons),
         "fee_bps_per_side": fee_bps_per_side,
         "slippage_bps_per_side": slippage_bps_per_side,
