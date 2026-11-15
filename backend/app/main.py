@@ -318,6 +318,7 @@ async def start_multitimeframe_pattern_research(
     query_end_time: int | None = Query(None, ge=0),
     fee_bps_per_side: float = Query(5.0, ge=0, lt=10000),
     slippage_bps_per_side: float = Query(2.0, ge=0, lt=10000),
+    adaptive_window_sweep: bool = Query(False),
 ) -> dict[str, Any]:
     """Queue causal 15m/1h/4h/1d historical shape analogue research."""
     if fee_bps_per_side + slippage_bps_per_side >= 10000:
@@ -337,6 +338,7 @@ async def start_multitimeframe_pattern_research(
             "query_end_time": query_end_time,
             "fee_bps_per_side": fee_bps_per_side,
             "slippage_bps_per_side": slippage_bps_per_side,
+            "adaptive_window_sweep": adaptive_window_sweep,
         },
     )
     return research_jobs.get_job(job.job_id)
