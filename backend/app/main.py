@@ -305,6 +305,45 @@ async def start_multitimeframe_research(
     return research_jobs.get_job(job.job_id)
 
 
+@app.post("/v1/research/multitimeframe-patterns", status_code=202)
+async def start_multitimeframe_pattern_research(
+    background_tasks: BackgroundTasks,
+    symbol: str = Query("BTCUSDT", pattern=r"^[A-Z0-9]{5,20}$"),
+    query_window_15m: int = Query(32, ge=8, le=500),
+    window_1h: int = Query(16, ge=2, le=500),
+    window_4h: int = Query(8, ge=2, le=500),
+    window_1d: int = Query(5, ge=2, le=500),
+    top_k: int = Query(30, ge=1, le=100),
+    candidate_budget: int = Query(2000, ge=100, le=5000),
+    query_end_time: int | None = Query(None, ge=0),
+    fee_bps_per_side: float = Query(5.0, ge=0, lt=10000),
+    slippage_bps_per_side: float = Query(2.0, ge=0, lt=10000),
+    adaptive_window_sweep: bool = Query(False),
+) -> dict[str, Any]:
+    """Queue causal 15m/1h/4h/1d historical shape analogue research."""
+    if fee_bps_per_side + slippage_bps_per_side >= 10000:
+        raise HTTPException(status_code=422, detail="combined per-side costs must be below 10000 bps")
+    job = research_jobs._new_job("multitimeframe_pattern_intelligence")
+    background_tasks.add_task(
+        _run_desktop_research_job, job.job_id,
+        desktop_services.run_multitimeframe_pattern_research,
+        {
+            "symbol": symbol,
+            "query_window_15m": query_window_15m,
+            "window_1h": window_1h,
+            "window_4h": window_4h,
+            "window_1d": window_1d,
+            "top_k": top_k,
+            "candidate_budget": candidate_budget,
+            "query_end_time": query_end_time,
+            "fee_bps_per_side": fee_bps_per_side,
+            "slippage_bps_per_side": slippage_bps_per_side,
+            "adaptive_window_sweep": adaptive_window_sweep,
+        },
+    )
+    return research_jobs.get_job(job.job_id)
+
+
 @app.post("/v1/research/ensemble", status_code=202)
 async def start_ensemble_research(
     background_tasks: BackgroundTasks,

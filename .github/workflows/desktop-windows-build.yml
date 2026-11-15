@@ -107,6 +107,7 @@ jobs:
                 $paths -notcontains '/v1/research/core' -or
                 $paths -notcontains '/v1/research/walk-forward' -or
                 $paths -notcontains '/v1/research/robustness' -or
+                $paths -notcontains '/v1/research/multitimeframe-patterns' -or
                 $paths -notcontains '/v1/data/archive-download' -or
                 $paths -notcontains '/v1/data/sync-current-month' -or
                 $paths -notcontains '/v1/paper/orders') {
@@ -142,7 +143,7 @@ jobs:
           $desktopPath = (Resolve-Path 'dist/release/Portable/CRYPTO-SHERLOCK.exe').Path
           $serverPath = (Resolve-Path 'dist/release/Portable/Server/CRYPTO-SHERLOCK-Server.exe').Path
           $manifest = @"
-          CRYPTO SHERLOCK DESKTOP 0.3.0
+          CRYPTO SHERLOCK DESKTOP 0.4.0
           Complete Windows x64 release bundle
 
           Installer\
