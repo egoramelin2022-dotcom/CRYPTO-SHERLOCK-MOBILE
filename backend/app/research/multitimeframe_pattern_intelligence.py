@@ -230,14 +230,21 @@ def _window_features(candles: Sequence[Candle]) -> list[tuple[float, ...]]:
             math.log(candle.close / candles[index - 1].close) / scale
             if index else 0.0
         )
-        local_start = max(0, index - 3)
+        local_start = max(0, index - 4)
         local_high = max(item.high for item in candles[local_start:index + 1])
         local_low = min(item.low for item in candles[local_start:index + 1])
         structure_position = (
             (candle.close - local_low) / (local_high - local_low)
             if local_high > local_low else 0.5
         )
+        prior = candles[local_start:index]
+        higher_high_break = float(bool(prior) and candle.high > max(item.high for item in prior))
+        lower_low_break = float(bool(prior) and candle.low < min(item.low for item in prior))
         volume_ratio = math.log(max(candle.volume, 1e-12) / median_volume)
+        taker_buy_fraction = (
+            min(1.0, max(0.0, candle.taker_buy_base / candle.volume))
+            if candle.volume > 0 else 0.5
+        )
         range_norm = (candle.high - candle.low) / candle.open / scale
         result.append((
             path,
@@ -247,7 +254,10 @@ def _window_features(candles: Sequence[Candle]) -> list[tuple[float, ...]]:
             close_location,
             previous_return,
             structure_position,
+            higher_high_break,
+            lower_low_break,
             volume_ratio,
+            taker_buy_fraction,
             range_norm,
         ))
     return result
@@ -258,7 +268,7 @@ def _distance(left: Sequence[tuple[float, ...]], right: Sequence[tuple[float, ..
         raise ValueError("feature windows must have equal nonzero length")
     # Explicit feature weights: price path, candle body, wicks, close location,
     # local structure, volume and range/volatility.
-    weights = (0.22, 0.14, 0.08, 0.08, 0.08, 0.12, 0.10, 0.08, 0.10)
+    weights = (0.20, 0.12, 0.06, 0.06, 0.06, 0.10, 0.08, 0.07, 0.07, 0.07, 0.06, 0.05)
     squared = []
     for a, b in zip(left, right):
         squared.append(sum(weight * (x - y) ** 2 for weight, x, y in zip(weights, a, b)))
