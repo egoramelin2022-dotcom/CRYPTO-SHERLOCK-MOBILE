@@ -108,7 +108,14 @@ class ResearchPanel(QWidget):
         self.mtf_candidate_budget = QSpinBox()
         self.mtf_candidate_budget.setRange(100, 5000)
         self.mtf_candidate_budget.setValue(2000)
+        self.mtf_adaptive = QCheckBox("Compare multiple scales (16, 24, 32, 48, 64)")
+        self.mtf_adaptive.setChecked(False)
+        self.mtf_adaptive.setToolTip(
+            "Runs five independent searches with proportionally scaled 15m/1h/4h/1d windows. "
+            "Reports sensitivity; it does not cherry-pick a single winner."
+        )
         if kind == "mtf_pattern":
+            form.addRow("Window-scale sensitivity", self.mtf_adaptive)
             form.addRow("1H comparison window", self.mtf_1h_window)
             form.addRow("4H comparison window", self.mtf_4h_window)
             form.addRow("1D comparison window", self.mtf_1d_window)
@@ -328,6 +335,7 @@ class ResearchPanel(QWidget):
                 "window_1d": self.mtf_1d_window.value(),
                 "top_k": self.top_k.value(),
                 "candidate_budget": self.mtf_candidate_budget.value(),
+                "adaptive_window_sweep": self.mtf_adaptive.isChecked(),
             })
             selected_time = self.query_start.text().strip()
             if selected_time:
@@ -422,6 +430,18 @@ class ResearchPanel(QWidget):
                 "Similarity is a shape-distance transform, not a probability.",
                 "Forward outcomes use next 15M open, horizon close, fees and slippage.",
             ])
+            sweep = result.get("window_sensitivity")
+            if sweep:
+                summary.extend([
+                    "WINDOW-SCALE SENSITIVITY · no automatic winner",
+                    "Tested 15M lengths: " + ", ".join(map(str, sweep.get("window_lengths_15m_tested", []))),
+                ])
+                for scale in sweep.get("scale_reports", []):
+                    summary.append(
+                        f"  {scale.get('window_lengths', {}).get('15m')} candles · "
+                        f"{len(scale.get('analogs', []))} analogues · "
+                        f"{scale.get('candidates_examined', 0):,} candidates examined"
+                    )
             for interval, freshness_row in (result.get("data_freshness") or {}).get("timeframes", {}).items():
                 freshness_label = "STALE" if freshness_row.get("is_stale") else "fresh"
                 summary.append(
