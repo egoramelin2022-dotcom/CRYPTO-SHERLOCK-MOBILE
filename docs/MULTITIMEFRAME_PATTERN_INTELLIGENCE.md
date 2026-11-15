@@ -63,7 +63,7 @@ Parameters:
 - `query_end_time` (optional exact 15m candle open time in UTC milliseconds for historical replay)
 - `fee_bps_per_side` and `slippage_bps_per_side`
 
-The endpoint queues a background job. Read its result from `GET /v1/research/jobs/{job_id}`.
+The endpoint queues a background job. Read its result from `GET /v1/research/jobs/{job_id}`. The result includes normalized query and candidate close paths for all four timeframes; the Windows desktop panel renders them in separate 15m, 1h, 4h and 1d comparison tabs.
 
 The service loads only locally configured market databases using the existing read-only loader. Each timeframe gets its own canonical candle fingerprint; those fingerprints are combined into the input fingerprint stored in the existing append-only Experiment Ledger. The source market databases are not modified.
 
