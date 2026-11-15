@@ -384,6 +384,7 @@ def test_multitimeframe_pattern_endpoint_queues_causal_search(monkeypatch):
     assert captured["kwargs"]["window_4h"] == 10
     assert captured["kwargs"]["window_1d"] == 6
     assert captured["kwargs"]["candidate_budget"] == 1200
+    assert captured["kwargs"]["adaptive_window_sweep"] is False
 
 
 def test_multitimeframe_pattern_endpoint_rejects_invalid_windows_and_costs():
