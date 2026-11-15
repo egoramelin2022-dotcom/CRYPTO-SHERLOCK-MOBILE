@@ -94,3 +94,13 @@ def test_run_fails_instead_of_reporting_complete_when_requested_archive_is_missi
             progress_callback=messages.append,
         )
     assert any("15m 2017-08: missing" in message for message in messages)
+
+
+def test_archive_parser_rejects_mixed_timestamp_precision():
+    with pytest.raises(ValueError, match="different timestamp precisions"):
+        normalize_kline_times("1502942400000", "1502943299999000", "15m")
+
+
+def test_archive_parser_rejects_submillisecond_microsecond_timestamps():
+    with pytest.raises(ValueError, match="exact millisecond boundaries"):
+        normalize_kline_times("1502942400000001", "1502943299999000", "15m")
