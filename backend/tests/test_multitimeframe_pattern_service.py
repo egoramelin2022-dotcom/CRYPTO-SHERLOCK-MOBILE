@@ -58,9 +58,13 @@ def test_multitimeframe_service_persists_complete_run_in_append_only_ledger(
         query_window_15m=32,
         top_k=2,
         candidate_budget=100,
+        adaptive_window_sweep=True,
+        sweep_window_lengths=(16, 24, 32),
     )
 
     assert result["engine"] == "multitimeframe_pattern_intelligence"
+    assert result["window_sensitivity"]["window_lengths_15m_tested"] == [16, 24, 32]
+    assert len(result["window_sensitivity"]["scale_reports"]) == 3
     assert result["run_id"] == result["experiment_ledger"]["run_id"]
     assert result["experiment_ledger"]["append_only"] is True
     assert set(result["data_fingerprints"]) == {"15m", "1h", "4h", "1d"}
