@@ -96,6 +96,23 @@ class ResearchPanel(QWidget):
         self.top_k.setRange(1, 100)
         self.top_k.setValue(10)
         form.addRow("Top historical analogs", self.top_k)
+        self.mtf_1h_window = QSpinBox()
+        self.mtf_1h_window.setRange(2, 500)
+        self.mtf_1h_window.setValue(16)
+        self.mtf_4h_window = QSpinBox()
+        self.mtf_4h_window.setRange(2, 500)
+        self.mtf_4h_window.setValue(8)
+        self.mtf_1d_window = QSpinBox()
+        self.mtf_1d_window.setRange(2, 500)
+        self.mtf_1d_window.setValue(5)
+        self.mtf_candidate_budget = QSpinBox()
+        self.mtf_candidate_budget.setRange(100, 5000)
+        self.mtf_candidate_budget.setValue(2000)
+        if kind == "mtf_pattern":
+            form.addRow("1H comparison window", self.mtf_1h_window)
+            form.addRow("4H comparison window", self.mtf_4h_window)
+            form.addRow("1D comparison window", self.mtf_1d_window)
+            form.addRow("Candidate search budget", self.mtf_candidate_budget)
         self.core_min_analogs = QSpinBox()
         self.core_min_analogs.setRange(1, 100)
         self.core_min_analogs.setValue(5)
@@ -157,6 +174,27 @@ class ResearchPanel(QWidget):
             self.adaptive_min.setEnabled(False)
             self.adaptive_max.setEnabled(False)
             self.adaptive_step.setEnabled(False)
+        elif kind == "mtf_pattern":
+            for control in (self.interval, self.mode):
+                control.hide()
+                label = form.labelForField(control)
+                if label is not None:
+                    label.hide()
+            self.window.setRange(8, 500)
+            self.window.setValue(32)
+            label = form.labelForField(self.window)
+            if label is not None:
+                label.setText("Query window (15M candles)")
+            label = form.labelForField(self.query_start)
+            if label is not None:
+                label.setText("Historical decision candle (UTC)")
+            self.query_start.setPlaceholderText("Optional · YYYY-MM-DD HH:MM UTC")
+            for control in (self.adaptive, self.adaptive_min, self.adaptive_max, self.adaptive_step):
+                control.hide()
+                label = form.labelForField(control)
+                if label is not None:
+                    label.hide()
+            self.top_k.setValue(30)
         elif kind == "ensemble":
             self.query_start.setEnabled(False)
             self.adaptive.setEnabled(False)
@@ -267,6 +305,25 @@ class ResearchPanel(QWidget):
                 except ValueError:
                     self.status.setText("Invalid sample time · use YYYY-MM-DD HH:MM UTC")
                     return
+        elif self.kind == "mtf_pattern":
+            params.update({
+                "query_window_15m": self.window.value(),
+                "window_1h": self.mtf_1h_window.value(),
+                "window_4h": self.mtf_4h_window.value(),
+                "window_1d": self.mtf_1d_window.value(),
+                "top_k": self.top_k.value(),
+                "candidate_budget": self.mtf_candidate_budget.value(),
+            })
+            selected_time = self.query_start.text().strip()
+            if selected_time:
+                try:
+                    parsed = datetime.fromisoformat(selected_time.replace("Z", "+00:00"))
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=timezone.utc)
+                    params["query_end_time"] = int(parsed.astimezone(timezone.utc).timestamp() * 1000)
+                except ValueError:
+                    self.status.setText("Invalid decision candle time · use YYYY-MM-DD HH:MM UTC")
+                    return
         elif self.kind == "ensemble":
             params.update({
                 "interval": self.interval.currentText(),
@@ -332,6 +389,36 @@ class ResearchPanel(QWidget):
                 summary.append(f"CONFLICT · +{conflict['horizon']} · {conflict['current_regime']} vs {conflict['historical_analogue_side']}")
             summary.append("REQUIRED NEXT CHECKS")
             summary.extend("  • " + item for item in result.get("required_next_checks", []))
+        if result.get("engine") == "multitimeframe_pattern_intelligence":
+            summary.extend([
+                "\\nMULTI-TIMEFRAME PATTERN INTELLIGENCE · v" + str(result.get("engine_version")),
+                f"Decision time (UTC ms): {result.get('query_decision_time')}",
+                "Closed higher-timeframe bars only · 15M / 1H / 4H / 1D",
+                f"Candidates examined: {result.get('candidates_examined', 0):,} · "
+                f"rejected for data: {result.get('candidates_rejected_for_data', 0):,} · "
+                f"de-duplicated: {result.get('candidates_rejected_for_overlap', 0):,}",
+                f"Historical analogues returned: {len(result.get('analogs', []))}",
+                "Similarity is a shape-distance transform, not a probability.",
+                "Forward outcomes use next 15M open, horizon close, fees and slippage.",
+            ])
+            for rank, analog in enumerate(result.get("analogs", []), start=1):
+                summary.append(
+                    f"  #{rank} · combined similarity {analog.get('similarity', 0):.4f} · "
+                    f"decision {analog.get('decision_time')}"
+                )
+                for interval, score in analog.get("timeframe_scores", {}).items():
+                    summary.append(
+                        f"      {interval}: {score.get('similarity', 0):.4f} · "
+                        f"distance {score.get('distance', 0):.4f}"
+                    )
+                for outcome in (analog.get("forward_outcomes") or {}).get("outcomes", []):
+                    if outcome:
+                        summary.append(
+                            f"      +{outcome['horizon']} x15M · "
+                            f"LONG net {outcome['long_net_return']:+.2%} · "
+                            f"SHORT net {outcome['short_net_return']:+.2%} · "
+                            f"LONG MAE {outcome['long_mae']:+.2%}"
+                        )
         if result.get("adaptive_search"):
             summary.append("\nADAPTIVE WINDOW SEARCH · INDEPENDENT RANKINGS")
             summary.append(result.get("adaptive_comparison_note", ""))
