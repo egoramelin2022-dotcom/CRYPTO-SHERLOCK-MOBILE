@@ -4,22 +4,7 @@ android {
  compileSdk 35
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = '17' }
- signingConfigs {
-  stable {
-   def ksPath = System.getenv('CRYPTO_SIGNING_STORE_FILE')
-   if (ksPath != null) {
-    storeFile file(ksPath)
-    storePassword System.getenv('CRYPTO_SIGNING_STORE_PASSWORD')
-    keyAlias System.getenv('CRYPTO_SIGNING_KEY_ALIAS')
-    keyPassword System.getenv('CRYPTO_SIGNING_KEY_PASSWORD')
-   }
-  }
- }
- buildTypes {
-  debug {
-   signingConfig signingConfigs.stable
-  }
- }
+ buildTypes { debug { } }
  defaultConfig {
   applicationId 'com.cryptosherlock.mobile'
   minSdk 26
