@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import sqlite3
+import hashlib
+import json
 from bisect import bisect_left
 import os
 from dataclasses import asdict
@@ -16,6 +18,9 @@ from app.market_data.intervals import interval_to_ms
 from app.research.pattern_intelligence import search_analogs
 from app.research.multitimeframe_detector import (
     MultiTimeframeConfig, detect_multitimeframe_setups,
+)
+from app.research.multitimeframe_pattern_intelligence import (
+    MultiTimeframeSearchConfig, search_multitimeframe_analogs,
 )
 from app.research.evidence_adapters import pattern_search_evidence, stumpy_matches_evidence
 from app.research.ensemble import build_evidence_report
@@ -437,6 +442,152 @@ def run_walk_forward_research(
         age > result["data_freshness"]["stale_after_hours"]
     )
     return result
+
+
+
+def run_multitimeframe_pattern_research(
+    symbol: str = "BTCUSDT",
+    query_window_15m: int = 32,
+    top_k: int = 30,
+    candidate_budget: int = 2000,
+    query_end_time: int | None = None,
+    window_1h: int = 16,
+    window_4h: int = 8,
+    window_1d: int = 5,
+    fee_bps_per_side: float = 5.0,
+    slippage_bps_per_side: float = 2.0,
+) -> dict[str, Any]:
+    """Search full local history for causal 15m/1h/4h/1d shape analogues."""
+    if isinstance(query_window_15m, bool) or not isinstance(query_window_15m, int) or not 8 <= query_window_15m <= 500:
+        raise ValueError("query_window_15m must be an integer in [8, 500]")
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
+        raise ValueError("top_k must be an integer in [1, 100]")
+    if isinstance(candidate_budget, bool) or not isinstance(candidate_budget, int) or not 100 <= candidate_budget <= 5000:
+        raise ValueError("candidate_budget must be an integer in [100, 5000]")
+
+    series: dict[str, list[Candle]] = {}
+    data_sources: dict[str, list[str]] = {}
+    limits = {"15m": 400000, "1h": 100000, "4h": 30000, "1d": 10000}
+    for interval, limit in limits.items():
+        series[interval], data_sources[interval] = _load_candles(symbol, interval, limit)
+
+    fifteen = series["15m"]
+    if query_end_time is None:
+        query_end_index = len(fifteen) - 1
+        query_selection = "latest_closed_15m_candle"
+    else:
+        if isinstance(query_end_time, bool) or not isinstance(query_end_time, int) or query_end_time < 0:
+            raise ValueError("query_end_time must be a nonnegative UTC millisecond candle open time")
+        query_index = bisect_left([item.open_time for item in fifteen], query_end_time)
+        if query_index >= len(fifteen) or fifteen[query_index].open_time != query_end_time:
+            raise ValueError("query_end_time does not match an available closed 15m candle open time")
+        query_end_index = query_index
+        query_selection = "historical_15m_open_time"
+
+    horizons = (16, 96, 288, 480, 960)
+    query_start_index = query_end_index - query_window_15m + 1
+    if query_start_index < 0:
+        raise ValueError("not enough 15m history for the requested query window")
+    eligible = max(0, query_start_index - query_window_15m - max(horizons) + 1)
+    candidate_stride = max(1, (eligible + candidate_budget - 1) // candidate_budget)
+    config = MultiTimeframeSearchConfig(
+        window_lengths={
+            "15m": query_window_15m, "1h": window_1h,
+            "4h": window_4h, "1d": window_1d,
+        },
+        top_k=top_k,
+        candidate_stride=candidate_stride,
+        horizons_15m=horizons,
+        fee_bps_per_side=fee_bps_per_side,
+        slippage_bps_per_side=slippage_bps_per_side,
+    )
+
+    source_path, analytics_path = base_jobs._configured_paths()
+    del source_path
+    ledger = ExperimentLedger(analytics_path)
+    run_id = str(uuid4())
+    component_fingerprints = {
+        interval: fingerprint_candles(rows)
+        for interval, rows in series.items()
+    }
+    fingerprint_payload = json.dumps(
+        component_fingerprints, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    input_fingerprint = hashlib.sha256(fingerprint_payload).hexdigest()
+    total_candles = sum(len(rows) for rows in series.values())
+    query_start_time = fifteen[query_start_index].open_time
+    query_end_close_time = fifteen[query_end_index].close_time
+    parameters = {
+        "engine": "multitimeframe_pattern_intelligence",
+        "engine_version": "0.1.0",
+        "symbol": symbol,
+        "query_selection": query_selection,
+        "query_window_15m": query_window_15m,
+        "window_lengths": config.window_lengths,
+        "timeframe_weights": config.timeframe_weights,
+        "top_k": top_k,
+        "candidate_budget": candidate_budget,
+        "candidate_stride": candidate_stride,
+        "horizons_15m": list(horizons),
+        "fee_bps_per_side": fee_bps_per_side,
+        "slippage_bps_per_side": slippage_bps_per_side,
+        "deduplicate_higher_timeframe_context": True,
+        "component_fingerprints": component_fingerprints,
+    }
+    ledger.start_run(
+        run_id=run_id,
+        core_version="mtf-pi-0.1.0",
+        symbol=symbol,
+        interval="MTF-15m-1h-4h-1d",
+        query_start_time=query_start_time,
+        query_end_time=query_end_close_time,
+        mode="multi_timeframe_free",
+        parameters=parameters,
+        input_fingerprint=input_fingerprint,
+        input_candle_count=total_candles,
+    )
+    try:
+        search = search_multitimeframe_analogs(
+            series, query_end_index_15m=query_end_index, config=config
+        )
+        result = search.to_dict()
+        result.update({
+            "query_selection": query_selection,
+            "query_window_15m": query_window_15m,
+            "candidate_budget": candidate_budget,
+            "data_sources": data_sources,
+            "history_candles": {key: len(value) for key, value in series.items()},
+            "history_gaps": {
+                key: len(find_gaps([item.open_time for item in value], key))
+                for key, value in series.items()
+            },
+            "data_fingerprints": component_fingerprints,
+            "experiment_ledger": {
+                "run_id": run_id,
+                "status": "completed",
+                "input_fingerprint": input_fingerprint,
+                "append_only": True,
+                "event_hash_chain": True,
+            },
+        })
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        result["data_freshness"] = {
+            key: {
+                "latest_closed_candle_time": rows[-1].close_time,
+                "age_hours": max(0.0, (now_ms - rows[-1].close_time) / 3_600_000),
+                "as_of_utc": datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc).isoformat(),
+            }
+            for key, rows in series.items()
+        }
+    except Exception as exc:
+        try:
+            ledger.fail_run(run_id, type(exc).__name__)
+        except Exception:
+            pass
+        raise
+    ledger.complete_run(run_id, result)
+    return result
+
 
 
 def run_multitimeframe_research(symbol: str = "BTCUSDT") -> dict[str, Any]:
