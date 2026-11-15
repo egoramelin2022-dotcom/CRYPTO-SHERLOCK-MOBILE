@@ -38,6 +38,7 @@ def test_audit_is_read_only_and_reports_gaps(tmp_path):
     assert item["missing_candles"] == 1
     assert item["malformed_rows"] == 0
     assert report["integrity_check"] == ["ok"]
+    assert report["integrity_ok"] is True
 
 
 def test_audit_rejects_missing_database_and_table(tmp_path):
