@@ -355,7 +355,8 @@ def search_multitimeframe_analogs(
                 distance=distance,
                 similarity=similarity,
             )
-            context_signature.append(end)
+            if interval != "15m":
+                context_signature.append(end)
             weighted_distance += weights[interval] * distance
             usable_weight += weights[interval]
         if not valid or usable_weight <= 0:
