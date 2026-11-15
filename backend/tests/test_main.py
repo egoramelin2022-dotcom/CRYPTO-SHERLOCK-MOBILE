@@ -387,6 +387,28 @@ def test_multitimeframe_pattern_endpoint_queues_causal_search(monkeypatch):
     assert captured["kwargs"]["adaptive_window_sweep"] is False
 
 
+def test_multitimeframe_pattern_endpoint_can_enable_window_sensitivity(monkeypatch):
+    import app.main as main
+
+    captured = {}
+    queued = {"job_id": "mtf-adaptive-job", "kind": "multitimeframe_pattern_intelligence"}
+    monkeypatch.setattr(
+        main.research_jobs, "_new_job",
+        lambda kind: SimpleNamespace(job_id=queued["job_id"]),
+    )
+    monkeypatch.setattr(main.research_jobs, "get_job", lambda job_id: queued)
+    monkeypatch.setattr(
+        main, "_run_desktop_research_job",
+        lambda job_id, function, kwargs: captured.update(kwargs),
+    )
+    response = client.post(
+        "/v1/research/multitimeframe-patterns",
+        params={"adaptive_window_sweep": "true"},
+    )
+    assert response.status_code == 202
+    assert captured["adaptive_window_sweep"] is True
+
+
 def test_multitimeframe_pattern_endpoint_rejects_invalid_windows_and_costs():
     invalid_window = client.post(
         "/v1/research/multitimeframe-patterns",
