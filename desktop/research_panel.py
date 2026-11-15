@@ -401,6 +401,13 @@ class ResearchPanel(QWidget):
                 "Similarity is a shape-distance transform, not a probability.",
                 "Forward outcomes use next 15M open, horizon close, fees and slippage.",
             ])
+            for interval, freshness_row in (result.get("data_freshness") or {}).get("timeframes", {}).items():
+                freshness_label = "STALE" if freshness_row.get("is_stale") else "fresh"
+                summary.append(
+                    f"  {interval} data: {freshness_label} · "
+                    f"age {freshness_row.get('age_hours', 0):.2f}h · "
+                    f"threshold {freshness_row.get('stale_after_hours', 0):.2f}h"
+                )
             for rank, analog in enumerate(result.get("analogs", []), start=1):
                 summary.append(
                     f"  #{rank} · combined similarity {analog.get('similarity', 0):.4f} · "
