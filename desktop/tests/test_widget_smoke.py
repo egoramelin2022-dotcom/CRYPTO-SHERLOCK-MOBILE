@@ -109,6 +109,21 @@ def test_multitimeframe_pattern_panel_renders_per_timeframe_analog_scores():
                 "4h": [100.0, 99.5, 101.0],
                 "1d": [100.0, 102.0, 101.0],
             },
+            "window_sensitivity": {
+                "window_lengths_15m_tested": [16, 24],
+                "scale_reports": [{
+                    "window_lengths": {"15m": 16},
+                    "candidates_examined": 100,
+                    "analogs": [{}],
+                    "historical_outcome_summary": {
+                        "16": {
+                            "median_long_net_return": 0.01,
+                            "median_short_net_return": -0.01,
+                            "independent_analog_count": 7,
+                        }
+                    },
+                }],
+            },
             "analogs": [{
                 "similarity": 0.82,
                 "decision_time": 123456000,
@@ -133,6 +148,8 @@ def test_multitimeframe_pattern_panel_renders_per_timeframe_analog_scores():
     assert "combined similarity 0.8200" in rendered
     assert "15m: 0.8000" in rendered
     assert "LONG net +1.20%" in rendered
+    assert "WINDOW-SCALE SENSITIVITY" in rendered
+    assert "median LONG +1.00%" in rendered
     assert set(panel.mtf_plots) == {"15m", "1h", "4h", "1d"}
     assert len(panel.mtf_plots["15m"].listDataItems()) == 2
     panel.close()
