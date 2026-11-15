@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from app.market_data.sync import HistoricalSyncEngine
+from app.market_data.binance import parse_binance_kline
 
 
 def kline(open_time: int, close: float = 100.0) -> list:
@@ -276,3 +277,19 @@ def test_sparse_page_is_ingested_but_marked_partial_with_gap_registry():
         engine.close()
         client.close()
         conn.close()
+
+
+
+def test_binance_parser_accepts_microsecond_and_exclusive_close_timestamps():
+    step = 900_000
+    raw = kline(1_735_689_600_000)
+    raw[0] = 1_735_689_600_000_000
+    raw[6] = 1_735_690_499_999_999
+    candle = parse_binance_kline(raw, symbol="BTCUSDT", interval="15m")
+    assert candle.open_time == 1_735_689_600_000
+    assert candle.close_time == 1_735_690_499_999
+
+    exclusive = kline(0)
+    exclusive[6] = step
+    candle = parse_binance_kline(exclusive, symbol="BTCUSDT", interval="15m")
+    assert candle.close_time == step - 1
