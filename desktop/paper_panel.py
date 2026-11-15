@@ -51,19 +51,19 @@ class PaperPanel(QWidget):
         self.quantity.setDecimals(8)
         self.quantity.setRange(0.00000001, 100000000)
         self.quantity.setValue(0.001)
-        form.addRow("Asset", self.symbol)
-        form.addRow("Virtual action", self.side)
-        form.addRow("Quantity", self.quantity)
+        form.addRow("Актив", self.symbol)
+        form.addRow("Виртуальная операция", self.side)
+        form.addRow("Количество", self.quantity)
         root.addLayout(form)
         actions = QHBoxLayout()
-        self.submit = QPushButton("PLACE VIRTUAL ORDER")
+        self.submit = QPushButton("ВЫПОЛНИТЬ ДЕМО-ОРДЕР")
         self.submit.clicked.connect(self.place_order)
-        self.refresh = QPushButton("REFRESH PORTFOLIO")
+        self.refresh = QPushButton("ОБНОВИТЬ ПОРТФЕЛЬ")
         self.refresh.clicked.connect(self.load_snapshot)
         actions.addWidget(self.submit)
         actions.addWidget(self.refresh)
         root.addLayout(actions)
-        self.status = QLabel("PAPER ONLY · no exchange account access")
+        self.status = QLabel("ТОЛЬКО ДЕМО · доступ к биржевому счёту отсутствует")
         self.status.setObjectName("muted")
         root.addWidget(self.status)
         self.output = QTextEdit()
@@ -83,7 +83,7 @@ class PaperPanel(QWidget):
             return
         self.submit.setEnabled(False)
         self.refresh.setEnabled(False)
-        self.status.setText("Contacting local paper ledger…")
+        self.status.setText("Подключение к локальному демо-журналу…")
         self.worker = PaperWorker(self.api_url, operation, params)
         self.worker.done.connect(self._on_done)
         self.worker.failed.connect(self._on_failed)
@@ -111,11 +111,11 @@ class PaperPanel(QWidget):
         })
 
     def _on_done(self, result: dict):
-        self.status.setText("Paper ledger updated" if "fill_price" in result else "Paper portfolio loaded")
+        self.status.setText("Демо-журнал обновлён" if "fill_price" in result else "Демо-портфель загружен")
         self.output.setPlainText(json.dumps(result, ensure_ascii=False, indent=2))
 
     def _on_failed(self, message: str):
-        self.status.setText("Paper operation failed")
+        self.status.setText("Ошибка демо-операции")
         self.output.setPlainText(message)
 
     def _on_finished(self):
