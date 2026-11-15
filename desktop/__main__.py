@@ -86,10 +86,11 @@ class MainWindow(QMainWindow):
         ("Sherlock Core", "04"),
         ("Experiment Ledger", "05"),
         ("Multi-Timeframe", "06"),
-        ("Ensemble Engine", "07"),
-        ("Backtesting Lab", "08"),
-        ("Paper Trading", "09"),
-        ("System Monitor", "10"),
+        ("MTF Pattern Search", "07"),
+        ("Ensemble Engine", "08"),
+        ("Backtesting Lab", "09"),
+        ("Paper Trading", "10"),
+        ("System Monitor", "11"),
     ]
 
     def __init__(self):
