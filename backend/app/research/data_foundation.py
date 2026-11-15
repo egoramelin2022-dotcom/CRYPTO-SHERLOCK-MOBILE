@@ -159,6 +159,7 @@ def audit_sqlite_dataset(
         "modified_utc": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
         "sha256": _sha256_file(path) if include_sha256 else None,
         "integrity_check": integrity_rows,
+        "integrity_ok": integrity_rows == ["ok"],
         "datasets": datasets,
         "audit_created_utc": datetime.now(timezone.utc).isoformat(),
         "limitations": [
