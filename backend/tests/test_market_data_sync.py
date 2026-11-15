@@ -32,6 +32,7 @@ def test_sync_downloads_multiple_pages_and_checkpoints_complete():
     calls = []
 
     def handler(request: httpx.Request):
+        assert request.headers.get("X-MBX-TIME-UNIT") == "MILLISECOND"
         cursor = int(request.url.params["startTime"])
         calls.append(cursor)
         if cursor == start:
@@ -280,16 +281,25 @@ def test_sparse_page_is_ingested_but_marked_partial_with_gap_registry():
 
 
 
-def test_binance_parser_accepts_microsecond_and_exclusive_close_timestamps():
-    step = 900_000
-    raw = kline(1_735_689_600_000)
-    raw[0] = 1_735_689_600_000_000
-    raw[6] = 1_735_690_499_999_999
-    candle = parse_binance_kline(raw, symbol="BTCUSDT", interval="15m")
-    assert candle.open_time == 1_735_689_600_000
-    assert candle.close_time == 1_735_690_499_999
+@pytest.mark.parametrize(
+    "interval,step",
+    [("15m", 900_000), ("4h", 14_400_000), ("1d", 86_400_000)],
+)
+def test_binance_parser_normalizes_microseconds_for_all_imported_intervals(interval, step):
+    open_ms = 1_735_689_600_000  # 2025-01-01 00:00:00 UTC, aligned for all three.
+    raw = [
+        open_ms * 1000, "99", "101", "98", "100", "10",
+        (open_ms + step - 1) * 1000, "999", 12, "4", "399", "0",
+    ]
+    candle = parse_binance_kline(raw, symbol="BTCUSDT", interval=interval)
+    assert candle.open_time == open_ms
+    assert candle.close_time == open_ms + step - 1
 
-    exclusive = kline(0)
-    exclusive[6] = step
-    candle = parse_binance_kline(exclusive, symbol="BTCUSDT", interval="15m")
-    assert candle.close_time == step - 1
+
+def test_binance_parser_rejects_mixed_timestamp_units_with_diagnostic():
+    raw = [
+        1_735_689_600_000_000, "99", "101", "98", "100", "10",
+        1_735_690_499_999, "999", 12, "4", "399", "0",
+    ]
+    with pytest.raises(ValueError, match="15m close_time mismatch"):
+        parse_binance_kline(raw, symbol="BTCUSDT", interval="15m")
