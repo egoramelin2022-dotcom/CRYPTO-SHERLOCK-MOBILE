@@ -6,6 +6,7 @@ from app.market_data.candles import Candle
 from app.research.multitimeframe_pattern_intelligence import (
     MultiTimeframeSearchConfig,
     search_multitimeframe_analogs,
+    search_multitimeframe_window_sweep,
 )
 
 
@@ -144,4 +145,35 @@ def test_config_rejects_missing_timeframes_and_bad_weights():
             config=MultiTimeframeSearchConfig(
                 timeframe_weights={"15m": -1, "1h": 1, "4h": 1, "1d": 1}
             ),
+        )
+
+
+
+def test_window_sweep_compares_predeclared_scales_without_declaring_a_winner():
+    data = fixture()
+    report = search_multitimeframe_window_sweep(
+        data,
+        query_end_index_15m=2800,
+        window_lengths_15m=(16, 24, 32),
+        config=MultiTimeframeSearchConfig(
+            top_k=3, candidate_stride=16, horizons_15m=(4, 16)
+        ),
+    )
+    assert report["analysis_mode"] == "window_scale_sensitivity"
+    assert report["window_lengths_15m_tested"] == [16, 24, 32]
+    assert len(report["scale_reports"]) == 3
+    assert report["selection_policy"].startswith("No single window")
+    assert [item["window_lengths"]["15m"] for item in report["scale_reports"]] == [16, 24, 32]
+    assert all(set(item["query_charts"]) == {"15m", "1h", "4h", "1d"} for item in report["scale_reports"])
+
+
+def test_window_sweep_rejects_duplicate_or_invalid_scales():
+    data = fixture()
+    with pytest.raises(ValueError, match="duplicates"):
+        search_multitimeframe_window_sweep(
+            data, query_end_index_15m=2800, window_lengths_15m=(16, 16)
+        )
+    with pytest.raises(ValueError, match="8, 500"):
+        search_multitimeframe_window_sweep(
+            data, query_end_index_15m=2800, window_lengths_15m=(4,)
         )
