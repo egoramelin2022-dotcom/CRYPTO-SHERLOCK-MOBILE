@@ -80,17 +80,17 @@ class Page(QWidget):
 
 class MainWindow(QMainWindow):
     NAV_ITEMS = [
-        ("Overview", "01"),
-        ("Market Data", "02"),
-        ("Pattern Intelligence", "03"),
-        ("Sherlock Core", "04"),
-        ("Experiment Ledger", "05"),
-        ("Multi-Timeframe", "06"),
-        ("MTF Pattern Search", "07"),
-        ("Ensemble Engine", "08"),
-        ("Backtesting Lab", "09"),
-        ("Paper Trading", "10"),
-        ("System Monitor", "11"),
+        ("Обзор", "01"),
+        ("Рынок", "02"),
+        ("Поиск паттернов", "03"),
+        ("Ядро Sherlock", "04"),
+        ("Журнал экспериментов", "05"),
+        ("Мульти-ТФ сканер", "06"),
+        ("Мульти-ТФ паттерны", "07"),
+        ("Ансамбль моделей", "08"),
+        ("Тестирование", "09"),
+        ("Демо-портфель", "10"),
+        ("Система", "11"),
     ]
 
     def __init__(self):
@@ -129,7 +129,7 @@ class MainWindow(QMainWindow):
         side.addWidget(brand)
         side.addWidget(brand2)
         side.addSpacing(28)
-        section = QLabel("RESEARCH TERMINAL")
+        section = QLabel("АНАЛИТИЧЕСКИЙ ТЕРМИНАЛ")
         section.setObjectName("eyebrow")
         side.addWidget(section)
         self.nav_buttons = []
@@ -152,14 +152,14 @@ class MainWindow(QMainWindow):
         topbar.setObjectName("topbar")
         top = QHBoxLayout(topbar)
         top.setContentsMargins(28, 14, 28, 14)
-        self.breadcrumb = QLabel("OVERVIEW  /  MARKET INTELLIGENCE")
+        self.breadcrumb = QLabel("ОБЗОР  /  АНАЛИТИКА РЫНКА")
         self.breadcrumb.setObjectName("topLabel")
-        self.connection = QLabel("●  CHECKING BACKEND")
+        self.connection = QLabel("●  ПРОВЕРКА СЕРВЕРА")
         self.connection.setObjectName("connection")
         top.addWidget(self.breadcrumb)
         top.addStretch(1)
         top.addWidget(self.connection)
-        self.server_settings_button = QPushButton('SERVER SETTINGS')
+        self.server_settings_button = QPushButton('НАСТРОЙКИ СЕРВЕРА')
         self.server_settings_button.setObjectName('settingsButton')
         self.server_settings_button.clicked.connect(self.open_server_settings)
         top.addWidget(self.server_settings_button)
@@ -202,17 +202,17 @@ class MainWindow(QMainWindow):
         return row
 
     def make_overview(self):
-        page = Page("Market Intelligence", "A focused command center for historical research, market structure and evidence-backed testing.")
+        page = Page("Аналитика рынка", "Центр исторических исследований, анализа структуры рынка и проверки гипотез на данных.")
         page.body.addLayout(self.card_row([
-            MetricCard("Market feed", "—", "Waiting for local backend", "mint"),
-            MetricCard("Historical candles", "NOT LOADED", "BTCUSDT · 15M / 4H / 1D", "amber"),
-            MetricCard("Research engine", "READY TO CONNECT", "Local analytics services", "blue"),
-            MetricCard("Execution mode", "PAPER ONLY", "Live orders disabled", "mint"),
+            MetricCard("Рыночные данные", "—", "Ожидание локального сервера", "mint"),
+            MetricCard("Исторические свечи", "НЕ ЗАГРУЖЕНЫ", "BTCUSDT · 15M / 4H / 1D", "amber"),
+            MetricCard("Аналитический движок", "ГОТОВ К ПОДКЛЮЧЕНИЮ", "Локальные аналитические службы", "blue"),
+            MetricCard("Режим исполнения", "ТОЛЬКО ДЕМО", "Реальные ордера отключены", "mint"),
         ]))
         panel = QFrame()
         panel.setObjectName("panel")
         p = QVBoxLayout(panel)
-        title = QLabel("RESEARCH WORKSPACE")
+        title = QLabel("РАБОЧЕЕ ПРОСТРАНСТВО")
         title.setObjectName("panelTitle")
         desc = QLabel("The desktop shell is connected to the CRYPTO SHERLOCK backend when it is running. Historical data and analytics will appear here only after they have been loaded and verified.")
         desc.setObjectName("bodyText")
