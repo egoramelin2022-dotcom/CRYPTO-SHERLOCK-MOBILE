@@ -141,7 +141,7 @@ class MainWindow(QMainWindow):
             side.addWidget(button)
             self.nav_buttons.append(button)
         side.addStretch(1)
-        version = QLabel("DESKTOP  •  v0.3.0\nPAPER RESEARCH ONLY")
+        version = QLabel("DESKTOP  •  v0.4.0\nPAPER RESEARCH ONLY")
         version.setObjectName("sidebarFoot")
         side.addWidget(version)
 
