@@ -126,7 +126,10 @@ class HistoricalSyncEngine:
         last_error: Exception | None = None
         for attempt in range(self.max_attempts):
             try:
-                response = self.client.get(BINANCE_KLINES_URL, params=params)
+                response = self.client.get(
+                    BINANCE_KLINES_URL, params=params,
+                    headers={"X-MBX-TIME-UNIT": "MILLISECOND"},
+                )
                 if response.status_code in RETRYABLE_STATUS:
                     if attempt + 1 == self.max_attempts:
                         response.raise_for_status()
