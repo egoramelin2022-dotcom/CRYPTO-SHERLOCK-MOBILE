@@ -52,6 +52,14 @@ def normalize_kline_times(open_value: str, close_value: str, interval: str) -> t
     """Normalize timestamps and canonicalize an exact exclusive close boundary."""
     from app.market_data.intervals import interval_to_ms
 
+    raw_open = int(open_value)
+    raw_close = int(close_value)
+    open_is_microseconds = raw_open >= 100_000_000_000_000
+    close_is_microseconds = raw_close >= 100_000_000_000_000
+    if open_is_microseconds != close_is_microseconds:
+        raise ValueError("open_time and close_time use different timestamp precisions")
+    if open_is_microseconds and (raw_open % 1_000 or raw_close % 1_000):
+        raise ValueError("microsecond timestamps must represent exact millisecond boundaries")
     open_time = normalize_timestamp(open_value)
     close_time = normalize_timestamp(close_value)
     expected_close = open_time + interval_to_ms(interval) - 1
