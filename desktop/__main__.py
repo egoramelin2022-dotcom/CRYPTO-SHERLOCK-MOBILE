@@ -172,6 +172,7 @@ class MainWindow(QMainWindow):
             self.make_research_page("Sherlock Intelligence Core", "Central research coordinator: pattern analogs, causal market regime, cost-adjusted outcomes and explicit evidence conflicts.", "/v1/research/core", "core"),
             self.make_ledger_page(),
             self.make_research_page("Multi-Timeframe Scanner", "Aligned 15m lower-wick, 4h support sweep/reclaim and closed 1d bearish-context scan.", "/v1/research/multitimeframe", "mtf"),
+            self.make_research_page("Multi-Timeframe Pattern Intelligence", "Search historical analogues by matching complete price geometry, candle structure, volume and closed 15m/1h/4h/1d contexts.", "/v1/research/multitimeframe-patterns", "mtf_pattern"),
             self.make_research_page("Ensemble Engine", "Evidence aggregation with explicit engine availability. No uncalibrated probabilities or signal averaging.", "/v1/research/ensemble", "ensemble"),
             self.make_research_page("Backtesting Lab", "Expanding-window out-of-sample validation of historical analog decisions, with embargo, costs and simple baselines.", "/v1/research/walk-forward", "walk_forward"),
             self.make_paper_page(),
