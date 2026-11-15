@@ -4,7 +4,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from desktop.download_panel import DownloadPanel
+from desktop.download_panel import DownloadPanel, validate_month_range
 from desktop.market_panel import MarketPanel
 from desktop.paper_panel import PaperPanel
 from desktop.research_panel import ResearchPanel
@@ -388,3 +388,20 @@ def test_experiment_ledger_panel_renders_history_and_integrity_report():
     assert panel.status.text() == "LEDGER INTEGRITY: PASS"
     panel.close()
     app.processEvents()
+
+
+
+def test_archive_month_range_validation_accepts_valid_dates_and_rejects_bad_ranges():
+    assert validate_month_range("2017-08", "2026-10") == ("2017-08", "2026-10")
+    for start, end in [
+        ("2017-00", "2026-10"),
+        ("2017-13", "2026-10"),
+        ("17-08", "2026-10"),
+        ("2018-01", "2017-12"),
+    ]:
+        try:
+            validate_month_range(start, end)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid month range was accepted: {start}..{end}")
