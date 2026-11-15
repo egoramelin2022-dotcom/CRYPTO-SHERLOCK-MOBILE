@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .candles import Candle
+from .intervals import interval_to_ms
 
 
 def parse_binance_kline(row: list | tuple, *, symbol: str, interval: str) -> Candle:
@@ -16,16 +17,32 @@ def parse_binance_kline(row: list | tuple, *, symbol: str, interval: str) -> Can
     if not isinstance(row, (list, tuple)) or len(row) != 12:
         raise ValueError("Binance kline row must contain exactly 12 fields")
     try:
+        raw_open_time = int(row[0])
+        raw_close_time = int(row[6])
+        # Binance Spot public archives use microseconds from 2025-01-01.
+        # Normalize both timestamp fields together before validation.
+        divisor = 1_000 if raw_open_time >= 100_000_000_000_000 else 1
+        open_time = raw_open_time // divisor
+        close_time = raw_close_time // divisor
+        expected_close = open_time + interval_to_ms(interval) - 1
+        # Internal storage uses the final millisecond (inclusive close).
+        if close_time == expected_close + 1:
+            close_time = expected_close
+        if close_time != expected_close:
+            raise ValueError(
+                f"{interval} close_time mismatch: open={open_time}, close={close_time}, "
+                f"expected={expected_close}, raw_open={raw_open_time}, raw_close={raw_close_time}"
+            )
         candle = Candle(
             symbol=symbol,
             interval=interval,
-            open_time=int(row[0]),
+            open_time=open_time,
             open=float(row[1]),
             high=float(row[2]),
             low=float(row[3]),
             close=float(row[4]),
             volume=float(row[5]),
-            close_time=int(row[6]),
+            close_time=close_time,
             quote_volume=float(row[7]),
             trade_count=int(row[8]),
             taker_buy_base=float(row[9]),
