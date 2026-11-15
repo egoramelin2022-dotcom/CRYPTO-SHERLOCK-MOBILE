@@ -448,3 +448,76 @@ def search_multitimeframe_analogs(
         horizons_15m=tuple(config.horizons_15m),
         analogs=tuple(analogs),
     )
+
+
+def search_multitimeframe_window_sweep(
+    series: Mapping[str, Sequence[Candle]],
+    *,
+    query_end_index_15m: int,
+    window_lengths_15m: Sequence[int] = (16, 24, 32, 48, 64),
+    config: MultiTimeframeSearchConfig | None = None,
+) -> dict:
+    """Compare a predeclared family of multi-timeframe window scales.
+
+    This is a sensitivity report, not an automatic winner selector. Each
+    candidate scale is evaluated independently with the same query endpoint,
+    candidate stride, costs, horizons and ranking method. Results remain
+    separate so a user can inspect whether conclusions are stable across
+    scales rather than selecting the most flattering window after the fact.
+    """
+    if not window_lengths_15m:
+        raise ValueError("window_lengths_15m must not be empty")
+    normalized = []
+    for length in window_lengths_15m:
+        if isinstance(length, bool) or not isinstance(length, int) or not 8 <= length <= 500:
+            raise ValueError("each adaptive window length must be an integer in [8, 500]")
+        if length in normalized:
+            raise ValueError("window_lengths_15m must not contain duplicates")
+        normalized.append(length)
+    normalized.sort()
+    base = config or MultiTimeframeSearchConfig()
+    reports = []
+    for length in normalized:
+        lengths = {
+            "15m": length,
+            "1h": max(2, round(length / 2)),
+            "4h": max(2, round(length / 4)),
+            "1d": max(2, round(length / 8)),
+        }
+        run_config = MultiTimeframeSearchConfig(
+            window_lengths=lengths,
+            timeframe_weights=base.timeframe_weights,
+            top_k=base.top_k,
+            candidate_stride=base.candidate_stride,
+            horizons_15m=base.horizons_15m,
+            embargo_15m=base.embargo_15m,
+            fee_bps_per_side=base.fee_bps_per_side,
+            slippage_bps_per_side=base.slippage_bps_per_side,
+            deduplicate_higher_timeframe_context=base.deduplicate_higher_timeframe_context,
+        )
+        result = search_multitimeframe_analogs(
+            series,
+            query_end_index_15m=query_end_index_15m,
+            config=run_config,
+        )
+        reports.append(result.to_dict())
+    return {
+        "engine": "multitimeframe_pattern_intelligence",
+        "engine_version": "0.1.0",
+        "analysis_mode": "window_scale_sensitivity",
+        "selection_policy": (
+            "No single window is selected automatically. Compare independent "
+            "scale results and prefer conclusions stable across adjacent scales; "
+            "do not choose a scale solely by its best in-sample similarity."
+        ),
+        "query_end_index_15m": query_end_index_15m,
+        "window_lengths_15m_tested": normalized,
+        "timeframe_window_rule": {
+            "15m": "N",
+            "1h": "max(2, round(N/2))",
+            "4h": "max(2, round(N/4))",
+            "1d": "max(2, round(N/8))",
+        },
+        "scale_reports": reports,
+        "source_data_modified": False,
+    }
