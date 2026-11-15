@@ -2,12 +2,23 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone, timedelta
 from PySide6.QtWidgets import (
     QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
     QPushButton, QTextEdit, QVBoxLayout, QWidget,
 )
 from desktop.research_panel import ResearchJobWorker
+
+
+def validate_month_range(start: str, end: str) -> tuple[str, str]:
+    """Validate inclusive YYYY-MM archive bounds without starting a job."""
+    pattern = r"\d{4}-(0[1-9]|1[0-2])"
+    if not re.fullmatch(pattern, start) or not re.fullmatch(pattern, end):
+        raise ValueError("Укажите месяц в формате ГГГГ-ММ, например 2017-08.")
+    if tuple(map(int, start.split("-"))) > tuple(map(int, end.split("-"))):
+        raise ValueError("Начальный месяц не может быть позже конечного.")
+    return start, end
 
 
 class DownloadPanel(QWidget):
@@ -55,12 +66,10 @@ class DownloadPanel(QWidget):
         if self.worker is not None and self.worker.isRunning():
             return
         start, end = self.start.text().strip(), self.end.text().strip()
-        import re
-        if not re.fullmatch(r"\\d{4}-(0[1-9]|1[0-2])", start) or not re.fullmatch(r"\\d{4}-(0[1-9]|1[0-2])", end):
-            QMessageBox.warning(self, "Неверный формат даты", "Укажите месяц в формате ГГГГ-ММ, например 2017-08.")
-            return
-        if tuple(map(int, start.split("-"))) > tuple(map(int, end.split("-"))):
-            QMessageBox.warning(self, "Неверный период", "Начальный месяц не может быть позже конечного.")
+        try:
+            validate_month_range(start, end)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Проверьте период загрузки", str(exc))
             return
         answer = QMessageBox.question(
             self, "Подтверждение загрузки архивов",
