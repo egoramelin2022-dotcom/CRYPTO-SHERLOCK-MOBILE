@@ -552,6 +552,7 @@ def run_multitimeframe_pattern_research(
         )
         result = search.to_dict()
         result.update({
+            "run_id": run_id,
             "query_selection": query_selection,
             "query_window_15m": query_window_15m,
             "candidate_budget": candidate_budget,
