@@ -303,3 +303,28 @@ def test_binance_parser_rejects_mixed_timestamp_units_with_diagnostic():
     ]
     with pytest.raises(ValueError, match="15m close_time mismatch"):
         parse_binance_kline(raw, symbol="BTCUSDT", interval="15m")
+
+
+def test_binance_parser_rejects_mixed_timestamp_precision():
+    row = kline(1_735_689_600_000)
+    row[6] = 1_735_690_499_999_000
+    with pytest.raises(ValueError, match="different timestamp precisions"):
+        parse_binance_kline(row, symbol="BTCUSDT", interval="15m")
+
+
+def test_binance_parser_rejects_microsecond_values_with_submillisecond_remainder():
+    row = kline(1_735_689_600_000_001)
+    row[6] = 1_735_690_499_999_000
+    with pytest.raises(ValueError, match="exact millisecond boundaries"):
+        parse_binance_kline(row, symbol="BTCUSDT", interval="15m")
+
+
+def test_binance_parser_accepts_consistent_microsecond_timestamps():
+    open_us = 1_735_689_600_000_000
+    row = [
+        open_us, "99", "101", "98", "100", "10",
+        open_us + 899_999_000, "999", 12, "4", "399", "0",
+    ]
+    candle = parse_binance_kline(row, symbol="BTCUSDT", interval="15m")
+    assert candle.open_time == 1_735_689_600_000
+    assert candle.close_time == 1_735_690_499_999
