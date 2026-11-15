@@ -301,7 +301,7 @@ def test_binance_parser_rejects_mixed_timestamp_units_with_diagnostic():
         1_735_689_600_000_000, "99", "101", "98", "100", "10",
         1_735_690_499_999, "999", 12, "4", "399", "0",
     ]
-    with pytest.raises(ValueError, match="15m close_time mismatch"):
+    with pytest.raises(ValueError, match="different timestamp precisions"):
         parse_binance_kline(raw, symbol="BTCUSDT", interval="15m")
 
 
