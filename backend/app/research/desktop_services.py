@@ -572,13 +572,22 @@ def run_multitimeframe_pattern_research(
             },
         })
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-        result["data_freshness"] = {
+        freshness_by_interval = {
             key: {
                 "latest_closed_candle_time": rows[-1].close_time,
                 "age_hours": max(0.0, (now_ms - rows[-1].close_time) / 3_600_000),
-                "as_of_utc": datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc).isoformat(),
+                "stale_after_hours": 3 * interval_to_ms(key) / 3_600_000,
+                "is_stale": max(0.0, (now_ms - rows[-1].close_time) / 3_600_000)
+                    > 3 * interval_to_ms(key) / 3_600_000,
             }
             for key, rows in series.items()
+        }
+        result["data_freshness"] = {
+            "is_stale": any(item["is_stale"] for item in freshness_by_interval.values()),
+            "age_hours": max(item["age_hours"] for item in freshness_by_interval.values()),
+            "stale_after_hours": min(item["stale_after_hours"] for item in freshness_by_interval.values()),
+            "as_of_utc": datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc).isoformat(),
+            "timeframes": freshness_by_interval,
         }
     except Exception as exc:
         try:
