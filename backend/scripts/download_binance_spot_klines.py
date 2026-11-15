@@ -204,16 +204,26 @@ def run(start: str, end: str, raw_dir: Path, db_path: Path, progress_callback: C
         repository = CandleRepository(connection)
         repository.ensure_schema()
         total_inserted = 0
+        missing_archives: list[str] = []
         for interval in INTERVALS:
             for year, month in months_between(start_year, start_month, end_year, end_month):
                 inserted, status = ingest_month(
                     "BTCUSDT", interval, year, month, raw_dir, repository
                 )
                 total_inserted += inserted
+                if status == "missing":
+                    missing_archives.append(f"{interval} {year}-{month:02d}")
                 emit(f"{interval} {year}-{month:02d}: {status}; inserted={inserted}")
         for interval in INTERVALS:
             emit(f"TOTAL BTCUSDT {interval}: {repository.count('BTCUSDT', interval)} rows")
         emit(f"TOTAL inserted this run: {total_inserted}")
+        if missing_archives:
+            missing_text = ", ".join(missing_archives)
+            raise RuntimeError(
+                "Archive download is incomplete: Binance returned HTTP 404 for "
+                f"requested monthly archives: {missing_text}. Data already ingested "
+                "remains in staging; rerun after verifying archive availability."
+            )
         return total_inserted
     finally:
         connection.close()
