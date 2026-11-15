@@ -88,21 +88,21 @@ def run_multitimeframe_walk_forward(
     }
     folds: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
-    stride = max(1, (first_end + 1 - window - max_horizon) // candidate_budget)
-    search_config = MultiTimeframeSearchConfig(
-        window_lengths=base.window_lengths,
-        timeframe_weights=base.timeframe_weights,
-        top_k=base.top_k,
-        candidate_stride=max(base.candidate_stride, stride),
-        horizons_15m=base.horizons_15m,
-        embargo_15m=max(base.embargo_15m or 0, max_horizon),
-        fee_bps_per_side=base.fee_bps_per_side,
-        slippage_bps_per_side=base.slippage_bps_per_side,
-        deduplicate_higher_timeframe_context=base.deduplicate_higher_timeframe_context,
-    )
-
     for number, query_end in enumerate(fold_ends, start=1):
         query_start = query_end - window + 1
+        eligible_candidates = max(0, query_start - window - max_horizon)
+        stride = max(1, (eligible_candidates + candidate_budget - 1) // candidate_budget)
+        search_config = MultiTimeframeSearchConfig(
+            window_lengths=base.window_lengths,
+            timeframe_weights=base.timeframe_weights,
+            top_k=base.top_k,
+            candidate_stride=max(base.candidate_stride, stride),
+            horizons_15m=base.horizons_15m,
+            embargo_15m=max(base.embargo_15m or 0, max_horizon),
+            fee_bps_per_side=base.fee_bps_per_side,
+            slippage_bps_per_side=base.slippage_bps_per_side,
+            deduplicate_higher_timeframe_context=base.deduplicate_higher_timeframe_context,
+        )
         try:
             search = search_multitimeframe_analogs(
                 series, query_end_index_15m=query_end, config=search_config
