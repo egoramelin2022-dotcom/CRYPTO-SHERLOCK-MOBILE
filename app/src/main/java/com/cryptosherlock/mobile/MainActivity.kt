@@ -541,21 +541,30 @@ class MainActivity : Activity() {
 
     private fun serverBaseUrl(): String {
         val prefs = getSharedPreferences("sherlock_settings", MODE_PRIVATE)
-        return prefs.getString("server_url", "http://10.0.2.2:8000")!!.trimEnd('/')
+        val address = prefs.getString("server_url", "")?.trim()?.trimEnd('/').orEmpty()
+        if (address.isBlank()) {
+            throw IllegalStateException(
+                "Backend не настроен. Запусти сервер на ПК и укажи его LAN-адрес в «Подключение к серверу»."
+            )
+        }
+        if (!address.startsWith("http://") && !address.startsWith("https://")) {
+            throw IllegalStateException("Адрес сервера должен начинаться с http:// или https://")
+        }
+        return address
     }
 
     private fun configureServer() {
         val input = EditText(this).apply {
             setSingleLine(true)
             hint = "http://192.168.1.10:8000"
-            setText(serverBaseUrl())
+            setText(getSharedPreferences("sherlock_settings", MODE_PRIVATE).getString("server_url", "") ?: "")
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
         }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
             addView(TextView(this@MainActivity).apply {
-                text = "Эмулятор: http://10.0.2.2:8000\nТелефон: http://IP-АДРЕС-ПК:8000 (одна Wi-Fi сеть)"
+                text = "Сначала запусти Backend на ПК.\nТелефон и ПК должны быть в одной Wi-Fi сети. Укажи IPv4 компьютера из ipconfig, например http://192.168.1.10:8000.\n10.0.2.2 работает только в Android Emulator."
                 textSize = 12f
             })
             addView(input)
@@ -567,16 +576,25 @@ class MainActivity : Activity() {
             .setNeutralButton("Проверить") { _, _ -> checkServer(input.text.toString().trim()) }
             .setPositiveButton("Сохранить") { _, _ ->
                 val value = input.text.toString().trim().trimEnd('/')
+                if (value.isBlank() || (!value.startsWith("http://") && !value.startsWith("https://"))) {
+                    status.text = "Укажи полный адрес сервера, например http://192.168.1.10:8000"
+                    return@setPositiveButton
+                }
                 getSharedPreferences("sherlock_settings", MODE_PRIVATE).edit().putString("server_url", value).apply()
-                status.text = "Адрес сервера сохранён: $value"
-                loadMarket(true)
+                status.text = "Адрес сохранён. Проверяем /health…"
+                checkServer(value)
             }.show()
     }
 
     private fun checkServer(address: String) {
+        val normalized = address.trim().trimEnd('/')
+        if (normalized.isBlank() || (!normalized.startsWith("http://") && !normalized.startsWith("https://"))) {
+            status.text = "Укажи полный адрес сервера: http://IP-АДРЕС-ПК:8000"
+            return
+        }
         historyExecutor.execute {
             try {
-                val health = JSONObject(readUrl(address.trimEnd('/') + "/health"))
+                val health = JSONObject(readUrl(normalized + "/health"))
                 runOnUiThread {
                     status.text = if (health.optString("status") == "ok") "СЕРВЕР ДОСТУПЕН · " + health.optString("service")
                         else "СЕРВЕР ОТВЕТИЛ, НО СТАТУС НЕ OK"
