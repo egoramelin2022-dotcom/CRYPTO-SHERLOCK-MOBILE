@@ -52,7 +52,7 @@ class ResearchJobWorker(QThread):
                         self.completed.emit(job)
                         return
                     if job.get("status") == "failed":
-                        raise RuntimeError(job.get("error") or "Research job failed")
+                        raise RuntimeError(job.get("error") or "Ошибка исследовательской задачи")
                 raise TimeoutError("Research job exceeded 12-hour desktop wait limit")
         except Exception as exc:
             self.failed.emit(f"{type(exc).__name__}: {exc}")
@@ -70,32 +70,32 @@ class ResearchPanel(QWidget):
         form = QFormLayout()
         self.symbol = QComboBox()
         self.symbol.addItems(["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT"])
-        form.addRow("Market", self.symbol)
+        form.addRow("Рынок", self.symbol)
         self.interval = QComboBox()
         self.interval.addItems(["15m", "1h", "4h", "1d"])
         if kind == "mtf":
             self.interval.setEnabled(False)
             self.interval.setToolTip("MTF scanner always combines 15m, 4h and 1d")
-        form.addRow("Interval", self.interval)
+        form.addRow("Интервал", self.interval)
         self.mode = QComboBox()
         self.mode.addItem("Free Pattern Intelligence", "free")
         self.mode.addItem("Five-stage formation", "five_stage")
-        form.addRow("Search mode", self.mode)
+        form.addRow("Режим поиска", self.mode)
         self.window = QSpinBox()
         self.window.setRange(5, 500)
         self.window.setValue(40)
-        form.addRow("Query window (candles)", self.window)
+        form.addRow("Размер анализируемого окна (свечи)", self.window)
         self.query_start = QLineEdit()
-        self.query_start.setPlaceholderText("Optional · YYYY-MM-DD HH:MM UTC")
+        self.query_start.setPlaceholderText("Необязательно · ГГГГ-ММ-ДД ЧЧ:ММ UTC")
         self.query_start.setToolTip(
             "Leave empty to analyze the latest closed candles. "
             "Enter an exact candle open time in UTC to compare a historical sample."
         )
-        form.addRow("Historical sample start (UTC)", self.query_start)
+        form.addRow("Начало исторического периода (UTC)", self.query_start)
         self.top_k = QSpinBox()
         self.top_k.setRange(1, 100)
         self.top_k.setValue(10)
-        form.addRow("Top historical analogs", self.top_k)
+        form.addRow("Количество лучших аналогов", self.top_k)
         self.mtf_1h_window = QSpinBox()
         self.mtf_1h_window.setRange(2, 500)
         self.mtf_1h_window.setValue(16)
@@ -115,11 +115,11 @@ class ResearchPanel(QWidget):
             "Reports sensitivity; it does not cherry-pick a single winner."
         )
         if kind == "mtf_pattern":
-            form.addRow("Window-scale sensitivity", self.mtf_adaptive)
-            form.addRow("1H comparison window", self.mtf_1h_window)
-            form.addRow("4H comparison window", self.mtf_4h_window)
-            form.addRow("1D comparison window", self.mtf_1d_window)
-            form.addRow("Candidate search budget", self.mtf_candidate_budget)
+            form.addRow("Проверка разных размеров окна", self.mtf_adaptive)
+            form.addRow("Окно сравнения 1H", self.mtf_1h_window)
+            form.addRow("Окно сравнения 4H", self.mtf_4h_window)
+            form.addRow("Окно сравнения 1D", self.mtf_1d_window)
+            form.addRow("Лимит проверки кандидатов", self.mtf_candidate_budget)
         self.core_min_analogs = QSpinBox()
         self.core_min_analogs.setRange(1, 100)
         self.core_min_analogs.setValue(5)
@@ -127,23 +127,23 @@ class ResearchPanel(QWidget):
         self.core_budget.setRange(100, 5000)
         self.core_budget.setValue(2000)
         if kind == "core":
-            form.addRow("Minimum analog sample", self.core_min_analogs)
-            form.addRow("Candidate search budget", self.core_budget)
+            form.addRow("Минимальное число аналогов", self.core_min_analogs)
+            form.addRow("Лимит проверки кандидатов", self.core_budget)
         self.adaptive = QCheckBox("Automatically compare multiple pattern lengths")
         self.adaptive.setToolTip("Keeps the sample end fixed; each length is ranked independently.")
-        form.addRow("Adaptive window search", self.adaptive)
+        form.addRow("Адаптивный поиск размера окна", self.adaptive)
         self.adaptive_min = QSpinBox()
         self.adaptive_min.setRange(5, 500)
         self.adaptive_min.setValue(20)
-        form.addRow("Adaptive minimum length", self.adaptive_min)
+        form.addRow("Минимальная длина окна", self.adaptive_min)
         self.adaptive_max = QSpinBox()
         self.adaptive_max.setRange(5, 500)
         self.adaptive_max.setValue(100)
-        form.addRow("Adaptive maximum length", self.adaptive_max)
+        form.addRow("Максимальная длина окна", self.adaptive_max)
         self.adaptive_step = QSpinBox()
         self.adaptive_step.setRange(1, 500)
         self.adaptive_step.setValue(20)
-        form.addRow("Adaptive length step", self.adaptive_step)
+        form.addRow("Шаг изменения длины окна", self.adaptive_step)
         self.wf_folds = QSpinBox()
         self.wf_folds.setRange(2, 100)
         self.wf_folds.setValue(30)
@@ -164,9 +164,9 @@ class ResearchPanel(QWidget):
                 if label is not None:
                     label.hide()
         if kind == "walk_forward":
-            form.addRow("Out-of-sample folds", self.wf_folds)
-            form.addRow("Minimum training history (candles)", self.wf_training)
-            form.addRow("Candidate budget per fold", self.wf_budget)
+            form.addRow("Независимые тестовые периоды", self.wf_folds)
+            form.addRow("Минимальная обучающая история (свечи)", self.wf_training)
+            form.addRow("Лимит кандидатов на период", self.wf_budget)
             self.query_start.setEnabled(False)
             self.adaptive.setEnabled(False)
             self.adaptive_min.setEnabled(False)
@@ -195,7 +195,7 @@ class ResearchPanel(QWidget):
             label = form.labelForField(self.query_start)
             if label is not None:
                 label.setText("Historical decision candle (UTC)")
-            self.query_start.setPlaceholderText("Optional · YYYY-MM-DD HH:MM UTC")
+            self.query_start.setPlaceholderText("Необязательно · ГГГГ-ММ-ДД ЧЧ:ММ UTC")
             for control in (self.adaptive, self.adaptive_min, self.adaptive_max, self.adaptive_step):
                 control.hide()
                 label = form.labelForField(control)
@@ -211,12 +211,12 @@ class ResearchPanel(QWidget):
         root.addLayout(form)
 
         actions = QHBoxLayout()
-        self.run_button = QPushButton("RUN RESEARCH")
+        self.run_button = QPushButton("ЗАПУСТИТЬ ИССЛЕДОВАНИЕ")
         self.run_button.clicked.connect(self.run_research)
         actions.addWidget(self.run_button)
         self.robustness_button = None
         if kind == "walk_forward":
-            self.robustness_button = QPushButton("RUN ROBUSTNESS AUDIT")
+            self.robustness_button = QPushButton("ПРОВЕРИТЬ УСТОЙЧИВОСТЬ")
             self.robustness_button.setToolTip(
                 "Run up to five independent parameter configurations. "
                 "Capped at 30 folds and 2,000 candidate windows per fold; no winner is selected."
@@ -225,7 +225,7 @@ class ResearchPanel(QWidget):
             actions.addWidget(self.robustness_button)
         actions.addStretch(1)
         root.addLayout(actions)
-        self.status = QLabel("No research job started")
+        self.status = QLabel("Исследование ещё не запускалось")
         self.status.setObjectName("muted")
         root.addWidget(self.status)
         self.plot = None
@@ -256,7 +256,7 @@ class ResearchPanel(QWidget):
             root.addWidget(self.mtf_tabs, 1)
         self.output = QTextEdit()
         self.output.setReadOnly(True)
-        self.output.setPlaceholderText("Verified research results will appear here.")
+        self.output.setPlaceholderText("Здесь появятся проверенные результаты исследования.")
         self.output.setMinimumHeight(280)
         root.addWidget(self.output, 1)
         disclaimer = QLabel(
@@ -361,7 +361,7 @@ class ResearchPanel(QWidget):
         if self.robustness_button is not None:
             self.robustness_button.setEnabled(False)
         self.output.clear()
-        self.status.setText("Submitting research job…")
+        self.status.setText("Отправка исследовательской задачи…")
         self.worker = ResearchJobWorker(self.api_url, endpoint_override or self.endpoint, params)
         self.worker.status.connect(self.status.setText)
         self.worker.completed.connect(self.on_completed)
@@ -746,5 +746,5 @@ class ResearchPanel(QWidget):
                 chart.setTitle(f"{interval} · current structure vs historical analogues")
 
     def on_failed(self, message: str):
-        self.status.setText("Research job failed")
+        self.status.setText("Ошибка исследовательской задачи")
         self.output.setPlainText(message)
