@@ -38,6 +38,7 @@ def test_audit_is_read_only_and_reports_gaps(tmp_path):
     assert item["missing_candles"] == 1
     assert item["malformed_rows"] == 0
     assert report["integrity_check"] == ["ok"]
+    assert report["integrity_ok"] is True
 
 
 def test_audit_rejects_missing_database_and_table(tmp_path):
@@ -47,3 +48,26 @@ def test_audit_rejects_missing_database_and_table(tmp_path):
     sqlite3.connect(db).close()
     with pytest.raises(ValueError, match="table not found"):
         audit_sqlite_dataset(db)
+
+
+def test_audit_reports_off_grid_timestamps_instead_of_crashing(tmp_path):
+    db = tmp_path / "off_grid.db"
+    connection = sqlite3.connect(db)
+    connection.execute("""CREATE TABLE candles (
+        symbol TEXT, interval TEXT, open_time INTEGER, open REAL, high REAL,
+        low REAL, close REAL, volume REAL, close_time INTEGER,
+        quote_volume REAL, trade_count INTEGER, taker_buy_base REAL,
+        taker_buy_quote REAL)""")
+    connection.execute(
+        "INSERT INTO candles VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        ("BTCUSDT", "15m", 1, 100, 102, 99, 101, 10, 900000, 1005, 5, 6, 6030),
+    )
+    connection.commit()
+    connection.close()
+
+    report = audit_sqlite_dataset(db)
+    item = report["datasets"][0]
+    assert item["rows"] == 1
+    assert item["invalid_timestamp_rows"] == 1
+    assert item["malformed_rows"] == 1
+    assert item["gap_count"] == 0

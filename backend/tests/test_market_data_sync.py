@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from app.market_data.sync import HistoricalSyncEngine
+from app.market_data.binance import parse_binance_kline
 
 
 def kline(open_time: int, close: float = 100.0) -> list:
@@ -31,6 +32,7 @@ def test_sync_downloads_multiple_pages_and_checkpoints_complete():
     calls = []
 
     def handler(request: httpx.Request):
+        assert request.headers.get("X-MBX-TIME-UNIT") == "MILLISECOND"
         cursor = int(request.url.params["startTime"])
         calls.append(cursor)
         if cursor == start:
@@ -276,3 +278,53 @@ def test_sparse_page_is_ingested_but_marked_partial_with_gap_registry():
         engine.close()
         client.close()
         conn.close()
+
+
+
+@pytest.mark.parametrize(
+    "interval,step",
+    [("15m", 900_000), ("4h", 14_400_000), ("1d", 86_400_000)],
+)
+def test_binance_parser_normalizes_microseconds_for_all_imported_intervals(interval, step):
+    open_ms = 1_735_689_600_000  # 2025-01-01 00:00:00 UTC, aligned for all three.
+    raw = [
+        open_ms * 1000, "99", "101", "98", "100", "10",
+        (open_ms + step - 1) * 1000, "999", 12, "4", "399", "0",
+    ]
+    candle = parse_binance_kline(raw, symbol="BTCUSDT", interval=interval)
+    assert candle.open_time == open_ms
+    assert candle.close_time == open_ms + step - 1
+
+
+def test_binance_parser_rejects_mixed_timestamp_units_with_diagnostic():
+    raw = [
+        1_735_689_600_000_000, "99", "101", "98", "100", "10",
+        1_735_690_499_999, "999", 12, "4", "399", "0",
+    ]
+    with pytest.raises(ValueError, match="different timestamp precisions"):
+        parse_binance_kline(raw, symbol="BTCUSDT", interval="15m")
+
+
+def test_binance_parser_rejects_mixed_timestamp_precision():
+    row = kline(1_735_689_600_000)
+    row[6] = 1_735_690_499_999_000
+    with pytest.raises(ValueError, match="different timestamp precisions"):
+        parse_binance_kline(row, symbol="BTCUSDT", interval="15m")
+
+
+def test_binance_parser_rejects_microsecond_values_with_submillisecond_remainder():
+    row = kline(1_735_689_600_000_001)
+    row[6] = 1_735_690_499_999_000
+    with pytest.raises(ValueError, match="exact millisecond boundaries"):
+        parse_binance_kline(row, symbol="BTCUSDT", interval="15m")
+
+
+def test_binance_parser_accepts_consistent_microsecond_timestamps():
+    open_us = 1_735_689_600_000_000
+    row = [
+        open_us, "99", "101", "98", "100", "10",
+        open_us + 899_999_000, "999", 12, "4", "399", "0",
+    ]
+    candle = parse_binance_kline(row, symbol="BTCUSDT", interval="15m")
+    assert candle.open_time == 1_735_689_600_000
+    assert candle.close_time == 1_735_690_499_999

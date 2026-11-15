@@ -88,10 +88,22 @@ def audit_sqlite_dataset(
                     FROM "{table}" WHERE symbol=? AND interval=? ORDER BY open_time''',
                 (symbol, interval),
             ).fetchall()
-            times = [int(row["open_time"]) for row in rows]
-            gaps = find_gaps(times, interval) if times else []
+            raw_times: list[int] = []
+            aligned_times: list[int] = []
+            invalid_timestamp_rows = 0
             malformed = 0
+            step_ms = interval_to_ms(interval)
             for row in rows:
+                try:
+                    open_time = int(row["open_time"])
+                    raw_times.append(open_time)
+                    if open_time < 0 or open_time % step_ms:
+                        invalid_timestamp_rows += 1
+                    else:
+                        aligned_times.append(open_time)
+                except (TypeError, ValueError, OverflowError):
+                    invalid_timestamp_rows += 1
+
                 o, h, low, c = (row[k] for k in ("open", "high", "low", "close"))
                 numeric = [row[k] for k in (
                     "open", "high", "low", "close", "volume", "quote_volume",
@@ -106,21 +118,25 @@ def audit_sqlite_dataset(
                         "volume", "quote_volume", "taker_buy_base", "taker_buy_quote"
                     ))
                     valid = valid and int(row["trade_count"]) >= 0
-                    step_ms = interval_to_ms(interval)
-                    valid = valid and int(row["open_time"]) % step_ms == 0
                     valid = valid and int(row["close_time"]) == int(row["open_time"]) + step_ms - 1
+                    valid = valid and int(row["open_time"]) >= 0 and int(row["open_time"]) % step_ms == 0
                 except (TypeError, ValueError, OverflowError):
                     valid = False
                 if not valid:
                     malformed += 1
 
+            # Duplicates and off-grid rows remain visible instead of aborting the audit.
+            duplicate_open_times = len(raw_times) - len(set(raw_times))
+            unique_aligned_times = sorted(set(aligned_times))
+            gaps = find_gaps(unique_aligned_times, interval) if unique_aligned_times else []
             datasets.append({
                 "symbol": symbol,
                 "interval": interval,
                 "rows": len(rows),
-                "first_open_time_ms": times[0] if times else None,
-                "last_open_time_ms": times[-1] if times else None,
-                "duplicate_open_times": len(times) - len(set(times)),
+                "first_open_time_ms": unique_aligned_times[0] if unique_aligned_times else None,
+                "last_open_time_ms": unique_aligned_times[-1] if unique_aligned_times else None,
+                "duplicate_open_times": duplicate_open_times,
+                "invalid_timestamp_rows": invalid_timestamp_rows,
                 "missing_candles": sum(g.missing_candles for g in gaps),
                 "gap_count": len(gaps),
                 "malformed_rows": malformed,
@@ -143,6 +159,7 @@ def audit_sqlite_dataset(
         "modified_utc": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
         "sha256": _sha256_file(path) if include_sha256 else None,
         "integrity_check": integrity_rows,
+        "integrity_ok": integrity_rows == ["ok"],
         "datasets": datasets,
         "audit_created_utc": datetime.now(timezone.utc).isoformat(),
         "limitations": [

@@ -54,16 +54,16 @@ class ExperimentLedgerPanel(QWidget):
         root.setSpacing(12)
 
         actions = QHBoxLayout()
-        self.refresh_button = QPushButton("REFRESH HISTORY")
+        self.refresh_button = QPushButton("ОБНОВИТЬ ИСТОРИЮ")
         self.refresh_button.clicked.connect(self.refresh)
-        self.verify_button = QPushButton("VERIFY LEDGER INTEGRITY")
+        self.verify_button = QPushButton("ПРОВЕРИТЬ ЦЕЛОСТНОСТЬ ЖУРНАЛА")
         self.verify_button.clicked.connect(self.verify)
         actions.addWidget(self.refresh_button)
         actions.addWidget(self.verify_button)
         actions.addStretch(1)
         root.addLayout(actions)
 
-        self.status = QLabel("Research history has not been loaded yet.")
+        self.status = QLabel("История исследований ещё не загружена.")
         self.status.setObjectName("muted")
         root.addWidget(self.status)
 
@@ -84,7 +84,7 @@ class ExperimentLedgerPanel(QWidget):
         self.table.itemSelectionChanged.connect(self._selection_changed)
         root.addWidget(self.table, 2)
 
-        detail_title = QLabel("EXPERIMENT RECORD / INTEGRITY REPORT")
+        detail_title = QLabel("ЗАПИСЬ ЭКСПЕРИМЕНТА / ОТЧЁТ О ЦЕЛОСТНОСТИ")
         detail_title.setObjectName("panelTitle")
         root.addWidget(detail_title)
         self.details = QTextEdit()
@@ -107,7 +107,7 @@ class ExperimentLedgerPanel(QWidget):
             return
         self.refresh_button.setEnabled(False)
         self.verify_button.setEnabled(False)
-        self.status.setText("Reading local research ledger…")
+        self.status.setText("Чтение локального журнала исследований…")
         self.worker = LedgerWorker(self.api_url, action, run_id)
         self.worker.completed.connect(self._completed)
         self.worker.failed.connect(self._failed)
@@ -167,5 +167,5 @@ class ExperimentLedgerPanel(QWidget):
             self.details.setPlainText(json.dumps(payload, indent=2, ensure_ascii=False))
 
     def _failed(self, message: str):
-        self.status.setText("Ledger request failed · " + message)
+        self.status.setText("Ошибка обращения к журналу · " + message)
         self.details.setPlainText(message)

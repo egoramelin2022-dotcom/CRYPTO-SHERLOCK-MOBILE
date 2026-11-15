@@ -37,11 +37,42 @@ def months_between(start_year: int, start_month: int, end_year: int, end_month: 
 
 
 def normalize_timestamp(value: str) -> int:
-    """Normalize Binance Spot milliseconds or microseconds to milliseconds."""
+    """Normalize Binance Spot millisecond or microsecond epoch timestamps."""
     timestamp = int(value)
+    if timestamp < 0:
+        raise ValueError("timestamp must be nonnegative")
     if timestamp >= 100_000_000_000_000:
         timestamp //= 1_000
+    elif timestamp < 100_000_000_000:
+        raise ValueError(f"unsupported Binance timestamp precision: {value!r}")
     return timestamp
+
+
+def normalize_kline_times(open_value: str, close_value: str, interval: str) -> tuple[int, int]:
+    """Normalize timestamps and canonicalize an exact exclusive close boundary."""
+    from app.market_data.intervals import interval_to_ms
+
+    raw_open = int(open_value)
+    raw_close = int(close_value)
+    open_is_microseconds = raw_open >= 100_000_000_000_000
+    close_is_microseconds = raw_close >= 100_000_000_000_000
+    if open_is_microseconds != close_is_microseconds:
+        raise ValueError("open_time and close_time use different timestamp precisions")
+    if open_is_microseconds and (raw_open % 1_000 or raw_close % 1_000):
+        raise ValueError("microsecond timestamps must represent exact millisecond boundaries")
+    open_time = normalize_timestamp(open_value)
+    close_time = normalize_timestamp(close_value)
+    expected_close = open_time + interval_to_ms(interval) - 1
+    # Internal storage uses the final millisecond (inclusive close).
+    # Accept an archive that encodes the exact interval end as exclusive.
+    if close_time == expected_close + 1:
+        close_time = expected_close
+    if close_time != expected_close:
+        raise ValueError(
+            f"{interval} close_time mismatch: open={open_time}, close={close_time}, "
+            f"expected inclusive close={expected_close}, delta={close_time - open_time}ms"
+        )
+    return open_time, close_time
 
 
 def parse_checksum(text: str) -> str:
@@ -104,22 +135,29 @@ def iter_archive_candles(archive: Path, symbol: str, interval: str) -> Iterator[
                     continue
                 if len(row) != COLUMNS:
                     raise ValueError(f"{archive.name}:{line_number}: expected 12 columns, got {len(row)}")
+                open_time, close_time = normalize_kline_times(row[0], row[6], interval)
                 candle = Candle(
                     symbol=symbol,
                     interval=interval,
-                    open_time=normalize_timestamp(row[0]),
+                    open_time=open_time,
                     open=float(row[1]),
                     high=float(row[2]),
                     low=float(row[3]),
                     close=float(row[4]),
                     volume=float(row[5]),
-                    close_time=normalize_timestamp(row[6]),
+                    close_time=close_time,
                     quote_volume=float(row[7]),
                     trade_count=int(row[8]),
                     taker_buy_base=float(row[9]),
                     taker_buy_quote=float(row[10]),
                 )
-                candle.validate()
+                try:
+                    candle.validate()
+                except ValueError as exc:
+                    raise ValueError(
+                        f"{archive.name}:{line_number}: invalid {interval} candle "
+                        f"(open_time={open_time}, close_time={close_time}): {exc}"
+                    ) from exc
                 yield candle
 
 
@@ -158,9 +196,22 @@ def ingest_month(
     return inserted, "ok"
 
 
+def _parse_month(value: str, field_name: str) -> tuple[int, int]:
+    if (
+        not isinstance(value, str) or len(value) != 7
+        or value[4] != "-" or not value[:4].isdigit()
+        or not value[5:].isdigit()
+    ):
+        raise ValueError(f"{field_name} must use exact YYYY-MM format")
+    year, month = int(value[:4]), int(value[5:])
+    if year < 2017 or not 1 <= month <= 12:
+        raise ValueError(f"{field_name} is outside supported Binance Spot archive range")
+    return year, month
+
+
 def run(start: str, end: str, raw_dir: Path, db_path: Path, progress_callback: Callable[[str], None] | None = None) -> int:
-    start_year, start_month = map(int, start.split("-"))
-    end_year, end_month = map(int, end.split("-"))
+    start_year, start_month = _parse_month(start, "start month")
+    end_year, end_month = _parse_month(end, "end month")
     if (start_year, start_month) > (end_year, end_month):
         raise ValueError("start month must not be after end month")
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -174,16 +225,26 @@ def run(start: str, end: str, raw_dir: Path, db_path: Path, progress_callback: C
         repository = CandleRepository(connection)
         repository.ensure_schema()
         total_inserted = 0
+        missing_archives: list[str] = []
         for interval in INTERVALS:
             for year, month in months_between(start_year, start_month, end_year, end_month):
                 inserted, status = ingest_month(
                     "BTCUSDT", interval, year, month, raw_dir, repository
                 )
                 total_inserted += inserted
+                if status == "missing":
+                    missing_archives.append(f"{interval} {year}-{month:02d}")
                 emit(f"{interval} {year}-{month:02d}: {status}; inserted={inserted}")
         for interval in INTERVALS:
             emit(f"TOTAL BTCUSDT {interval}: {repository.count('BTCUSDT', interval)} rows")
         emit(f"TOTAL inserted this run: {total_inserted}")
+        if missing_archives:
+            missing_text = ", ".join(missing_archives)
+            raise RuntimeError(
+                "Archive download is incomplete: Binance returned HTTP 404 for "
+                f"requested monthly archives: {missing_text}. Data already ingested "
+                "remains in staging; rerun after verifying archive availability."
+            )
         return total_inserted
     finally:
         connection.close()

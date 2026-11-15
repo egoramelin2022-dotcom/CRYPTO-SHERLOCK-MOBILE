@@ -13,15 +13,15 @@ class SystemPanel(QWidget):
         self.worker: ResearchJobWorker | None = None
         root = QVBoxLayout(self)
         actions = QHBoxLayout()
-        self.audit = QPushButton("AUDIT SOURCE DATABASE")
+        self.audit = QPushButton("ПРОВЕРИТЬ ИСХОДНУЮ БАЗУ")
         self.audit.clicked.connect(self.run_audit)
-        self.pipeline = QPushButton("RUN FEATURE PIPELINE")
+        self.pipeline = QPushButton("ЗАПУСТИТЬ ОБРАБОТКУ ДАННЫХ")
         self.pipeline.clicked.connect(self.run_pipeline)
         actions.addWidget(self.audit)
         actions.addWidget(self.pipeline)
         actions.addStretch(1)
         root.addLayout(actions)
-        self.status = QLabel("Backend health is shown in the top bar")
+        self.status = QLabel("Состояние локального сервера отображается в верхней панели")
         self.status.setObjectName("muted")
         root.addWidget(self.status)
         self.output = QTextEdit()
@@ -55,11 +55,11 @@ class SystemPanel(QWidget):
         self._run("/v1/research/pipeline", {"symbol": "BTCUSDT", "interval": "15m", "window": 20})
 
     def _done(self, job: dict):
-        self.status.setText(f"Completed · {job.get('kind')} · {job.get('updated_at')}")
+        self.status.setText(f"Завершено · {job.get('kind')} · {job.get('updated_at')}")
         self.output.setPlainText(json.dumps(job.get("result") or {}, ensure_ascii=False, indent=2))
 
     def _failed(self, message: str):
-        self.status.setText("System task failed")
+        self.status.setText("Ошибка системной задачи")
         self.output.setPlainText(message)
 
     def _finished(self):

@@ -21,7 +21,7 @@ class ServerSettingsDialog(QDialog):
     def __init__(self, settings: QSettings, parent=None):
         super().__init__(parent)
         self.settings = settings
-        self.setWindowTitle("CRYPTO SHERLOCK · Server Settings")
+        self.setWindowTitle("CRYPTO SHERLOCK · Настройки сервера")
         self.setMinimumWidth(720)
         root = QVBoxLayout(self)
         form = QFormLayout()
@@ -31,22 +31,22 @@ class ServerSettingsDialog(QDialog):
         )
         source_row = QHBoxLayout()
         source_row.addWidget(self.source, 1)
-        source_browse = QPushButton("Browse…")
+        source_browse = QPushButton("ОБЗОР…")
         source_browse.clicked.connect(self.browse_source)
         source_row.addWidget(source_browse)
         analytics_row = QHBoxLayout()
         analytics_row.addWidget(self.analytics, 1)
-        analytics_browse = QPushButton("Browse…")
+        analytics_browse = QPushButton("ОБЗОР…")
         analytics_browse.clicked.connect(self.browse_analytics)
         analytics_row.addWidget(analytics_browse)
-        form.addRow("Source market database (read-only)", source_row)
-        form.addRow("Separate analytics database", analytics_row)
+        form.addRow("Исходная база рынка (только чтение)", source_row)
+        form.addRow("Отдельная база аналитики", analytics_row)
         root.addLayout(form)
         actions = QHBoxLayout()
         actions.addStretch(1)
-        cancel = QPushButton("CANCEL")
+        cancel = QPushButton("ОТМЕНА")
         cancel.clicked.connect(self.reject)
-        save = QPushButton("SAVE & START SERVER")
+        save = QPushButton("СОХРАНИТЬ И ЗАПУСТИТЬ СЕРВЕР")
         save.clicked.connect(self.accept)
         actions.addWidget(cancel)
         actions.addWidget(save)
@@ -54,16 +54,16 @@ class ServerSettingsDialog(QDialog):
 
     def browse_source(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select source market database", self.source.text(),
-            "SQLite databases (*.db *.sqlite *.sqlite3);;All files (*.*)",
+            self, "Выберите исходную базу рыночных данных", self.source.text(),
+            "Базы SQLite (*.db *.sqlite *.sqlite3);;Все файлы (*.*)",
         )
         if path:
             self.source.setText(path)
 
     def browse_analytics(self):
         path, _ = QFileDialog.getSaveFileName(
-            self, "Select analytics database", self.analytics.text(),
-            "SQLite databases (*.db *.sqlite *.sqlite3)",
+            self, "Выберите базу аналитики", self.analytics.text(),
+            "Базы SQLite (*.db *.sqlite *.sqlite3)",
         )
         if path:
             self.analytics.setText(path)
@@ -72,15 +72,15 @@ class ServerSettingsDialog(QDialog):
         source = Path(self.source.text().strip()).expanduser()
         analytics = Path(self.analytics.text().strip()).expanduser()
         if not source.is_file():
-            QMessageBox.warning(self, "Source database not found", "Select an existing source market database.")
+            QMessageBox.warning(self, "Исходная база не найдена", "Выберите существующую базу рыночных данных.")
             return
         if source.resolve() == analytics.resolve():
-            QMessageBox.warning(self, "Unsafe database configuration", "Analytics database must be separate from the source database.")
+            QMessageBox.warning(self, "Небезопасная настройка баз данных", "База аналитики должна отличаться от исходной базы.")
             return
         try:
             analytics.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            QMessageBox.warning(self, "Cannot create analytics folder", str(exc))
+            QMessageBox.warning(self, "Не удалось создать папку базы аналитики", str(exc))
             return
         self.settings.setValue("source_db", str(source.resolve()))
         self.settings.setValue("analytics_db", str(analytics.resolve()))

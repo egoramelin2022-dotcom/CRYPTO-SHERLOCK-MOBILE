@@ -4,7 +4,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from desktop.download_panel import DownloadPanel
+from desktop.download_panel import DownloadPanel, validate_month_range
 from desktop.market_panel import MarketPanel
 from desktop.paper_panel import PaperPanel
 from desktop.research_panel import ResearchPanel
@@ -160,8 +160,8 @@ def test_multitimeframe_pattern_panel_renders_per_timeframe_analog_scores():
 def test_download_panel_exposes_separate_archive_and_recent_sync_actions():
     app = QApplication.instance() or QApplication([])
     panel = DownloadPanel("http://127.0.0.1:1")
-    assert panel.run_button.text() == "DOWNLOAD ARCHIVES TO STAGING"
-    assert panel.sync_button.text() == "SYNC CURRENT MONTH"
+    assert panel.run_button.text() == "ЗАГРУЗИТЬ АРХИВЫ ВО ВРЕМЕННОЕ ХРАНИЛИЩЕ"
+    assert panel.sync_button.text() == "СИНХРОНИЗИРОВАТЬ ТЕКУЩИЙ МЕСЯЦ"
     panel.close()
     app.processEvents()
 
@@ -214,7 +214,7 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
     assert "WALK-FORWARD" in rendered
     assert "evaluated folds: 4" in rendered
     assert panel.robustness_button is not None
-    assert panel.robustness_button.text() == "RUN ROBUSTNESS AUDIT"
+    assert panel.robustness_button.text() == "ПРОВЕРИТЬ УСТОЙЧИВОСТЬ"
     calls = []
     panel.run_research = lambda endpoint_override=None: calls.append(endpoint_override)
     panel.robustness_button.click()
@@ -388,3 +388,20 @@ def test_experiment_ledger_panel_renders_history_and_integrity_report():
     assert panel.status.text() == "LEDGER INTEGRITY: PASS"
     panel.close()
     app.processEvents()
+
+
+
+def test_archive_month_range_validation_accepts_valid_dates_and_rejects_bad_ranges():
+    assert validate_month_range("2017-08", "2026-10") == ("2017-08", "2026-10")
+    for start, end in [
+        ("2017-00", "2026-10"),
+        ("2017-13", "2026-10"),
+        ("17-08", "2026-10"),
+        ("2018-01", "2017-12"),
+    ]:
+        try:
+            validate_month_range(start, end)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid month range was accepted: {start}..{end}")

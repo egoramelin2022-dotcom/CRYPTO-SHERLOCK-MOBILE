@@ -80,17 +80,17 @@ class Page(QWidget):
 
 class MainWindow(QMainWindow):
     NAV_ITEMS = [
-        ("Overview", "01"),
-        ("Market Data", "02"),
-        ("Pattern Intelligence", "03"),
-        ("Sherlock Core", "04"),
-        ("Experiment Ledger", "05"),
-        ("Multi-Timeframe", "06"),
-        ("MTF Pattern Search", "07"),
-        ("Ensemble Engine", "08"),
-        ("Backtesting Lab", "09"),
-        ("Paper Trading", "10"),
-        ("System Monitor", "11"),
+        ("Обзор", "01"),
+        ("Рынок", "02"),
+        ("Поиск паттернов", "03"),
+        ("Ядро Sherlock", "04"),
+        ("Журнал экспериментов", "05"),
+        ("Мульти-ТФ сканер", "06"),
+        ("Мульти-ТФ паттерны", "07"),
+        ("Ансамбль моделей", "08"),
+        ("Тестирование", "09"),
+        ("Демо-портфель", "10"),
+        ("Система", "11"),
     ]
 
     def __init__(self):
@@ -129,7 +129,7 @@ class MainWindow(QMainWindow):
         side.addWidget(brand)
         side.addWidget(brand2)
         side.addSpacing(28)
-        section = QLabel("RESEARCH TERMINAL")
+        section = QLabel("АНАЛИТИЧЕСКИЙ ТЕРМИНАЛ")
         section.setObjectName("eyebrow")
         side.addWidget(section)
         self.nav_buttons = []
@@ -152,14 +152,14 @@ class MainWindow(QMainWindow):
         topbar.setObjectName("topbar")
         top = QHBoxLayout(topbar)
         top.setContentsMargins(28, 14, 28, 14)
-        self.breadcrumb = QLabel("OVERVIEW  /  MARKET INTELLIGENCE")
+        self.breadcrumb = QLabel("ОБЗОР  /  АНАЛИТИКА РЫНКА")
         self.breadcrumb.setObjectName("topLabel")
-        self.connection = QLabel("●  CHECKING BACKEND")
+        self.connection = QLabel("●  ПРОВЕРКА СЕРВЕРА")
         self.connection.setObjectName("connection")
         top.addWidget(self.breadcrumb)
         top.addStretch(1)
         top.addWidget(self.connection)
-        self.server_settings_button = QPushButton('SERVER SETTINGS')
+        self.server_settings_button = QPushButton('НАСТРОЙКИ СЕРВЕРА')
         self.server_settings_button.setObjectName('settingsButton')
         self.server_settings_button.clicked.connect(self.open_server_settings)
         top.addWidget(self.server_settings_button)
@@ -169,13 +169,13 @@ class MainWindow(QMainWindow):
         self.pages = [
             self.make_overview(),
             self.make_data_page(),
-            self.make_research_page("Pattern Intelligence", "Historical analog search with a free mode and the preserved equal-weight five-stage formation.", "/v1/research/pattern", "pattern"),
-            self.make_research_page("Sherlock Intelligence Core", "Central research coordinator: pattern analogs, causal market regime, cost-adjusted outcomes and explicit evidence conflicts.", "/v1/research/core", "core"),
+            self.make_research_page("Поиск паттернов", "Поиск исторических аналогов в свободном режиме и в сохранённой пятиэтапной модели с равными весами.", "/v1/research/pattern", "pattern"),
+            self.make_research_page("Аналитическое ядро Sherlock", "Объединение поиска аналогов, рыночного режима и результатов с учётом комиссий и проскальзывания.", "/v1/research/core", "core"),
             self.make_ledger_page(),
-            self.make_research_page("Multi-Timeframe Scanner", "Aligned 15m lower-wick, 4h support sweep/reclaim and closed 1d bearish-context scan.", "/v1/research/multitimeframe", "mtf"),
-            self.make_research_page("Multi-Timeframe Pattern Intelligence", "Search historical analogues by matching complete price geometry, candle structure, volume and closed 15m/1h/4h/1d contexts.", "/v1/research/multitimeframe-patterns", "mtf_pattern"),
-            self.make_research_page("Ensemble Engine", "Evidence aggregation with explicit engine availability. No uncalibrated probabilities or signal averaging.", "/v1/research/ensemble", "ensemble"),
-            self.make_research_page("Backtesting Lab", "Expanding-window out-of-sample validation of historical analog decisions, with embargo, costs and simple baselines.", "/v1/research/walk-forward", "walk_forward"),
+            self.make_research_page("Мульти-ТФ сканер", "Поиск нижней тени на 15m, снятия и возврата поддержки на 4h и медвежьего контекста на закрытой 1d.", "/v1/research/multitimeframe", "mtf"),
+            self.make_research_page("Мульти-ТФ анализ паттернов", "Поиск исторических аналогов по геометрии цены, структуре свечей, объёму и закрытым таймфреймам 15m/1h/4h/1d.", "/v1/research/multitimeframe-patterns", "mtf_pattern"),
+            self.make_research_page("Ансамбль моделей", "Объединение подтверждённых результатов модулей без некалиброванных вероятностей и механического усреднения сигналов.", "/v1/research/ensemble", "ensemble"),
+            self.make_research_page("Лаборатория тестирования", "Проверка исторических гипотез на независимых периодах с эмбарго, комиссиями и сравнением с базовыми стратегиями.", "/v1/research/walk-forward", "walk_forward"),
             self.make_paper_page(),
             self.make_system_page(),
         ]
@@ -202,19 +202,19 @@ class MainWindow(QMainWindow):
         return row
 
     def make_overview(self):
-        page = Page("Market Intelligence", "A focused command center for historical research, market structure and evidence-backed testing.")
+        page = Page("Аналитика рынка", "Центр исторических исследований, анализа структуры рынка и проверки гипотез на данных.")
         page.body.addLayout(self.card_row([
-            MetricCard("Market feed", "—", "Waiting for local backend", "mint"),
-            MetricCard("Historical candles", "NOT LOADED", "BTCUSDT · 15M / 4H / 1D", "amber"),
-            MetricCard("Research engine", "READY TO CONNECT", "Local analytics services", "blue"),
-            MetricCard("Execution mode", "PAPER ONLY", "Live orders disabled", "mint"),
+            MetricCard("Рыночные данные", "—", "Ожидание локального сервера", "mint"),
+            MetricCard("Исторические свечи", "НЕ ЗАГРУЖЕНЫ", "BTCUSDT · 15M / 4H / 1D", "amber"),
+            MetricCard("Аналитический движок", "ГОТОВ К ПОДКЛЮЧЕНИЮ", "Локальные аналитические службы", "blue"),
+            MetricCard("Режим исполнения", "ТОЛЬКО ДЕМО", "Реальные ордера отключены", "mint"),
         ]))
         panel = QFrame()
         panel.setObjectName("panel")
         p = QVBoxLayout(panel)
-        title = QLabel("RESEARCH WORKSPACE")
+        title = QLabel("РАБОЧЕЕ ПРОСТРАНСТВО")
         title.setObjectName("panelTitle")
-        desc = QLabel("The desktop shell is connected to the CRYPTO SHERLOCK backend when it is running. Historical data and analytics will appear here only after they have been loaded and verified.")
+        desc = QLabel("Приложение подключается к локальному серверу CRYPTO SHERLOCK. Исторические данные и результаты анализа появятся здесь после загрузки и проверки.")
         desc.setObjectName("bodyText")
         desc.setWordWrap(True)
         p.addWidget(title)
@@ -224,18 +224,18 @@ class MainWindow(QMainWindow):
         self.backend_detail.setObjectName("muted")
         p.addWidget(self.backend_detail)
         page.body.addWidget(panel)
-        quick = QLabel("RESEARCH MODULES")
+        quick = QLabel("ИССЛЕДОВАТЕЛЬСКИЕ МОДУЛИ")
         quick.setObjectName("eyebrow")
         page.body.addWidget(quick)
         page.body.addLayout(self.card_row([
-            MetricCard("01 / Discovery", "Pattern Lab", "Search historical analogs", "blue"),
-            MetricCard("02 / Structure", "MTF Scanner", "15M + 4H + 1D", "mint"),
-            MetricCard("03 / Validation", "Walk Forward", "Test out-of-sample", "amber"),
+            MetricCard("01 / ПОИСК", "Pattern Lab", "Поиск исторических аналогов", "blue"),
+            MetricCard("02 / СТРУКТУРА", "MTF Scanner", "15M + 4H + 1D", "mint"),
+            MetricCard("03 / ПРОВЕРКА", "Walk Forward", "Тестирование вне обучающей выборки", "amber"),
         ]))
         return page
 
     def make_data_page(self):
-        page = Page("Market Data & History", "Live public Binance Spot market feed and verified historical archive staging.")
+        page = Page("Рынок и история", "Публичные рыночные данные Binance Spot и проверка исторических архивов.")
         market_panel = QFrame()
         market_panel.setObjectName("panel")
         market_layout = QVBoxLayout(market_panel)
@@ -264,7 +264,7 @@ class MainWindow(QMainWindow):
         return page
 
     def make_system_page(self):
-        page = Page("System Monitor", "Backend connection, read-only source audit and derived feature pipeline.")
+        page = Page("Монитор системы", "Подключение сервера, проверка исходной базы только для чтения и обработка данных.")
         panel = QFrame()
         panel.setObjectName("panel")
         layout = QVBoxLayout(panel)
@@ -274,7 +274,7 @@ class MainWindow(QMainWindow):
         return page
 
     def make_paper_page(self):
-        page = Page("Paper Trading", "Persistent virtual spot portfolio. All actions are manually confirmed and simulated locally.")
+        page = Page("Демо-торговля", "Виртуальный спотовый портфель. Все действия подтверждаются вручную и моделируются локально.")
         panel = QFrame()
         panel.setObjectName("panel")
         layout = QVBoxLayout(panel)
