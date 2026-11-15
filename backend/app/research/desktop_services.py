@@ -554,6 +554,8 @@ def run_multitimeframe_pattern_research(
         result.update({
             "run_id": run_id,
             "query_selection": query_selection,
+            "query_start_time": query_start_time,
+            "query_end_time": query_end_close_time,
             "query_window_15m": query_window_15m,
             "candidate_budget": candidate_budget,
             "data_sources": data_sources,
