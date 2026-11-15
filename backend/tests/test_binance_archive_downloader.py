@@ -2,6 +2,7 @@ from scripts.download_binance_spot_klines import (
     archive_url,
     months_between,
     normalize_timestamp,
+    normalize_kline_times,
     parse_checksum,
 )
 
@@ -33,3 +34,28 @@ def test_archive_url_uses_binance_spot_monthly_layout():
         "https://data.binance.vision/data/spot/monthly/klines/"
         "BTCUSDT/15m/BTCUSDT-15m-2017-08.zip"
     )
+
+
+
+def test_normalizes_inclusive_and_exact_exclusive_close_boundaries():
+    # 15m candle in milliseconds.
+    assert normalize_kline_times("1502942400000", "1502943299999", "15m") == (
+        1502942400000, 1502943299999
+    )
+    # Same candle represented in microseconds.
+    assert normalize_kline_times("1502942400000000", "1502943299999000", "15m") == (
+        1502942400000, 1502943299999
+    )
+    # Some exports encode the interval end as an exclusive boundary.
+    assert normalize_kline_times("1502942400000", "1502943300000", "15m") == (
+        1502942400000, 1502943299999
+    )
+
+
+def test_rejects_close_time_that_is_not_an_exact_interval_boundary():
+    try:
+        normalize_kline_times("1502942400000", "1502943299998", "15m")
+    except ValueError as exc:
+        assert "15m close_time mismatch" in str(exc)
+    else:
+        raise AssertionError("invalid close_time must fail")
