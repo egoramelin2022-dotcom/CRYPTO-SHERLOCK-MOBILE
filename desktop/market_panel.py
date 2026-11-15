@@ -91,11 +91,11 @@ class MarketPanel(QWidget):
         self.interval.addItems(["15m", "1h", "4h", "1d"])
         self.symbol.currentTextChanged.connect(lambda _value: self.refresh())
         self.interval.currentTextChanged.connect(lambda _value: self.refresh())
-        self.refresh_button = QPushButton("REFRESH MARKET")
+        self.refresh_button = QPushButton("ОБНОВИТЬ РЫНОК")
         self.refresh_button.clicked.connect(self.refresh)
-        controls.addWidget(QLabel("SYMBOL"))
+        controls.addWidget(QLabel("ИНСТРУМЕНТ"))
         controls.addWidget(self.symbol)
-        controls.addWidget(QLabel("TIMEFRAME"))
+        controls.addWidget(QLabel("ТАЙМФРЕЙМ"))
         controls.addWidget(self.interval)
         controls.addStretch(1)
         controls.addWidget(self.refresh_button)
@@ -103,7 +103,7 @@ class MarketPanel(QWidget):
 
         self.price = QLabel("—")
         self.price.setObjectName("marketPrice")
-        self.change = QLabel("Waiting for verified market response")
+        self.change = QLabel("Ожидание проверенных рыночных данных")
         self.change.setObjectName("muted")
         root.addWidget(self.price)
         root.addWidget(self.change)
@@ -118,7 +118,7 @@ class MarketPanel(QWidget):
         self.chart.getViewBox().setBorder(pg.mkPen("#263641"))
         root.addWidget(self.chart, 1)
 
-        self.status = QLabel("No market data loaded")
+        self.status = QLabel("Рыночные данные ещё не загружены")
         self.status.setObjectName("muted")
         root.addWidget(self.status)
         self.auto_refresh = QTimer(self)
@@ -128,7 +128,7 @@ class MarketPanel(QWidget):
         if self.worker is not None and self.worker.isRunning():
             return
         self.refresh_button.setEnabled(False)
-        self.status.setText("Fetching live public market data…")
+        self.status.setText("Получение публичных рыночных данных…")
         self.worker = MarketWorker(self.api_url, self.symbol.currentText(), self.interval.currentText())
         self.worker.loaded.connect(self.on_loaded)
         self.worker.failed.connect(self.on_failed)
@@ -151,4 +151,4 @@ class MarketPanel(QWidget):
         )
 
     def on_failed(self, message: str):
-        self.status.setText(f"Market data unavailable: {message}")
+        self.status.setText(f"Рыночные данные недоступны: {message}")
