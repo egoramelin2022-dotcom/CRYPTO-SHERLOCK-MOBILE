@@ -1,3 +1,4 @@
+import pytest
 from scripts.download_binance_spot_klines import (
     archive_url,
     months_between,
@@ -59,3 +60,15 @@ def test_rejects_close_time_that_is_not_an_exact_interval_boundary():
         assert "15m close_time mismatch" in str(exc)
     else:
         raise AssertionError("invalid close_time must fail")
+
+@pytest.mark.parametrize(
+    "interval,step",
+    [("15m", 900_000), ("4h", 14_400_000), ("1d", 86_400_000)],
+)
+def test_archive_timestamp_normalization_for_all_supported_intervals(interval, step):
+    open_ms = 1_735_689_600_000
+    assert normalize_kline_times(
+        str(open_ms * 1000),
+        str((open_ms + step - 1) * 1000),
+        interval,
+    ) == (open_ms, open_ms + step - 1)
