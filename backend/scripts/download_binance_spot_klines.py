@@ -37,11 +37,34 @@ def months_between(start_year: int, start_month: int, end_year: int, end_month: 
 
 
 def normalize_timestamp(value: str) -> int:
-    """Normalize Binance Spot milliseconds or microseconds to milliseconds."""
+    """Normalize Binance Spot millisecond or microsecond epoch timestamps."""
     timestamp = int(value)
+    if timestamp < 0:
+        raise ValueError("timestamp must be nonnegative")
     if timestamp >= 100_000_000_000_000:
         timestamp //= 1_000
+    elif timestamp < 100_000_000_000:
+        raise ValueError(f"unsupported Binance timestamp precision: {value!r}")
     return timestamp
+
+
+def normalize_kline_times(open_value: str, close_value: str, interval: str) -> tuple[int, int]:
+    """Normalize timestamps and canonicalize an exact exclusive close boundary."""
+    from app.market_data.intervals import interval_to_ms
+
+    open_time = normalize_timestamp(open_value)
+    close_time = normalize_timestamp(close_value)
+    expected_close = open_time + interval_to_ms(interval) - 1
+    # Internal storage uses the final millisecond (inclusive close).
+    # Accept an archive that encodes the exact interval end as exclusive.
+    if close_time == expected_close + 1:
+        close_time = expected_close
+    if close_time != expected_close:
+        raise ValueError(
+            f"{interval} close_time mismatch: open={open_time}, close={close_time}, "
+            f"expected inclusive close={expected_close}, delta={close_time - open_time}ms"
+        )
+    return open_time, close_time
 
 
 def parse_checksum(text: str) -> str:
@@ -104,22 +127,29 @@ def iter_archive_candles(archive: Path, symbol: str, interval: str) -> Iterator[
                     continue
                 if len(row) != COLUMNS:
                     raise ValueError(f"{archive.name}:{line_number}: expected 12 columns, got {len(row)}")
+                open_time, close_time = normalize_kline_times(row[0], row[6], interval)
                 candle = Candle(
                     symbol=symbol,
                     interval=interval,
-                    open_time=normalize_timestamp(row[0]),
+                    open_time=open_time,
                     open=float(row[1]),
                     high=float(row[2]),
                     low=float(row[3]),
                     close=float(row[4]),
                     volume=float(row[5]),
-                    close_time=normalize_timestamp(row[6]),
+                    close_time=close_time,
                     quote_volume=float(row[7]),
                     trade_count=int(row[8]),
                     taker_buy_base=float(row[9]),
                     taker_buy_quote=float(row[10]),
                 )
-                candle.validate()
+                try:
+                    candle.validate()
+                except ValueError as exc:
+                    raise ValueError(
+                        f"{archive.name}:{line_number}: invalid {interval} candle "
+                        f"(open_time={open_time}, close_time={close_time}): {exc}"
+                    ) from exc
                 yield candle
 
 
