@@ -214,7 +214,7 @@ def test_walk_forward_panel_renders_out_of_sample_baselines():
     assert "WALK-FORWARD" in rendered
     assert "evaluated folds: 4" in rendered
     assert panel.robustness_button is not None
-    assert panel.robustness_button.text() == "RUN ROBUSTNESS AUDIT"
+    assert panel.robustness_button.text() == "ПРОВЕРИТЬ УСТОЙЧИВОСТЬ"
     calls = []
     panel.run_research = lambda endpoint_override=None: calls.append(endpoint_override)
     panel.robustness_button.click()
