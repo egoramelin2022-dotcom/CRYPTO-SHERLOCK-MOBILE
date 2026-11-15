@@ -583,9 +583,9 @@ def run_multitimeframe_pattern_research(
             for key, rows in series.items()
         }
         result["data_freshness"] = {
-            "is_stale": any(item["is_stale"] for item in freshness_by_interval.values()),
-            "age_hours": max(item["age_hours"] for item in freshness_by_interval.values()),
-            "stale_after_hours": min(item["stale_after_hours"] for item in freshness_by_interval.values()),
+            "is_stale": freshness_by_interval["15m"]["is_stale"],
+            "age_hours": freshness_by_interval["15m"]["age_hours"],
+            "stale_after_hours": freshness_by_interval["15m"]["stale_after_hours"],
             "as_of_utc": datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc).isoformat(),
             "timeframes": freshness_by_interval,
         }
