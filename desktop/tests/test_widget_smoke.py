@@ -103,14 +103,20 @@ def test_multitimeframe_pattern_panel_renders_per_timeframe_analog_scores():
             "candidates_examined": 1200,
             "candidates_rejected_for_data": 12,
             "candidates_rejected_for_overlap": 40,
+            "query_charts": {
+                "15m": [100.0, 101.0, 102.0],
+                "1h": [100.0, 100.5, 101.0],
+                "4h": [100.0, 99.5, 101.0],
+                "1d": [100.0, 102.0, 101.0],
+            },
             "analogs": [{
                 "similarity": 0.82,
                 "decision_time": 123456000,
                 "timeframe_scores": {
-                    "15m": {"similarity": 0.80, "distance": 0.25},
-                    "1h": {"similarity": 0.81, "distance": 0.23},
-                    "4h": {"similarity": 0.83, "distance": 0.20},
-                    "1d": {"similarity": 0.84, "distance": 0.19},
+                    "15m": {"similarity": 0.80, "distance": 0.25, "candidate_normalized_close": [100.0, 100.8, 101.2]},
+                    "1h": {"similarity": 0.81, "distance": 0.23, "candidate_normalized_close": [100.0, 100.4, 101.1]},
+                    "4h": {"similarity": 0.83, "distance": 0.20, "candidate_normalized_close": [100.0, 99.8, 100.9]},
+                    "1d": {"similarity": 0.84, "distance": 0.19, "candidate_normalized_close": [100.0, 101.5, 101.0]},
                 },
                 "forward_outcomes": {"outcomes": [{
                     "horizon": 16,
@@ -127,6 +133,8 @@ def test_multitimeframe_pattern_panel_renders_per_timeframe_analog_scores():
     assert "combined similarity 0.8200" in rendered
     assert "15m: 0.8000" in rendered
     assert "LONG net +1.20%" in rendered
+    assert set(panel.mtf_plots) == {"15m", "1h", "4h", "1d"}
+    assert len(panel.mtf_plots["15m"].listDataItems()) == 2
     panel.close()
     app.processEvents()
 
