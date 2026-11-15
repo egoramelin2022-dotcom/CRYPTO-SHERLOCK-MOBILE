@@ -115,7 +115,7 @@ def test_query_rejects_a_gap_in_the_15m_window():
 
 def test_query_rejects_a_gap_in_a_higher_timeframe_window():
     data = fixture()
-    del data["4h"][180]
+    del data["4h"][170]
     with pytest.raises(ValueError, match="closed 4h query window"):
         search_multitimeframe_analogs(
             data,
