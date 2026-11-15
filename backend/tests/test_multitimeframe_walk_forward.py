@@ -47,7 +47,7 @@ def test_mtf_walk_forward_is_chronological_cost_aware_and_compares_baselines():
             top_k=3, candidate_stride=8, horizons_15m=(4, 16),
             fee_bps_per_side=5.0, slippage_bps_per_side=2.0,
         ),
-        min_training_candles=500,
+        min_training_candles=1200,
         max_folds=4,
         candidate_budget=500,
     )
@@ -76,7 +76,7 @@ def test_mtf_walk_forward_rejects_insufficient_independent_folds():
         run_multitimeframe_walk_forward(
             data,
             config=MultiTimeframeSearchConfig(horizons_15m=(4, 16)),
-            min_training_candles=500,
+            min_training_candles=1200,
         )
 
 
@@ -85,5 +85,5 @@ def test_mtf_walk_forward_validates_fold_controls():
         run_multitimeframe_walk_forward(
             fixture(), max_folds=1,
             config=MultiTimeframeSearchConfig(horizons_15m=(4, 16)),
-            min_training_candles=500,
+            min_training_candles=1200,
         )
