@@ -73,7 +73,7 @@ class DownloadPanel(QWidget):
             return
         answer = QMessageBox.question(
             self, "Подтверждение загрузки архивов",
-            f"Загрузить архивы Binance Spot BTCUSDT 15m / 4h / 1d за период с {start} по {end}?\\n\\n"
+            f"Загрузить архивы Binance Spot BTCUSDT 15m / 4h / 1d за период с {start} по {end}?\n\n"
             "Файлы и свечи будут записаны только во временное хранилище. "
             "Потребуется дополнительное место на диске; операция может занять продолжительное время.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -101,7 +101,7 @@ class DownloadPanel(QWidget):
         answer = QMessageBox.question(
             self, "Подтверждение синхронизации",
             "Получить полностью закрытые свечи BTCUSDT 15m, 4h и 1d за текущий месяц "
-            "из публичного Binance Spot API?\\n\\n"
+            "из публичного Binance Spot API?\n\n"
             "Обновится только временная база. Исходная база останется без изменений.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
