@@ -52,6 +52,7 @@ class TimeframeSimilarity:
     candidate_window_start_time: int
     distance: float
     similarity: float
+    candidate_normalized_close: tuple[float, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +71,11 @@ class MultiTimeframeAnalog:
             "decision_time": self.decision_time,
             "similarity": self.similarity,
             "timeframe_scores": {
-                key: asdict(value) for key, value in self.timeframe_scores.items()
+                key: {
+                    **asdict(value),
+                    "candidate_normalized_close": list(value.candidate_normalized_close),
+                }
+                for key, value in self.timeframe_scores.items()
             },
             "forward_outcomes": self.forward_outcomes,
         }
@@ -84,6 +89,7 @@ class MultiTimeframeSearchResult:
     query_end_time_15m: int
     window_lengths: dict[str, int]
     timeframe_weights: dict[str, float]
+    query_charts: dict[str, tuple[float, ...]]
     candidates_examined: int
     candidates_rejected_for_data: int
     candidates_rejected_for_overlap: int
@@ -101,6 +107,9 @@ class MultiTimeframeSearchResult:
             "query_end_time_15m": self.query_end_time_15m,
             "window_lengths": self.window_lengths,
             "timeframe_weights": self.timeframe_weights,
+            "query_charts": {
+                key: list(values) for key, values in self.query_charts.items()
+            },
             "candidates_examined": self.candidates_examined,
             "candidates_rejected_for_data": self.candidates_rejected_for_data,
             "candidates_rejected_for_overlap": self.candidates_rejected_for_overlap,
@@ -318,13 +327,19 @@ def search_multitimeframe_analogs(
     query_decision_time = first_15m[query_end].close_time
     query_windows: dict[str, tuple[int, int]] = {}
     query_features: dict[str, list[tuple[float, ...]]] = {}
+    query_charts: dict[str, tuple[float, ...]] = {}
     for interval in required:
         window = _closed_window(series[interval], close_times[interval], query_decision_time, lengths[interval])
         if window is None:
             raise ValueError(f"insufficient or discontinuous closed {interval} query window")
         query_windows[interval] = window
         start, end = window
-        query_features[interval] = _window_features(series[interval][start:end + 1])
+        query_segment = series[interval][start:end + 1]
+        query_features[interval] = _window_features(query_segment)
+        query_base = query_segment[0].close
+        query_charts[interval] = tuple(
+            candle.close / query_base * 100.0 for candle in query_segment
+        )
 
     max_horizon = max(config.horizons_15m)
     embargo = max_horizon if config.embargo_15m is None else max(config.embargo_15m, max_horizon)
@@ -362,6 +377,10 @@ def search_multitimeframe_analogs(
                 candidate_window_start_time=series[interval][start].open_time,
                 distance=distance,
                 similarity=similarity,
+                candidate_normalized_close=tuple(
+                    candle.close / series[interval][start].close * 100.0
+                    for candle in series[interval][start:end + 1]
+                ),
             )
             if interval != "15m":
                 context_signature.append(end)
@@ -421,6 +440,7 @@ def search_multitimeframe_analogs(
         query_end_time_15m=first_15m[query_end].close_time,
         window_lengths=lengths,
         timeframe_weights=weights,
+        query_charts=query_charts,
         candidates_examined=examined,
         candidates_rejected_for_data=rejected_data,
         candidates_rejected_for_overlap=rejected_overlap,
