@@ -500,7 +500,38 @@ def search_multitimeframe_window_sweep(
             query_end_index_15m=query_end_index_15m,
             config=run_config,
         )
-        reports.append(result.to_dict())
+        report = result.to_dict()
+        outcome_rows: dict[int, dict[str, list[float]]] = {}
+        for analog in report["analogs"]:
+            for outcome in analog["forward_outcomes"].get("outcomes", []):
+                if outcome is None:
+                    continue
+                bucket = outcome_rows.setdefault(
+                    int(outcome["horizon"]),
+                    {"long": [], "short": [], "long_mae": [], "short_mae": []},
+                )
+                bucket["long"].append(float(outcome["long_net_return"]))
+                bucket["short"].append(float(outcome["short_net_return"]))
+                bucket["long_mae"].append(float(outcome["long_mae"]))
+                bucket["short_mae"].append(float(outcome["short_mae"]))
+        report["historical_outcome_summary"] = {
+            str(horizon): {
+                "independent_analog_count": len(values["long"]),
+                "median_long_net_return": statistics.median(values["long"]),
+                "median_short_net_return": statistics.median(values["short"]),
+                "historical_long_positive_fraction": (
+                    sum(value > 0 for value in values["long"]) / len(values["long"])
+                ),
+                "historical_short_positive_fraction": (
+                    sum(value > 0 for value in values["short"]) / len(values["short"])
+                ),
+                "median_long_mae": statistics.median(values["long_mae"]),
+                "median_short_mae": statistics.median(values["short_mae"]),
+                "interpretation": "descriptive historical sample fraction, not a forecast probability",
+            }
+            for horizon, values in sorted(outcome_rows.items())
+        }
+        reports.append(report)
     return {
         "engine": "multitimeframe_pattern_intelligence",
         "engine_version": "0.1.0",
