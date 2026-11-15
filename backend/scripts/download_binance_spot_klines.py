@@ -196,9 +196,22 @@ def ingest_month(
     return inserted, "ok"
 
 
+def _parse_month(value: str, field_name: str) -> tuple[int, int]:
+    if (
+        not isinstance(value, str) or len(value) != 7
+        or value[4] != "-" or not value[:4].isdigit()
+        or not value[5:].isdigit()
+    ):
+        raise ValueError(f"{field_name} must use exact YYYY-MM format")
+    year, month = int(value[:4]), int(value[5:])
+    if year < 2017 or not 1 <= month <= 12:
+        raise ValueError(f"{field_name} is outside supported Binance Spot archive range")
+    return year, month
+
+
 def run(start: str, end: str, raw_dir: Path, db_path: Path, progress_callback: Callable[[str], None] | None = None) -> int:
-    start_year, start_month = map(int, start.split("-"))
-    end_year, end_month = map(int, end.split("-"))
+    start_year, start_month = _parse_month(start, "start month")
+    end_year, end_month = _parse_month(end, "end month")
     if (start_year, start_month) > (end_year, end_month):
         raise ValueError("start month must not be after end month")
     db_path.parent.mkdir(parents=True, exist_ok=True)
