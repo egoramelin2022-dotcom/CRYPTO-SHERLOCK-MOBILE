@@ -21,6 +21,7 @@ from app.research.multitimeframe_detector import (
 )
 from app.research.multitimeframe_pattern_intelligence import (
     MultiTimeframeSearchConfig, search_multitimeframe_analogs,
+    search_multitimeframe_window_sweep,
 )
 from app.research.evidence_adapters import pattern_search_evidence, stumpy_matches_evidence
 from app.research.ensemble import build_evidence_report
@@ -330,6 +331,8 @@ def run_intelligence_core_research(
         "min_analogs": min_analogs,
         "candidate_budget": candidate_budget,
         "candidate_stride": candidate_stride,
+        "adaptive_window_sweep": adaptive_window_sweep,
+        "sweep_window_lengths": list(sweep_window_lengths) if adaptive_window_sweep else [],
         "horizons": [1, 4, 16, 32, 64],
         "fee_bps_per_side": fee_bps_per_side,
         "slippage_bps_per_side": slippage_bps_per_side,
@@ -456,6 +459,8 @@ def run_multitimeframe_pattern_research(
     window_1d: int = 5,
     fee_bps_per_side: float = 5.0,
     slippage_bps_per_side: float = 2.0,
+    adaptive_window_sweep: bool = False,
+    sweep_window_lengths: tuple[int, ...] = (16, 24, 32, 48, 64),
 ) -> dict[str, Any]:
     """Search full local history for causal 15m/1h/4h/1d shape analogues."""
     if isinstance(query_window_15m, bool) or not isinstance(query_window_15m, int) or not 8 <= query_window_15m <= 500:
@@ -464,8 +469,10 @@ def run_multitimeframe_pattern_research(
         raise ValueError("top_k must be an integer in [1, 100]")
     if isinstance(candidate_budget, bool) or not isinstance(candidate_budget, int) or not 100 <= candidate_budget <= 5000:
         raise ValueError("candidate_budget must be an integer in [100, 5000]")
+    if not isinstance(adaptive_window_sweep, bool):
+        raise ValueError("adaptive_window_sweep must be a boolean")
 
-    series: dict[str, list[Candle]] = {}
+    series: dict[str, list[Candle]] = {};
     data_sources: dict[str, list[str]] = {}
     limits = {"15m": 400000, "1h": 100000, "4h": 30000, "1d": 10000}
     for interval, limit in limits.items():
@@ -551,6 +558,13 @@ def run_multitimeframe_pattern_research(
             series, query_end_index_15m=query_end_index, config=config
         )
         result = search.to_dict()
+        if adaptive_window_sweep:
+            result["window_sensitivity"] = search_multitimeframe_window_sweep(
+                series,
+                query_end_index_15m=query_end_index,
+                window_lengths_15m=sweep_window_lengths,
+                config=config,
+            )
         result.update({
             "run_id": run_id,
             "query_selection": query_selection,
