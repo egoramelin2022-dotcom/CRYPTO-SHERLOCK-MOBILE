@@ -165,6 +165,11 @@ def test_window_sweep_compares_predeclared_scales_without_declaring_a_winner():
     assert report["selection_policy"].startswith("No single window")
     assert [item["window_lengths"]["15m"] for item in report["scale_reports"]] == [16, 24, 32]
     assert all(set(item["query_charts"]) == {"15m", "1h", "4h", "1d"} for item in report["scale_reports"])
+    for item in report["scale_reports"]:
+        assert "16" in item["historical_outcome_summary"]
+        summary = item["historical_outcome_summary"]["16"]
+        assert summary["independent_analog_count"] >= 1
+        assert "not a forecast probability" in summary["interpretation"]
 
 
 def test_window_sweep_rejects_duplicate_or_invalid_scales():
