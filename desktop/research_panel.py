@@ -398,6 +398,12 @@ class ResearchPanel(QWidget):
                 f"rejected for data: {result.get('candidates_rejected_for_data', 0):,} · "
                 f"de-duplicated: {result.get('candidates_rejected_for_overlap', 0):,}",
                 f"Historical analogues returned: {len(result.get('analogs', []))}",
+                "History loaded: " + " · ".join(
+                    f"{key} {value:,}" for key, value in (result.get("history_candles") or {}).items()
+                ),
+                "Gaps: " + " · ".join(
+                    f"{key} {value}" for key, value in (result.get("history_gaps") or {}).items()
+                ),
                 "Similarity is a shape-distance transform, not a probability.",
                 "Forward outcomes use next 15M open, horizon close, fees and slippage.",
             ])
@@ -578,9 +584,9 @@ class ResearchPanel(QWidget):
                     f"volatility {portfolio['volatility_per_fold']:.2%} · "
                     f"positive {portfolio['positive_fold_rate']:.0%}"
                 )
-        if "history_candles" in result and result.get("query_selection") is not None:
+        if "history_candles" in result and result.get("query_selection") is not None and result.get("engine") != "multitimeframe_pattern_intelligence":
             query_label = (
-                "Historical sample" if result.get("query_selection") == "historical_open_time"
+                "Historical sample" if result.get("query_selection") in ("historical_open_time", "historical_15m_open_time")
                 else "Latest closed sample"
             )
             summary.extend([
@@ -611,7 +617,7 @@ class ResearchPanel(QWidget):
                 assumptions.get("short_side", ""),
             ])
         analogs = result.get("analogs", [])
-        if analogs:
+        if analogs and result.get("engine") != "multitimeframe_pattern_intelligence":
             summary.append(f"\nTOP HISTORICAL ANALOGS · {len(analogs)}")
             for index, item in enumerate(analogs, start=1):
                 analog = item.get("analog", {})
