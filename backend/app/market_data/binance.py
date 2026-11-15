@@ -21,7 +21,13 @@ def parse_binance_kline(row: list | tuple, *, symbol: str, interval: str) -> Can
         raw_close_time = int(row[6])
         # Binance Spot public archives use microseconds from 2025-01-01.
         # Normalize both timestamp fields together before validation.
-        divisor = 1_000 if raw_open_time >= 100_000_000_000_000 else 1
+        open_is_microseconds = raw_open_time >= 100_000_000_000_000
+        close_is_microseconds = raw_close_time >= 100_000_000_000_000
+        if open_is_microseconds != close_is_microseconds:
+            raise ValueError("open_time and close_time use different timestamp precisions")
+        divisor = 1_000 if open_is_microseconds else 1
+        if divisor == 1_000 and (raw_open_time % divisor or raw_close_time % divisor):
+            raise ValueError("microsecond timestamps must represent exact millisecond boundaries")
         open_time = raw_open_time // divisor
         close_time = raw_close_time // divisor
         expected_close = open_time + interval_to_ms(interval) - 1
