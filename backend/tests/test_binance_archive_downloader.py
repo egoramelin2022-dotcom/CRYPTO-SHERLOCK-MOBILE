@@ -104,3 +104,20 @@ def test_archive_parser_rejects_mixed_timestamp_precision():
 def test_archive_parser_rejects_submillisecond_microsecond_timestamps():
     with pytest.raises(ValueError, match="exact millisecond boundaries"):
         normalize_kline_times("1502942400000001", "1502943299999000", "15m")
+
+
+@pytest.mark.parametrize(
+    "start,end",
+    [("2017-00", "2017-08"), ("2017-13", "2018-01"), ("2017/08", "2017-09"),
+     ("2016-12", "2017-08"), ("2017-08", "2017-8")],
+)
+def test_archive_run_rejects_invalid_month_ranges_before_creating_database(
+    tmp_path, start, end
+):
+    import sqlite3
+    from scripts.download_binance_spot_klines import run
+
+    target = tmp_path / "should_not_exist.db"
+    with pytest.raises(ValueError):
+        run(start, end, tmp_path / "raw", target)
+    assert not target.exists()
