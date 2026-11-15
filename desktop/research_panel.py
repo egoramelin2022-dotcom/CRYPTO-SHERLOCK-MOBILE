@@ -442,6 +442,13 @@ class ResearchPanel(QWidget):
                         f"{len(scale.get('analogs', []))} analogues · "
                         f"{scale.get('candidates_examined', 0):,} candidates examined"
                     )
+                    for horizon, metrics in (scale.get("historical_outcome_summary") or {}).items():
+                        summary.append(
+                            f"      +{horizon} x15M · "
+                            f"median LONG {metrics.get('median_long_net_return', 0):+.2%} · "
+                            f"median SHORT {metrics.get('median_short_net_return', 0):+.2%} · "
+                            f"sample n={metrics.get('independent_analog_count', 0)}"
+                        )
             for interval, freshness_row in (result.get("data_freshness") or {}).get("timeframes", {}).items():
                 freshness_label = "STALE" if freshness_row.get("is_stale") else "fresh"
                 summary.append(
