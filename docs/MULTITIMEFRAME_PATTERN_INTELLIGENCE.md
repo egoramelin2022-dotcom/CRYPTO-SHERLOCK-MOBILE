@@ -63,13 +63,13 @@ Parameters:
 - `query_end_time` (optional exact 15m candle open time in UTC milliseconds for historical replay)
 - `fee_bps_per_side` and `slippage_bps_per_side`
 
-The endpoint queues a background job. Read its result from `GET /v1/research/jobs/{job_id}`. The result includes normalized query and candidate close paths for all four timeframes; the Windows desktop panel renders them in separate 15m, 1h, 4h and 1d comparison tabs.
+The endpoint queues a background job. Read its result from `GET /v1/research/jobs/{job_id}`. The result includes normalized query and candidate close paths for all four timeframes; the Windows desktop panel renders them in separate 15m, 1h, 4h and 1d comparison tabs. Enable `adaptive_window_sweep=true` to compare five predeclared window scales in the same reproducible run.
 
 The service loads only locally configured market databases using the existing read-only loader. Each timeframe gets its own canonical candle fingerprint; those fingerprints are combined into the input fingerprint stored in the existing append-only Experiment Ledger. The source market databases are not modified.
 
 ## Current limitations
 
-- v0.1.0 supports fixed window lengths per timeframe; automatic multi-window selection is a subsequent phase.
+- Fixed windows remain available. Optional window-scale sensitivity tests 15M lengths 16, 24, 32, 48 and 64 with proportionally scaled 1H/4H/1D windows. It reports each scale independently and deliberately does not select a flattering in-sample winner.
 - Feature weights and timeframe weights are explicit starting values, not optimized.
 - This version ranks analogues and reports their historical outcomes. It does not calibrate probabilities or issue LONG/SHORT/SIDEWAYS forecasts.
 - A historical analogue count is not an independent sample count unless overlap and shared market context have been addressed; this implementation de-duplicates exact higher-timeframe contexts and overlapping candidate/outcome ranges, but later validation must still account for serial dependence.
