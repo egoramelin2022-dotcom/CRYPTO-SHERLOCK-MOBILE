@@ -190,7 +190,10 @@ def _is_contiguous(candles: Sequence[Candle], start: int, end: int) -> bool:
     if end - start < 1:
         return True
     step = interval_to_ms(candles[0].interval)
-    return candles[end].open_time - candles[start].open_time == (end - start) * step
+    return all(
+        candles[index].open_time - candles[index - 1].open_time == step
+        for index in range(start + 1, end + 1)
+    )
 
 
 def _closed_window(
