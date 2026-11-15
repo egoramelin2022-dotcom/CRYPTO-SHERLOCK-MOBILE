@@ -81,6 +81,10 @@ def test_search_returns_ranked_multitimeframe_analogs_with_costed_outcomes():
         for item in result.analogs
     )
     assert result.to_dict()["causality"]["closed_candles_only"] is True
+    rendered = result.to_dict()
+    assert set(rendered["query_charts"]) == {"15m", "1h", "4h", "1d"}
+    for analog in rendered["analogs"]:
+        assert len(analog["timeframe_scores"]["15m"]["candidate_normalized_close"]) == 32
 
 
 def test_higher_timeframe_windows_never_use_unclosed_candles():
