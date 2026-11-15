@@ -20,13 +20,14 @@ def test_desktop_panels_construct_without_backend_or_network():
         ResearchPanel("http://127.0.0.1:1", "/v1/research/core", "core"),
         ExperimentLedgerPanel("http://127.0.0.1:1"),
         ResearchPanel("http://127.0.0.1:1", "/v1/research/multitimeframe", "mtf"),
+        ResearchPanel("http://127.0.0.1:1", "/v1/research/multitimeframe-patterns", "mtf_pattern"),
         ResearchPanel("http://127.0.0.1:1", "/v1/research/ensemble", "ensemble"),
         ResearchPanel("http://127.0.0.1:1", "/v1/research/walk-forward", "walk_forward"),
         PaperPanel("http://127.0.0.1:1"),
         DownloadPanel("http://127.0.0.1:1"),
         SystemPanel("http://127.0.0.1:1"),
     ]
-    assert len(widgets) == 10
+    assert len(widgets) == 11
     assert not widgets[0].auto_refresh.isActive()  # Market feed is idle until its page is opened.
     for widget in widgets:
         widget.close()
@@ -79,6 +80,78 @@ def test_research_panel_formats_stage_scores_and_forward_outcomes():
     assert "Fees: 5.0 bps/side" in rendered
     assert "Slippage: 2.0 bps/side" in rendered
     assert "LONG net +1.00%" in rendered
+    panel.close()
+    app.processEvents()
+
+
+
+
+def test_multitimeframe_pattern_panel_renders_per_timeframe_analog_scores():
+    app = QApplication.instance() or QApplication([])
+    panel = ResearchPanel(
+        "http://127.0.0.1:1",
+        "/v1/research/multitimeframe-patterns",
+        "mtf_pattern",
+    )
+    panel.on_completed({
+        "kind": "multitimeframe_pattern_intelligence",
+        "updated_at": "test",
+        "result": {
+            "engine": "multitimeframe_pattern_intelligence",
+            "engine_version": "0.1.0",
+            "query_decision_time": 123456789,
+            "candidates_examined": 1200,
+            "candidates_rejected_for_data": 12,
+            "candidates_rejected_for_overlap": 40,
+            "query_charts": {
+                "15m": [100.0, 101.0, 102.0],
+                "1h": [100.0, 100.5, 101.0],
+                "4h": [100.0, 99.5, 101.0],
+                "1d": [100.0, 102.0, 101.0],
+            },
+            "window_sensitivity": {
+                "window_lengths_15m_tested": [16, 24],
+                "scale_reports": [{
+                    "window_lengths": {"15m": 16},
+                    "candidates_examined": 100,
+                    "analogs": [{}],
+                    "historical_outcome_summary": {
+                        "16": {
+                            "median_long_net_return": 0.01,
+                            "median_short_net_return": -0.01,
+                            "independent_analog_count": 7,
+                        }
+                    },
+                }],
+            },
+            "analogs": [{
+                "similarity": 0.82,
+                "decision_time": 123456000,
+                "timeframe_scores": {
+                    "15m": {"similarity": 0.80, "distance": 0.25, "candidate_normalized_close": [100.0, 100.8, 101.2]},
+                    "1h": {"similarity": 0.81, "distance": 0.23, "candidate_normalized_close": [100.0, 100.4, 101.1]},
+                    "4h": {"similarity": 0.83, "distance": 0.20, "candidate_normalized_close": [100.0, 99.8, 100.9]},
+                    "1d": {"similarity": 0.84, "distance": 0.19, "candidate_normalized_close": [100.0, 101.5, 101.0]},
+                },
+                "forward_outcomes": {"outcomes": [{
+                    "horizon": 16,
+                    "long_net_return": 0.012,
+                    "short_net_return": -0.018,
+                    "long_mae": -0.025,
+                }]},
+            }],
+        },
+    })
+    rendered = panel.output.toPlainText()
+    assert "MULTI-TIMEFRAME PATTERN INTELLIGENCE" in rendered
+    assert "Closed higher-timeframe bars only" in rendered
+    assert "combined similarity 0.8200" in rendered
+    assert "15m: 0.8000" in rendered
+    assert "LONG net +1.20%" in rendered
+    assert "WINDOW-SCALE SENSITIVITY" in rendered
+    assert "median LONG +1.00%" in rendered
+    assert set(panel.mtf_plots) == {"15m", "1h", "4h", "1d"}
+    assert len(panel.mtf_plots["15m"].listDataItems()) == 2
     panel.close()
     app.processEvents()
 

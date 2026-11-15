@@ -10,7 +10,7 @@ import pyqtgraph as pg
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QSpinBox, QTextEdit, QVBoxLayout, QWidget,
+    QSpinBox, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
 
@@ -96,6 +96,30 @@ class ResearchPanel(QWidget):
         self.top_k.setRange(1, 100)
         self.top_k.setValue(10)
         form.addRow("Top historical analogs", self.top_k)
+        self.mtf_1h_window = QSpinBox()
+        self.mtf_1h_window.setRange(2, 500)
+        self.mtf_1h_window.setValue(16)
+        self.mtf_4h_window = QSpinBox()
+        self.mtf_4h_window.setRange(2, 500)
+        self.mtf_4h_window.setValue(8)
+        self.mtf_1d_window = QSpinBox()
+        self.mtf_1d_window.setRange(2, 500)
+        self.mtf_1d_window.setValue(5)
+        self.mtf_candidate_budget = QSpinBox()
+        self.mtf_candidate_budget.setRange(100, 5000)
+        self.mtf_candidate_budget.setValue(2000)
+        self.mtf_adaptive = QCheckBox("Compare multiple scales (16, 24, 32, 48, 64)")
+        self.mtf_adaptive.setChecked(False)
+        self.mtf_adaptive.setToolTip(
+            "Runs five independent searches with proportionally scaled 15m/1h/4h/1d windows. "
+            "Reports sensitivity; it does not cherry-pick a single winner."
+        )
+        if kind == "mtf_pattern":
+            form.addRow("Window-scale sensitivity", self.mtf_adaptive)
+            form.addRow("1H comparison window", self.mtf_1h_window)
+            form.addRow("4H comparison window", self.mtf_4h_window)
+            form.addRow("1D comparison window", self.mtf_1d_window)
+            form.addRow("Candidate search budget", self.mtf_candidate_budget)
         self.core_min_analogs = QSpinBox()
         self.core_min_analogs.setRange(1, 100)
         self.core_min_analogs.setValue(5)
@@ -157,6 +181,27 @@ class ResearchPanel(QWidget):
             self.adaptive_min.setEnabled(False)
             self.adaptive_max.setEnabled(False)
             self.adaptive_step.setEnabled(False)
+        elif kind == "mtf_pattern":
+            for control in (self.interval, self.mode):
+                control.hide()
+                label = form.labelForField(control)
+                if label is not None:
+                    label.hide()
+            self.window.setRange(8, 500)
+            self.window.setValue(32)
+            label = form.labelForField(self.window)
+            if label is not None:
+                label.setText("Query window (15M candles)")
+            label = form.labelForField(self.query_start)
+            if label is not None:
+                label.setText("Historical decision candle (UTC)")
+            self.query_start.setPlaceholderText("Optional · YYYY-MM-DD HH:MM UTC")
+            for control in (self.adaptive, self.adaptive_min, self.adaptive_max, self.adaptive_step):
+                control.hide()
+                label = form.labelForField(control)
+                if label is not None:
+                    label.hide()
+            self.top_k.setValue(30)
         elif kind == "ensemble":
             self.query_start.setEnabled(False)
             self.adaptive.setEnabled(False)
@@ -184,6 +229,7 @@ class ResearchPanel(QWidget):
         self.status.setObjectName("muted")
         root.addWidget(self.status)
         self.plot = None
+        self.mtf_plots = {}
         if kind == "pattern":
             self.plot = pg.PlotWidget()
             self.plot.setBackground("#111B23")
@@ -194,6 +240,20 @@ class ResearchPanel(QWidget):
             self.plot.getAxis("bottom").setTextPen("#82939F")
             self.plot.setMinimumHeight(260)
             root.addWidget(self.plot, 1)
+        elif kind == "mtf_pattern":
+            self.mtf_tabs = QTabWidget()
+            for interval in ("15m", "1h", "4h", "1d"):
+                chart = pg.PlotWidget()
+                chart.setBackground("#111B23")
+                chart.showGrid(x=True, y=True, alpha=0.15)
+                chart.setLabel("left", "Normalized close (start = 100)")
+                chart.setLabel("bottom", "Candle offset")
+                chart.getAxis("left").setTextPen("#82939F")
+                chart.getAxis("bottom").setTextPen("#82939F")
+                chart.setMinimumHeight(220)
+                self.mtf_plots[interval] = chart
+                self.mtf_tabs.addTab(chart, interval)
+            root.addWidget(self.mtf_tabs, 1)
         self.output = QTextEdit()
         self.output.setReadOnly(True)
         self.output.setPlaceholderText("Verified research results will appear here.")
@@ -267,6 +327,26 @@ class ResearchPanel(QWidget):
                 except ValueError:
                     self.status.setText("Invalid sample time · use YYYY-MM-DD HH:MM UTC")
                     return
+        elif self.kind == "mtf_pattern":
+            params.update({
+                "query_window_15m": self.window.value(),
+                "window_1h": self.mtf_1h_window.value(),
+                "window_4h": self.mtf_4h_window.value(),
+                "window_1d": self.mtf_1d_window.value(),
+                "top_k": self.top_k.value(),
+                "candidate_budget": self.mtf_candidate_budget.value(),
+                "adaptive_window_sweep": self.mtf_adaptive.isChecked(),
+            })
+            selected_time = self.query_start.text().strip()
+            if selected_time:
+                try:
+                    parsed = datetime.fromisoformat(selected_time.replace("Z", "+00:00"))
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=timezone.utc)
+                    params["query_end_time"] = int(parsed.astimezone(timezone.utc).timestamp() * 1000)
+                except ValueError:
+                    self.status.setText("Invalid decision candle time · use YYYY-MM-DD HH:MM UTC")
+                    return
         elif self.kind == "ensemble":
             params.update({
                 "interval": self.interval.currentText(),
@@ -332,6 +412,68 @@ class ResearchPanel(QWidget):
                 summary.append(f"CONFLICT · +{conflict['horizon']} · {conflict['current_regime']} vs {conflict['historical_analogue_side']}")
             summary.append("REQUIRED NEXT CHECKS")
             summary.extend("  • " + item for item in result.get("required_next_checks", []))
+        if result.get("engine") == "multitimeframe_pattern_intelligence":
+            summary.extend([
+                "\\nMULTI-TIMEFRAME PATTERN INTELLIGENCE · v" + str(result.get("engine_version")),
+                f"Decision time (UTC ms): {result.get('query_decision_time')}",
+                "Closed higher-timeframe bars only · 15M / 1H / 4H / 1D",
+                f"Candidates examined: {result.get('candidates_examined', 0):,} · "
+                f"rejected for data: {result.get('candidates_rejected_for_data', 0):,} · "
+                f"de-duplicated: {result.get('candidates_rejected_for_overlap', 0):,}",
+                f"Historical analogues returned: {len(result.get('analogs', []))}",
+                "History loaded: " + " · ".join(
+                    f"{key} {value:,}" for key, value in (result.get("history_candles") or {}).items()
+                ),
+                "Gaps: " + " · ".join(
+                    f"{key} {value}" for key, value in (result.get("history_gaps") or {}).items()
+                ),
+                "Similarity is a shape-distance transform, not a probability.",
+                "Forward outcomes use next 15M open, horizon close, fees and slippage.",
+            ])
+            sweep = result.get("window_sensitivity")
+            if sweep:
+                summary.extend([
+                    "WINDOW-SCALE SENSITIVITY · no automatic winner",
+                    "Tested 15M lengths: " + ", ".join(map(str, sweep.get("window_lengths_15m_tested", []))),
+                ])
+                for scale in sweep.get("scale_reports", []):
+                    summary.append(
+                        f"  {scale.get('window_lengths', {}).get('15m')} candles · "
+                        f"{len(scale.get('analogs', []))} analogues · "
+                        f"{scale.get('candidates_examined', 0):,} candidates examined"
+                    )
+                    for horizon, metrics in (scale.get("historical_outcome_summary") or {}).items():
+                        summary.append(
+                            f"      +{horizon} x15M · "
+                            f"median LONG {metrics.get('median_long_net_return', 0):+.2%} · "
+                            f"median SHORT {metrics.get('median_short_net_return', 0):+.2%} · "
+                            f"sample n={metrics.get('independent_analog_count', 0)}"
+                        )
+            for interval, freshness_row in (result.get("data_freshness") or {}).get("timeframes", {}).items():
+                freshness_label = "STALE" if freshness_row.get("is_stale") else "fresh"
+                summary.append(
+                    f"  {interval} data: {freshness_label} · "
+                    f"age {freshness_row.get('age_hours', 0):.2f}h · "
+                    f"threshold {freshness_row.get('stale_after_hours', 0):.2f}h"
+                )
+            for rank, analog in enumerate(result.get("analogs", []), start=1):
+                summary.append(
+                    f"  #{rank} · combined similarity {analog.get('similarity', 0):.4f} · "
+                    f"decision {analog.get('decision_time')}"
+                )
+                for interval, score in analog.get("timeframe_scores", {}).items():
+                    summary.append(
+                        f"      {interval}: {score.get('similarity', 0):.4f} · "
+                        f"distance {score.get('distance', 0):.4f}"
+                    )
+                for outcome in (analog.get("forward_outcomes") or {}).get("outcomes", []):
+                    if outcome:
+                        summary.append(
+                            f"      +{outcome['horizon']} x15M · "
+                            f"LONG net {outcome['long_net_return']:+.2%} · "
+                            f"SHORT net {outcome['short_net_return']:+.2%} · "
+                            f"LONG MAE {outcome['long_mae']:+.2%}"
+                        )
         if result.get("adaptive_search"):
             summary.append("\nADAPTIVE WINDOW SEARCH · INDEPENDENT RANKINGS")
             summary.append(result.get("adaptive_comparison_note", ""))
@@ -484,9 +626,9 @@ class ResearchPanel(QWidget):
                     f"volatility {portfolio['volatility_per_fold']:.2%} · "
                     f"positive {portfolio['positive_fold_rate']:.0%}"
                 )
-        if "history_candles" in result and result.get("query_selection") is not None:
+        if "history_candles" in result and result.get("query_selection") is not None and result.get("engine") != "multitimeframe_pattern_intelligence":
             query_label = (
-                "Historical sample" if result.get("query_selection") == "historical_open_time"
+                "Historical sample" if result.get("query_selection") in ("historical_open_time", "historical_15m_open_time")
                 else "Latest closed sample"
             )
             summary.extend([
@@ -517,7 +659,7 @@ class ResearchPanel(QWidget):
                 assumptions.get("short_side", ""),
             ])
         analogs = result.get("analogs", [])
-        if analogs:
+        if analogs and result.get("engine") != "multitimeframe_pattern_intelligence":
             summary.append(f"\nTOP HISTORICAL ANALOGS · {len(analogs)}")
             for index, item in enumerate(analogs, start=1):
                 analog = item.get("analog", {})
@@ -577,6 +719,31 @@ class ResearchPanel(QWidget):
                     name=f"Analog {index + 1} · {similarity:.3f}",
                 )
             self.plot.setTitle("Selected pattern sample vs top historical analogs")
+        if self.mtf_plots and result.get("engine") == "multitimeframe_pattern_intelligence":
+            palette = ["#8CA4B5", "#A7B8C4", "#6F8798", "#C0CDD5", "#718B9C"]
+            query_charts = result.get("query_charts") or {}
+            analogs = result.get("analogs", [])
+            for interval, chart in self.mtf_plots.items():
+                chart.clear()
+                chart.addLegend()
+                query = query_charts.get(interval, [])
+                if query:
+                    chart.plot(
+                        list(range(len(query))), query,
+                        pen=pg.mkPen("#56D6B1", width=2.6),
+                        name="Current query",
+                    )
+                for index, analog in enumerate(analogs[:5]):
+                    score = (analog.get("timeframe_scores") or {}).get(interval, {})
+                    values = score.get("candidate_normalized_close", [])
+                    if not values:
+                        continue
+                    chart.plot(
+                        list(range(len(values))), values,
+                        pen=pg.mkPen(palette[index % len(palette)], width=1.2),
+                        name=f"Analog {index + 1} · {score.get('similarity', 0):.3f}",
+                    )
+                chart.setTitle(f"{interval} · current structure vs historical analogues")
 
     def on_failed(self, message: str):
         self.status.setText("Research job failed")

@@ -340,6 +340,89 @@ def test_intelligence_core_endpoint_rejects_impossible_sample_and_costs():
 
 
 
+
+def test_multitimeframe_pattern_endpoint_queues_causal_search(monkeypatch):
+    import app.main as main
+
+    queued = {
+        "job_id": "mtf-pattern-job",
+        "kind": "multitimeframe_pattern_intelligence",
+        "status": "queued",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+        "result": None,
+        "error": None,
+    }
+    captured = {}
+    monkeypatch.setattr(
+        main.research_jobs, "_new_job",
+        lambda kind: SimpleNamespace(job_id=queued["job_id"]),
+    )
+    monkeypatch.setattr(main.research_jobs, "get_job", lambda job_id: queued)
+    monkeypatch.setattr(
+        main, "_run_desktop_research_job",
+        lambda job_id, function, kwargs: captured.update(
+            job_id=job_id, function=function, kwargs=kwargs
+        ),
+    )
+    response = client.post(
+        "/v1/research/multitimeframe-patterns",
+        params={
+            "query_window_15m": 48,
+            "window_1h": 20,
+            "window_4h": 10,
+            "window_1d": 6,
+            "candidate_budget": 1200,
+            "top_k": 25,
+        },
+    )
+    assert response.status_code == 202
+    assert response.json()["kind"] == "multitimeframe_pattern_intelligence"
+    assert captured["function"] is main.desktop_services.run_multitimeframe_pattern_research
+    assert captured["kwargs"]["query_window_15m"] == 48
+    assert captured["kwargs"]["window_1h"] == 20
+    assert captured["kwargs"]["window_4h"] == 10
+    assert captured["kwargs"]["window_1d"] == 6
+    assert captured["kwargs"]["candidate_budget"] == 1200
+    assert captured["kwargs"]["adaptive_window_sweep"] is False
+
+
+def test_multitimeframe_pattern_endpoint_can_enable_window_sensitivity(monkeypatch):
+    import app.main as main
+
+    captured = {}
+    queued = {"job_id": "mtf-adaptive-job", "kind": "multitimeframe_pattern_intelligence"}
+    monkeypatch.setattr(
+        main.research_jobs, "_new_job",
+        lambda kind: SimpleNamespace(job_id=queued["job_id"]),
+    )
+    monkeypatch.setattr(main.research_jobs, "get_job", lambda job_id: queued)
+    monkeypatch.setattr(
+        main, "_run_desktop_research_job",
+        lambda job_id, function, kwargs: captured.update(kwargs),
+    )
+    response = client.post(
+        "/v1/research/multitimeframe-patterns",
+        params={"adaptive_window_sweep": "true"},
+    )
+    assert response.status_code == 202
+    assert captured["adaptive_window_sweep"] is True
+
+
+def test_multitimeframe_pattern_endpoint_rejects_invalid_windows_and_costs():
+    invalid_window = client.post(
+        "/v1/research/multitimeframe-patterns",
+        params={"query_window_15m": 4},
+    )
+    assert invalid_window.status_code == 422
+
+    invalid_costs = client.post(
+        "/v1/research/multitimeframe-patterns",
+        params={"fee_bps_per_side": 6000, "slippage_bps_per_side": 5000},
+    )
+    assert invalid_costs.status_code == 422
+
+
 def test_experiment_ledger_api_lists_details_and_integrity(tmp_path, monkeypatch):
     source = tmp_path / "source.db"
     sqlite3.connect(source).close()
