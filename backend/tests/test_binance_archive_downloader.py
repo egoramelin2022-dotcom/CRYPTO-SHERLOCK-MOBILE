@@ -72,3 +72,25 @@ def test_archive_timestamp_normalization_for_all_supported_intervals(interval, s
         str((open_ms + step - 1) * 1000),
         interval,
     ) == (open_ms, open_ms + step - 1)
+
+
+def test_run_fails_instead_of_reporting_complete_when_requested_archive_is_missing(
+    tmp_path, monkeypatch
+):
+    import sqlite3
+    import scripts.download_binance_spot_klines as downloader
+    from app.market_data.repository import CandleRepository
+
+    monkeypatch.setattr(downloader, "INTERVALS", ("15m",))
+    monkeypatch.setattr(
+        downloader,
+        "ingest_month",
+        lambda symbol, interval, year, month, raw_dir, repository: (0, "missing"),
+    )
+    messages = []
+    with pytest.raises(RuntimeError, match="Archive download is incomplete"):
+        downloader.run(
+            "2017-08", "2017-08", tmp_path / "raw", tmp_path / "staging.db",
+            progress_callback=messages.append,
+        )
+    assert any("15m 2017-08: missing" in message for message in messages)
