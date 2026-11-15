@@ -15,7 +15,7 @@ import math
 import statistics
 from typing import Mapping, Sequence
 
-from app.market_data.candles import Candle, find_gaps
+from app.market_data.candles import Candle
 from app.market_data.intervals import interval_to_ms
 from app.research.outcome_evaluation import evaluate_forward_path
 
@@ -219,8 +219,6 @@ def _window_features(candles: Sequence[Candle]) -> list[tuple[float, ...]]:
     volumes = [max(item.volume, 1e-12) for item in candles]
     median_volume = max(statistics.median(volumes), 1e-12)
     result: list[tuple[float, ...]] = []
-    rolling_high: list[float] = []
-    rolling_low: list[float] = []
     for index, candle in enumerate(candles):
         span = max(candle.high - candle.low, candle.open * 1e-12)
         body_return = (candle.close - candle.open) / candle.open
