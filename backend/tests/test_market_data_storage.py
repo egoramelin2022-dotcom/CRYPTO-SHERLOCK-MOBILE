@@ -69,3 +69,22 @@ def test_repository_rejects_duplicate_keys_in_one_batch():
         repo.insert_many([candle, candle])
     assert repo.count("BTCUSDT", "15m") == 0
     conn.close()
+
+
+def test_repository_rejects_conflicting_existing_candle_instead_of_silently_ignoring():
+    conn = sqlite3.connect(":memory:")
+    repo = CandleRepository(conn)
+    repo.ensure_schema()
+    original = parse_binance_kline(valid_row(), symbol="BTCUSDT", interval="15m")
+    changed_row = valid_row()
+    changed_row[4] = "106"
+    changed = parse_binance_kline(changed_row, symbol="BTCUSDT", interval="15m")
+    assert repo.insert_many([original]) == 1
+    with pytest.raises(ValueError, match="conflicting candle already exists"):
+        repo.insert_many([changed])
+    assert repo.count("BTCUSDT", "15m") == 1
+    stored = conn.execute(
+        "SELECT close FROM candles WHERE symbol='BTCUSDT' AND interval='15m' AND open_time=0"
+    ).fetchone()[0]
+    assert stored == 105.0
+    conn.close()
