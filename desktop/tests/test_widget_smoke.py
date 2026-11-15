@@ -160,8 +160,8 @@ def test_multitimeframe_pattern_panel_renders_per_timeframe_analog_scores():
 def test_download_panel_exposes_separate_archive_and_recent_sync_actions():
     app = QApplication.instance() or QApplication([])
     panel = DownloadPanel("http://127.0.0.1:1")
-    assert panel.run_button.text() == "DOWNLOAD ARCHIVES TO STAGING"
-    assert panel.sync_button.text() == "SYNC CURRENT MONTH"
+    assert panel.run_button.text() == "ЗАГРУЗИТЬ АРХИВЫ ВО ВРЕМЕННОЕ ХРАНИЛИЩЕ"
+    assert panel.sync_button.text() == "СИНХРОНИЗИРОВАТЬ ТЕКУЩИЙ МЕСЯЦ"
     panel.close()
     app.processEvents()
 
