@@ -10,7 +10,7 @@ import pyqtgraph as pg
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QSpinBox, QTextEdit, QVBoxLayout, QWidget,
+    QSpinBox, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
 
@@ -222,6 +222,7 @@ class ResearchPanel(QWidget):
         self.status.setObjectName("muted")
         root.addWidget(self.status)
         self.plot = None
+        self.mtf_plots = {}
         if kind == "pattern":
             self.plot = pg.PlotWidget()
             self.plot.setBackground("#111B23")
@@ -232,6 +233,20 @@ class ResearchPanel(QWidget):
             self.plot.getAxis("bottom").setTextPen("#82939F")
             self.plot.setMinimumHeight(260)
             root.addWidget(self.plot, 1)
+        elif kind == "mtf_pattern":
+            self.mtf_tabs = QTabWidget()
+            for interval in ("15m", "1h", "4h", "1d"):
+                chart = pg.PlotWidget()
+                chart.setBackground("#111B23")
+                chart.showGrid(x=True, y=True, alpha=0.15)
+                chart.setLabel("left", "Normalized close (start = 100)")
+                chart.setLabel("bottom", "Candle offset")
+                chart.getAxis("left").setTextPen("#82939F")
+                chart.getAxis("bottom").setTextPen("#82939F")
+                chart.setMinimumHeight(220)
+                self.mtf_plots[interval] = chart
+                self.mtf_tabs.addTab(chart, interval)
+            root.addWidget(self.mtf_tabs, 1)
         self.output = QTextEdit()
         self.output.setReadOnly(True)
         self.output.setPlaceholderText("Verified research results will appear here.")
@@ -677,6 +692,31 @@ class ResearchPanel(QWidget):
                     name=f"Analog {index + 1} · {similarity:.3f}",
                 )
             self.plot.setTitle("Selected pattern sample vs top historical analogs")
+        if self.mtf_plots and result.get("engine") == "multitimeframe_pattern_intelligence":
+            palette = ["#8CA4B5", "#A7B8C4", "#6F8798", "#C0CDD5", "#718B9C"]
+            query_charts = result.get("query_charts") or {}
+            analogs = result.get("analogs", [])
+            for interval, chart in self.mtf_plots.items():
+                chart.clear()
+                chart.addLegend()
+                query = query_charts.get(interval, [])
+                if query:
+                    chart.plot(
+                        list(range(len(query))), query,
+                        pen=pg.mkPen("#56D6B1", width=2.6),
+                        name="Current query",
+                    )
+                for index, analog in enumerate(analogs[:5]):
+                    score = (analog.get("timeframe_scores") or {}).get(interval, {})
+                    values = score.get("candidate_normalized_close", [])
+                    if not values:
+                        continue
+                    chart.plot(
+                        list(range(len(values))), values,
+                        pen=pg.mkPen(palette[index % len(palette)], width=1.2),
+                        name=f"Analog {index + 1} · {score.get('similarity', 0):.3f}",
+                    )
+                chart.setTitle(f"{interval} · current structure vs historical analogues")
 
     def on_failed(self, message: str):
         self.status.setText("Research job failed")
