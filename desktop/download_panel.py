@@ -1,4 +1,4 @@
-"""Explicitly confirmed Binance historical archive staging controls."""
+"""Интерфейс загрузки и проверки архивов Binance Spot в staging-базу."""
 from __future__ import annotations
 
 import json
@@ -22,29 +22,30 @@ class DownloadPanel(QWidget):
             datetime.now(timezone.utc).replace(day=1) - timedelta(days=1)
         ).strftime("%Y-%m")
         self.end = QLineEdit(latest_complete_month)
-        form.addRow("First month (YYYY-MM)", self.start)
-        form.addRow("Last month (YYYY-MM)", self.end)
+        form.addRow("Первый месяц (ГГГГ-ММ)", self.start)
+        form.addRow("Последний месяц (ГГГГ-ММ)", self.end)
         root.addLayout(form)
         actions = QHBoxLayout()
-        self.run_button = QPushButton("DOWNLOAD ARCHIVES TO STAGING")
+        self.run_button = QPushButton("ЗАГРУЗИТЬ АРХИВЫ ВО ВРЕМЕННОЕ ХРАНИЛИЩЕ")
         self.run_button.clicked.connect(self.start_download)
-        self.sync_button = QPushButton("SYNC CURRENT MONTH")
+        self.sync_button = QPushButton("СИНХРОНИЗИРОВАТЬ ТЕКУЩИЙ МЕСЯЦ")
         self.sync_button.clicked.connect(self.start_current_month_sync)
         actions.addWidget(self.run_button)
         actions.addWidget(self.sync_button)
         actions.addStretch(1)
         root.addLayout(actions)
-        self.status = QLabel("No archive download started")
+        self.status = QLabel("Загрузка архивов ещё не запускалась")
         self.status.setObjectName("muted")
         root.addWidget(self.status)
         self.output = QTextEdit()
         self.output.setReadOnly(True)
-        self.output.setPlaceholderText("Archive verification and import results will appear here.")
+        self.output.setPlaceholderText("Здесь появятся результаты загрузки, проверки и импорта.")
         root.addWidget(self.output, 1)
         note = QLabel(
-            "Downloads official Binance Spot monthly ZIP archives and verifies SHA256. "
-            "SYNC CURRENT MONTH fetches only fully closed 15m / 4h / 1d candles from the public REST API. "
-            "Both operations write to a separate staging database; the source market database is never modified."
+            "Загружаются официальные месячные архивы Binance Spot с проверкой SHA256. "
+            "Синхронизация текущего месяца получает только полностью закрытые свечи BTCUSDT "
+            "15m / 4h / 1d через публичный API. Обе операции записывают данные только "
+            "в отдельную временную базу (staging). Исходная база рынка не изменяется."
         )
         note.setObjectName("muted")
         note.setWordWrap(True)
@@ -55,16 +56,17 @@ class DownloadPanel(QWidget):
             return
         start, end = self.start.text().strip(), self.end.text().strip()
         import re
-        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", start) or not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", end):
-            QMessageBox.warning(self, "Invalid date", "Use YYYY-MM, for example 2017-08.")
+        if not re.fullmatch(r"\\d{4}-(0[1-9]|1[0-2])", start) or not re.fullmatch(r"\\d{4}-(0[1-9]|1[0-2])", end):
+            QMessageBox.warning(self, "Неверный формат даты", "Укажите месяц в формате ГГГГ-ММ, например 2017-08.")
             return
         if tuple(map(int, start.split("-"))) > tuple(map(int, end.split("-"))):
-            QMessageBox.warning(self, "Invalid range", "Start month must not be after end month.")
+            QMessageBox.warning(self, "Неверный период", "Начальный месяц не может быть позже конечного.")
             return
         answer = QMessageBox.question(
-            self, "Confirm archive download",
-            f"Download Binance Spot BTCUSDT 15m / 4h / 1d archives from {start} through {end}?\n\n"
-            "Files and candles will be written only to the staging area. This may take time and use additional disk space.",
+            self, "Подтверждение загрузки архивов",
+            f"Загрузить архивы Binance Spot BTCUSDT 15m / 4h / 1d за период с {start} по {end}?\\n\\n"
+            "Файлы и свечи будут записаны только во временное хранилище. "
+            "Потребуется дополнительное место на диске; операция может занять продолжительное время.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -73,7 +75,7 @@ class DownloadPanel(QWidget):
         self.run_button.setEnabled(False)
         self.sync_button.setEnabled(False)
         self.output.clear()
-        self.status.setText("Submitting archive download…")
+        self.status.setText("Подготовка загрузки архивов…")
         self.worker = ResearchJobWorker(
             self.api_url, "/v1/data/archive-download",
             {"start": start, "end": end},
@@ -88,10 +90,10 @@ class DownloadPanel(QWidget):
         if self.worker is not None and self.worker.isRunning():
             return
         answer = QMessageBox.question(
-            self, "Confirm current-month sync",
-            "Fetch the current UTC month's fully closed BTCUSDT 15m, 4h and 1d candles "
-            "from public Binance Spot data?\n\n"
-            "Only the staging database will be updated. The source database remains untouched.",
+            self, "Подтверждение синхронизации",
+            "Получить полностью закрытые свечи BTCUSDT 15m, 4h и 1d за текущий месяц "
+            "из публичного Binance Spot API?\\n\\n"
+            "Обновится только временная база. Исходная база останется без изменений.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -100,7 +102,7 @@ class DownloadPanel(QWidget):
         self.run_button.setEnabled(False)
         self.sync_button.setEnabled(False)
         self.output.clear()
-        self.status.setText("Submitting current-month sync…")
+        self.status.setText("Запрос текущих данных…")
         self.worker = ResearchJobWorker(
             self.api_url, "/v1/data/sync-current-month", {"symbol": "BTCUSDT"}
         )
@@ -115,9 +117,9 @@ class DownloadPanel(QWidget):
         self.sync_button.setEnabled(True)
 
     def on_completed(self, job: dict):
-        self.status.setText(f"{job.get('kind', 'Data job')} completed")
+        self.status.setText(f"Задача «{job.get('kind', 'Загрузка данных')}» завершена")
         self.output.setPlainText(json.dumps(job.get("result") or {}, ensure_ascii=False, indent=2))
 
     def on_failed(self, message: str):
-        self.status.setText("Data operation failed")
+        self.status.setText("Ошибка операции с данными")
         self.output.setPlainText(message)
